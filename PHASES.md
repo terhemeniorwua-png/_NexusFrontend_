@@ -761,13 +761,26 @@ ASSIGNED → IN_PROGRESS → SUBMITTED → UNDER_REVIEW → APPROVED
 - Lint, build, and tests pass.
 
 ### Completion Status
-`NOT_STARTED`
+`BLOCKED`
 
 ### Notes and Blockers
+- **BLOCKED — prerequisite phases incomplete.** Phase 6 requires Phase 5 to be complete. As of 2026-10-23, Phases 1–5 are all `NOT_STARTED`. The repository contains only the default Next.js bootstrap files — no design system, no UI components, no routing structure, no authentication layer, no workspace/team/project context. Phase 6 cannot begin until the full dependency chain (Phases 0 → 1 → 2 → 3 → 4 → 5) is completed.
 - **BLOCKED** on confirmed status transition matrix from backend before Kanban logic is finalized.
-- Drag-and-drop library must be installed (approved by team) before this phase begins.
+- **BLOCKED** on all Phase 6 backend API contracts — all 11 contracts listed above are unconfirmed. `PATCH /tasks/:id/status` is specifically required before Kanban implementation.
+- Drag-and-drop library not yet decided or installed. Must be approved by the team and confirmed in Phase 0/1 before this phase begins. Candidate: `@dnd-kit/core`.
+- No test framework installed (`npm test` script does not exist). Required before Phase 6 tests can be written. Must be configured in Phase 1.
 - Subtask and dependency features depend on backend support; implement as shells if backend not ready.
 - Attachment upload must respect the backend's file-size and file-type restrictions. Do not implement client-side bypasses.
+- **Required unblocking steps (in order):**
+  1. Complete Phase 0 remaining tasks (`.env.example`, lint/build baseline, conventions, library decisions).
+  2. Complete Phase 1 (design system, UI components, form library, test framework).
+  3. Complete Phase 2 (routing structure, app shell).
+  4. Complete Phase 3 (authentication, `lib/api.ts`, session management). Requires backend auth contract.
+  5. Complete Phase 4 (workspaces, teams, members, `providers/WorkspaceProvider.tsx`). Requires backend workspace APIs.
+  6. Complete Phase 5 (projects, project pages, `services/projects.ts`). Requires backend project APIs.
+  7. Confirm all Phase 6 backend API contracts with backend team.
+  8. Select and approve drag-and-drop library.
+  9. Implement Phase 6.
 
 ---
 

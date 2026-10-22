@@ -313,3 +313,179 @@ A feature is complete only when:
 - Any missing backend functionality or external configuration is documented.
 
 Build Nexus incrementally. Prioritize reliable core workflows before advanced AI automation and complex real-time features.
+
+## Git Workflow and Phase Delivery Rules
+
+These rules are mandatory whenever implementing a phase, feature, bug fix, or other substantial task in this repository.
+
+### 1. Create a Dedicated Branch for Every Phase
+
+Before implementing a phase:
+
+1. Inspect the current Git branch, working tree, configured remotes, and existing changes.
+2. Read `PHASES.md` and identify the phase being implemented.
+3. Create a dedicated feature branch for that phase from the appropriate base branch.
+4. Use the repository's established branch naming convention. If none exists, use:
+
+   `feature/phase-<number>-<short-description>`
+
+   Example: `feature/phase-5-workspace-membership`
+
+5. Keep all commits for that phase on its dedicated branch.
+6. Do not implement phase work directly on `main`, `master`, or another protected base branch.
+
+Use one branch per phase, not one branch per implementation chunk.
+
+If the current branch already contains phase work, inspect it before creating another branch. Reuse the appropriate existing phase branch when continuing the same phase.
+
+### 2. Protect Existing User Changes
+
+Before switching branches or modifying files:
+
+- Run `git status` and inspect existing changes.
+- Never discard, overwrite, reset, or commit unrelated user changes without authorization.
+- Do not use destructive commands such as `git reset --hard`, `git clean -fd`, or forced branch replacement to make the working tree clean.
+- Preserve existing application functionality, configuration, and documentation.
+- Never commit `.env`, `.env.local`, credentials, API keys, private certificates, or other secrets.
+- If uncommitted changes make branch creation unsafe, stop and explain the issue before proceeding.
+
+### 3. Implement the Phase in Logical Chunks
+
+Read `PHASES.md`, the relevant `SKILL.md` files, and the applicable project instructions before implementation.
+
+Break the current phase into small, meaningful, independently verifiable chunks based on its actual requirements.
+
+For each chunk:
+
+1. Identify the requirement and expected outcome.
+2. Inspect the existing implementation and its dependencies.
+3. Implement the smallest coherent unit of work.
+4. Run the relevant tests or validation checks.
+5. Inspect the Git diff for errors, accidental changes, secrets, and unrelated modifications.
+6. Stage only the files belonging to that chunk.
+7. Create a descriptive commit.
+8. Push the commit to the phase's remote branch.
+9. Verify that the push succeeded.
+10. Record the result before moving to the next chunk.
+
+**Do not wait until the entire phase is complete before committing and pushing.** Push completed and verified chunks incrementally throughout the phase.
+
+Combine very small related changes when appropriate, but keep each commit focused and easy to review.
+
+### 4. Commit Message Convention
+
+Use meaningful commit messages that describe the actual work completed.
+
+Follow this format:
+
+`type(scope): concise description`
+
+Examples:
+
+- `feat(phase-5): implement workspace membership`
+- `feat(phase-5): add role-based authorization`
+- `fix(phase-5): handle invalid membership requests`
+- `test(phase-5): cover workspace permission rules`
+- `docs(phase-5): document membership endpoints`
+- `chore(phase-5): update phase progress tracker`
+
+Choose the commit type according to the actual changes, including `feat`, `fix`, `test`, `refactor`, `docs`, or `chore`.
+
+Do not use vague messages such as `update`, `changes`, `done`, or `phase completed`.
+
+Never create a commit claiming functionality or verification that has not actually been completed.
+
+### 5. Push Every Completed Chunk
+
+After each successful chunk commit, push it to the dedicated phase branch.
+
+For the first push, use the appropriate remote and branch:
+
+`git push -u origin <phase-branch-name>`
+
+For subsequent pushes, use:
+
+`git push`
+
+Adapt these commands to the repository's configured remote and branch names.
+
+After each push:
+
+- Confirm the command succeeded.
+- Record the commit hash and commit message.
+- Record whether the commit is available on the remote branch.
+- Continue to the next chunk only after recording the push result.
+
+If a push fails, investigate the cause and retry safely when possible. Never use `git push --force` to resolve a failure.
+
+If authentication, network access, or remote configuration prevents pushing, retain the local commit when safe, report the blocker, and clearly identify all commits that remain unpushed.
+
+Never claim that work has been pushed when it exists only locally.
+
+### 6. Testing and Verification
+
+Run the relevant checks for each chunk before committing it.
+
+At the end of the phase, run the broader checks applicable to the changes, including tests, linting, type checking, builds, integration tests, and migration validation where relevant.
+
+Use the existing package manager, scripts, and project conventions.
+
+- Do not claim that a test passed unless it was actually executed successfully.
+- Do not hide failed or skipped checks.
+- Do not remove tests, disable validation, or weaken security controls just to obtain a passing result.
+- If a check cannot run because of a missing service or environmental limitation, explain why.
+
+### 7. Maintain the Phase Progress Tracker
+
+Use the existing progress tracker specified in `PHASES.md` or the repository instructions. Do not create a duplicate tracker without a clear reason.
+
+Update it as meaningful work is completed.
+
+Record:
+
+- Current phase and status.
+- Completed implementation chunks.
+- Remaining requirements and acceptance criteria.
+- Tests and verification results.
+- Commit hashes and commit messages.
+- Push status for each relevant commit.
+- Outstanding issues, blockers, and dependencies.
+
+Keep progress information accurate. Do not mark a phase complete while required acceptance criteria remain unmet.
+
+Commit and push tracker changes as a focused chunk when appropriate. Never mark work complete merely to make the tracker appear finished.
+
+### 8. Strict Scope Control
+
+Implement only the phase or task explicitly requested.
+
+- Follow the order and acceptance criteria in `PHASES.md`.
+- Preserve existing completed phases and integrate with them instead of rebuilding them.
+- Do not begin the next phase without explicit authorization.
+- Do not introduce unrelated refactors, dependency upgrades, or features from future phases.
+- If a required dependency is incomplete, implement only the minimum safe integration permitted by the roadmap. Otherwise, document the blocker.
+- If project instructions conflict, follow the most specific applicable instruction and report unresolved conflicts.
+
+### 9. Final Delivery Report
+
+At the end of each phase, report:
+
+1. **Phase summary:** what was implemented and which acceptance criteria were satisfied.
+2. **Branch:** base branch, phase branch name, and remote push status.
+3. **Commits:** every phase commit, in chronological order, with its message, hash, and push status.
+4. **Verification:** tests, linting, type checking, builds, and their actual results.
+5. **Progress tracker:** file updated and current phase status.
+6. **Outstanding issues:** failures, blockers, unpushed commits, and required manual steps.
+7. **Next recommended phase:** identify it from `PHASES.md` without implementing it.
+
+Report whether the working tree is clean. If unrelated pre-existing changes remain, distinguish them from the phase work.
+
+### Mandatory Execution Sequence
+
+For every phase:
+
+**Inspect → create or identify the phase branch → implement a logical chunk → test → review the diff → commit → push → update progress → repeat.**
+
+Before declaring the task complete, verify the final changes and report the actual Git and test status.
+
+These rules apply to every coding agent working in this repository, including OpenCode and Kiro CLI. Each repository must manage its own branches, commits, remotes, and pushes independently.

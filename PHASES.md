@@ -27,7 +27,7 @@
 | Environment file | No `.env` present |
 | Nexus features implemented | **Zero** |
 
-All phases begin at `NOT_STARTED`.
+All phases began at `NOT_STARTED`. Phase 0 is now `IN_PROGRESS`: the repository audit portion is complete (checked tasks below), while its remaining foundation tasks are still outstanding.
 
 ---
 
@@ -41,10 +41,10 @@ Phase 0  →  Phase 1  →  Phase 2  →  Phase 3
                                      Phase 5
                                         ↓
                                      Phase 6
-                                        ↓
-                           Phase 7   Phase 8
                               ↓         ↓
-                           Phase 9  (shared Socket.IO foundation)
+                           Phase 7   Phase 8
+                         (terminal)     ↓
+                                     Phase 9  (shared Socket.IO foundation)
                                         ↓
                                     Phase 10
                                         ↓
@@ -59,7 +59,7 @@ Phase 0  →  Phase 1  →  Phase 2  →  Phase 3
                                     Phase 15
 ```
 
-Phases 7 and 8 can proceed in parallel after Phase 6. Phase 9 depends on both.
+Phases 7 and 8 can proceed in parallel once their own prerequisites are met (Phase 7 requires Phase 5; Phase 8 requires Phases 4 and 6). Phase 9 requires Phases 3, 6, and 8 — it does not depend on Phase 7. Phases 10 and 11 additionally require Phase 9; Phase 11 also depends on Phase 10 when AI-generated insights are surfaced on the dashboard.
 
 ---
 
@@ -117,11 +117,12 @@ Establish a verified understanding of the repository's actual state, resolve env
 - No secrets committed to the repository.
 
 ### Completion Status
-`NOT_STARTED`
+`IN_PROGRESS`
 
 ### Notes and Blockers
 - The root instruction file is `AGENTS.md`, not `agent.md`. All future agents must read `AGENTS.md`.
 - `SKILL.md` is located at `nexus-frontend/SKILL.md`, not the repo root.
+- `SKILL.md` §3 refers to a `src/app` structure. This repository uses `app/` at the repo root; follow the actual structure.
 - A test framework (e.g., Vitest + Testing Library) must be decided and installed before Phase 13. The selection should be confirmed with the team before Phase 1.
 - Backend repository location and documentation are unknown at audit time. This must be resolved before Phase 3.
 
@@ -1186,14 +1187,15 @@ Build meeting entry points, meeting status UIs, and AI-assisted productivity int
 
 ---
 
-## Phase 11 — Search, Activity, and Cross-Feature Integration
+## Phase 11 — Search, Activity, Dashboards, and Cross-Feature Integration
 
 ### Objective
-Build unified search across supported workspace entities (tasks, projects, messages, documents, members), workspace-wide activity feeds, and cross-feature navigation (navigate from a notification to its task, from a message to its linked project, etc.). Ensure consistent global state and data refresh after cross-feature mutations.
+Build unified search across supported workspace entities (tasks, projects, messages, documents, members), workspace-wide activity feeds, the real post-login dashboard with backend-provided analytics and insights (`AGENTS.md` §4.H), and cross-feature navigation (navigate from a notification to its task, from a message to its linked project, etc.). Ensure consistent global state and data refresh after cross-feature mutations.
 
 ### Prerequisites
 - Phases 5, 6, 7, 8, and 9 complete: all major feature services and types exist.
-- Backend search and activity feed APIs confirmed.
+- Phase 10 complete if AI-generated insights are to be surfaced on the dashboard.
+- Backend search, activity feed, and analytics/aggregation APIs confirmed.
 
 ### Implementation Tasks
 
@@ -1218,6 +1220,16 @@ Build unified search across supported workspace entities (tasks, projects, messa
 - [ ] Paginated, load-more activity list.
 - [ ] Activity event icons and formatted descriptions (e.g., "Alice assigned a task to Bob in Project X").
 
+**Dashboard and insights**
+- [ ] `app/(auth)/dashboard/page.tsx` — replace the Phase 2 placeholder with the real post-login dashboard: greeting, current workspace summary, task counts by status, overdue work, upcoming deadlines, and recent activity.
+- [ ] `services/analytics.ts` — `getWorkspaceAnalytics`, `getProjectAnalytics`, defined strictly against confirmed backend aggregation endpoints.
+- [ ] `types/analytics.ts` — `AnalyticsSummary`, `TaskCompletionStat`, `WorkloadStat`, `DeadlineStat`.
+- [ ] Dashboard widget components: task completion, overdue work, upcoming deadlines, team workload, activity trend.
+- [ ] Render only metrics the backend returns. Do not compute authoritative project or task progress on the frontend and do not display fabricated production data (`AGENTS.md` §4.H).
+- [ ] AI-generated insights section fed by the Phase 10 AI service, visually labelled as AI suggestions and linked to the supporting tasks or projects when the response provides them.
+- [ ] Loading skeleton, empty state, and error state with retry for every dashboard widget.
+- [ ] Do not surface workspace analytics to users without access to the underlying workspace data; handle `403` with an access-denied state.
+
 **Cross-feature navigation**
 - [ ] Verify that every navigable notification type opens the correct target page without a 404.
 - [ ] Task cards in Kanban link to task detail.
@@ -1237,13 +1249,16 @@ Build unified search across supported workspace entities (tasks, projects, messa
 - [ ] Component test: search result list keyboard navigation.
 - [ ] Integration test: search query triggers debounced API call with correct params.
 - [ ] Test: clicking a notification for a task navigates to the correct task page.
+- [ ] Component test: dashboard widget renders loading, empty, error, and populated states from mocked analytics data.
 
 ### Frontend Deliverables
 - `services/search.ts`, `types/search.ts`.
 - `services/activity.ts`, `types/activity.ts`.
+- `services/analytics.ts`, `types/analytics.ts`.
 - Full search page with entity-type filtering.
 - Command palette (`Cmd+K`).
 - Workspace and project activity feeds wired to real data.
+- Dashboard page with analytics widgets driven by backend data, plus labelled AI insights.
 - Cross-feature navigation verified.
 - Global state consistency confirmed.
 
@@ -1255,6 +1270,10 @@ Build unified search across supported workspace entities (tasks, projects, messa
 | `GET /workspaces/:id/activity` | Requires confirmation |
 | `GET /projects/:id/activity` (may already exist from Phase 5/6) | Requires confirmation |
 | Activity event schema: actor, verb, resource type, resource ID | Requires confirmation |
+| `GET /workspaces/:id/analytics` or equivalent aggregation endpoint — metric list and response shape | Requires confirmation |
+| `GET /projects/:id/analytics` or equivalent | Requires confirmation |
+| Dashboard metrics: completion, overdue, workload, deadlines, activity trend — confirm which are provided | Requires confirmation |
+| AI insights endpoint (Phase 10 contract) and payload shape | Requires confirmation |
 
 ### Validation and Tests
 - Search returns results across task, project, message, and document entities.
@@ -1263,12 +1282,16 @@ Build unified search across supported workspace entities (tasks, projects, messa
 - Command palette opens with keyboard shortcut and closes with `Escape`.
 - Activity feeds paginate and load older events on scroll.
 - All notification navigation targets resolve without a 404.
+- Dashboard shows backend-provided data only; loading, empty, and error states render correctly.
+- AI insight cards are labelled as suggestions and link to supporting resources.
 - `npm run lint`, `npm run build`, `npm test` pass.
 
 ### Acceptance Criteria
 - Unified search covers all supported entity types.
 - Command palette is accessible and keyboard-navigable.
 - Activity feeds display real data for workspace and project contexts.
+- Dashboard replaces the Phase 2 placeholder and displays only backend-provided metrics.
+- AI-generated insights are clearly labelled and never presented as confirmed application data.
 - Cross-feature navigation is correct for all notification types and activity events.
 - No stale data inconsistencies found in cross-feature mutation scenarios.
 - Lint, build, and tests pass.
@@ -1279,6 +1302,7 @@ Build unified search across supported workspace entities (tasks, projects, messa
 ### Notes and Blockers
 - Global search scope (which entities are indexed) must be confirmed with the backend.
 - If backend does not yet support global search, implement per-entity search within each feature and defer unified search to when the backend is ready.
+- The dashboard must not invent analytics. If the backend aggregation endpoints are unavailable, ship the dashboard with activity feed and real feature links only, and record the analytics widgets as blocked.
 
 ---
 
@@ -1643,16 +1667,21 @@ All backend contracts marked "Requires confirmation" in the phases above should 
 | Phase 4 | `POST /workspaces` | Pending | — |
 | Phase 4 | `GET /workspaces/:id/members` | Pending | — |
 | Phase 4 | Role enum values | Pending | — |
+| Phase 4 | `POST /invitations/:token/accept` | Pending | — |
 | Phase 5 | `GET /workspaces/:id/projects` | Pending | — |
 | Phase 5 | `GET /projects/:id` (progress field) | Pending | — |
 | Phase 6 | `PATCH /tasks/:id/status` (transitions + roles) | Pending | — |
+| Phase 6 | Task attachment upload/download endpoints and file limits | Pending | — |
 | Phase 7 | Document content format | Pending | — |
+| Phase 7 | Real-time collaboration service (Yjs/OT/CRDT), if any | Pending | — |
 | Phase 8 | All messaging endpoints | Pending | — |
 | Phase 9 | Socket.IO gateway URL and auth method | Pending | — |
 | Phase 9 | All socket event names and payloads | Pending | — |
+| Phase 9 | Notification REST endpoints (`GET /notifications`, mark read, read-all) | Pending | — |
 | Phase 10 | Calling SDK provider | Pending | — |
 | Phase 10 | AI endpoint schema | Pending | — |
 | Phase 11 | Global search endpoint | Pending | — |
+| Phase 11 | Analytics/aggregation endpoints for dashboard widgets | Pending | — |
 
 ---
 

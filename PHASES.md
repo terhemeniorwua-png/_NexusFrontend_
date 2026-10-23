@@ -157,13 +157,13 @@ Replace the default Next.js bootstrap styles and establish the Nexus design syst
 ### Implementation Tasks
 
 **Environment and tooling**
-- [ ] Install and configure the agreed form validation library (e.g., Zod or similar; confirm with team first).
-- [ ] Install and configure the agreed test framework (e.g., Vitest + `@testing-library/react`).
-- [ ] Add a `test` script to `package.json`.
-- [ ] Verify `eslint` runs cleanly after tooling changes.
+- [x] Install and configure the agreed form validation library (e.g., Zod or similar; confirm with team first).
+- [x] Install and configure the agreed test framework (e.g., Vitest + `@testing-library/react`).
+- [x] Add a `test` script to `package.json`.
+- [x] Verify `eslint` runs cleanly after tooling changes.
 
 **Design tokens**
-- [ ] Replace `globals.css` default tokens with the Nexus palette using Tailwind CSS 4 `@theme` syntax:
+- [x] Replace `globals.css` default tokens with the Nexus palette using Tailwind CSS 4 `@theme` syntax:
   - Background: `#F8FAFC`
   - Surface: `#FFFFFF`
   - Secondary surface: `#F1F5F9`
@@ -173,40 +173,40 @@ Replace the default Next.js bootstrap styles and establish the Nexus design syst
   - Primary action: `#2563EB`
   - Success: `#059669`
   - Error: `#DC2626`
-- [ ] Define consistent spacing scale, type scale, border radii, and box-shadow tokens.
-- [ ] Add a Geist Sans font configuration that maps to the Nexus body typeface.
-- [ ] Verify reduced-motion media query handling is respected in all animation utilities.
+- [x] Define consistent spacing scale, type scale, border radii, and box-shadow tokens.
+- [x] Add a Geist Sans font configuration that maps to the Nexus body typeface.
+- [x] Verify reduced-motion media query handling is respected in all animation utilities.
 
 **Base layout and structure**
-- [ ] Create `app/layout.tsx` as the Nexus root layout (replacing the default title/description metadata).
-- [ ] Confirm `@/*` path alias resolves correctly.
-- [ ] Create `components/` folder with an `index.ts` barrel where appropriate.
+- [x] Create `app/layout.tsx` as the Nexus root layout (replacing the default title/description metadata).
+- [x] Confirm `@/*` path alias resolves correctly.
+- [x] Create `components/` folder with an `index.ts` barrel where appropriate.
 
 **Core UI components** (all must be accessible, keyboard-navigable, and responsive)
-- [ ] `Button` — variants: primary, secondary, ghost, destructive; sizes: sm, md, lg; loading and disabled states.
-- [ ] `Input` — text, email, password, search; label association; error state; helper text.
-- [ ] `Textarea` — label association; resize behavior; error state.
-- [ ] `Select` / `Dropdown` — accessible single-select; keyboard navigation.
-- [ ] `Checkbox` and `Radio` — accessible, styled.
-- [ ] `Badge` — status colors mapped to task states and notification types.
-- [ ] `Avatar` — image with fallback initials; size variants.
-- [ ] `Card` — surface container with optional header, body, footer.
-- [ ] `Modal` / `Dialog` — focus trap, `Escape` to close, backdrop, accessible title.
-- [ ] `Tooltip` — accessible, keyboard-triggerable.
-- [ ] `Spinner` / `Skeleton` — loading states for lists, cards, and page regions.
-- [ ] `EmptyState` — icon, title, description, and optional action slot.
-- [ ] `ErrorMessage` / `Alert` — inline field errors and page-level alerts (info, success, warning, error).
-- [ ] `ConfirmDialog` — reusable destructive-action confirmation (not `window.alert()`).
-- [ ] `Tabs` — accessible tab panel.
-- [ ] `Breadcrumb` — accessible navigation landmark.
+- [x] `Button` — variants: primary, secondary, ghost, destructive; sizes: sm, md, lg; loading and disabled states.
+- [x] `Input` — text, email, password, search; label association; error state; helper text.
+- [x] `Textarea` — label association; resize behavior; error state.
+- [x] `Select` / `Dropdown` — accessible single-select; keyboard navigation.
+- [x] `Checkbox` and `Radio` — accessible, styled.
+- [x] `Badge` — status colors mapped to task states and notification types.
+- [x] `Avatar` — image with fallback initials; size variants.
+- [x] `Card` — surface container with optional header, body, footer.
+- [x] `Modal` / `Dialog` — focus trap, `Escape` to close, backdrop, accessible title.
+- [x] `Tooltip` — accessible, keyboard-triggerable.
+- [x] `Spinner` / `Skeleton` — loading states for lists, cards, and page regions.
+- [x] `EmptyState` — icon, title, description, and optional action slot.
+- [x] `ErrorMessage` / `Alert` — inline field errors and page-level alerts (info, success, warning, error).
+- [x] `ConfirmDialog` — reusable destructive-action confirmation (not `window.alert()`).
+- [x] `Tabs` — accessible tab panel.
+- [x] `Breadcrumb` — accessible navigation landmark.
 
 **Type definitions**
-- [ ] Create `types/ui.ts` with shared prop types (variants, sizes, color roles).
-- [ ] Create `types/api.ts` with generic API response envelope types (`ApiResponse<T>`, `PaginatedResponse<T>`, `ApiError`).
+- [x] Create `types/ui.ts` with shared prop types (variants, sizes, color roles).
+- [x] Create `types/api.ts` with generic API response envelope types (`ApiResponse<T>`, `PaginatedResponse<T>`, `ApiError`).
 
 **Tests**
-- [ ] Unit tests for `Button`, `Input`, `Modal`, `ConfirmDialog`, and `EmptyState`.
-- [ ] Confirm test runner executes with `npm test`.
+- [x] Unit tests for `Button`, `Input`, `Modal`, `ConfirmDialog`, and `EmptyState`.
+- [x] Confirm test runner executes with `npm test`.
 
 ### Frontend Deliverables
 - Updated `globals.css` with Nexus design tokens.
@@ -233,12 +233,31 @@ None. This phase is entirely frontend infrastructure.
 - No default Next.js boilerplate styles remain in active use.
 
 ### Completion Status
-`NOT_STARTED`
+`COMPLETE`
+
+### Completion Record (Phase 1)
+
+| Deliverable | Status | Commit |
+|---|---|---|
+| Zod, Vitest, Testing Library installed; `test`/`test:watch` scripts added | ✅ Done | `68f6ee8` |
+| `globals.css` replaced with Nexus design tokens (`@theme` syntax) | ✅ Done | `8c7d869` |
+| `app/layout.tsx` updated with Nexus metadata | ✅ Done | `8c7d869` |
+| `tsconfig.json` excludes vitest configs from Next.js TS build | ✅ Done | `8c7d869` |
+| `types/ui.ts` and `types/api.ts` created | ✅ Done | `dd4bb28` |
+| Button, Input, Textarea, Checkbox, RadioGroup, Select | ✅ Done | `465e21b` |
+| Badge, Avatar, Card, Spinner, Skeleton, EmptyState | ✅ Done | `c4b2910` |
+| Modal, ConfirmDialog, Tooltip, Alert, ErrorMessage | ✅ Done | `35e154b` |
+| Tabs, Breadcrumb | ✅ Done | `d499e5d` |
+| 46 tests passing — Button (11), Input (8), Modal (9), ConfirmDialog (10), EmptyState (8) | ✅ Done | `2099886` |
+| `types/jest-dom.d.ts` for build compatibility | ✅ Done | `2099886` |
+
+**Verification:** `npm run lint` ✅ · `npm run build` ✅ · `npm test` 46/46 ✅
 
 ### Notes and Blockers
-- The specific form validation and test libraries must be agreed in Phase 0 before this phase starts.
-- A decision on light/dark mode support should be made before implementing the design token layer, since adding dark mode later requires retrofitting all components.
-- Do not use `window.alert()` or `window.confirm()` anywhere in the application. Use `ConfirmDialog` instead.
+- Form validation: Zod installed. Test framework: Vitest + Testing Library configured.
+- Light/dark mode: not implemented in this phase. Token layer uses light palette only. Retrofitting for dark mode is a future decision.
+- `window.alert()` and `window.confirm()` are not used anywhere — `ConfirmDialog` handles all destructive confirmations.
+- `components/` barrel index not created — components are imported directly. Add when the number of exports justifies it.
 
 ---
 

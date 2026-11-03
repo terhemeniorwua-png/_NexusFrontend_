@@ -30,14 +30,19 @@ export default function AppHomePage() {
         }
         if (active) setUser(result.user);
       } catch (cause) {
-        if (active) setError(cause instanceof ApiRequestError ? cause.message : 'Your session could not be verified.');
+        if (active && cause instanceof ApiRequestError && cause.status === 401) {
+          setError('Your session has expired. Redirecting to sign in…');
+          router.replace('/sign-in');
+        } else if (active) {
+          setError(cause instanceof ApiRequestError ? cause.message : 'Your session could not be verified.');
+        }
       } finally {
         if (active) setLoading(false);
       }
     }
     void loadSession();
     return () => { active = false; };
-  }, []);
+  }, [router]);
 
   async function handleSignOut() {
     try {

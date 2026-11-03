@@ -178,7 +178,7 @@ Last verified: 2026-11-03, on branch `feature/frontend-authentication`.
 
 Status meanings: **Not Started**, **In Progress**, **Blocked**, **Completed**. A phase is only marked **Completed** when its functional requirements, integrations, and validation requirements have been verified.
 
-Phases 0, 1, and 2 are complete. Phase 3 is in progress on `feature/frontend-authentication`; the backend auth contract has now been confirmed and connected through a same-origin Next.js proxy. Phase completion still depends on approved legal copy and exact paid-plan pricing/allowances. OAuth is omitted because the backend has no OAuth route.
+Phases 0, 1, and 2 are complete. Phase 3 is in progress on `feature/frontend-authentication`; the backend auth contract has been confirmed and connected through a same-origin Next.js proxy. Phase completion still depends on approved legal copy, exact paid-plan prices and seat allowances, and an approved subscription API contract. OAuth is omitted because the backend has no OAuth route or provider contract.
 
 ---
 
@@ -497,17 +497,35 @@ Implement the public-facing pages and authentication experience.
 
 Verified on 2026-11-03 against the frontend implementation and `../__NexusBackend__/docs/openapi.yaml`, `src/modules/auth/auth.routes.ts`, `src/modules/auth/auth.controller.ts`, and `src/modules/auth/auth.schemas.ts`.
 
+#### Phase 3 task status
+
+| Requirement | Status | Verification or dependency |
+|---|---|---|
+| Public landing page, product overview, and feature sections | Implemented; build verified, visual behavior not fully verified | Responsive classes are present; viewport-by-viewport browser review remains outstanding |
+| Pricing page and workspace plan overview | Implemented and automated UI test verified | Paid prices and seat allowances are intentionally unavailable pending decisions |
+| Registration and sign-in forms | Implemented and automated request, validation, success, and error tests pass | Live backend authentication remains unverified |
+| Email verification and verification resend | Implemented and automated request tests pass | Live backend workflow remains unverified |
+| Password recovery and password reset | Implemented and automated success/error/request tests pass | Live backend workflow remains unverified |
+| Authentication validation and API error feedback | Implemented; covered cases are automated-test verified | Not every backend validation response has been exercised against a live server |
+| Session restoration, expired-session refresh, unauthenticated redirect, and logout | Implemented and automated session-boundary tests pass | Live cookie/session behavior remains unverified |
+| Network/server failure and retry feedback | Implemented and automated session error-state test passes | Live backend outage behavior remains unverified |
+| Terms and Privacy routes, replaceable page structure, and links | Implemented and automated placeholder/accessibility tests pass | Approved Terms of Service and Privacy Policy content is externally blocked |
+| Paid-plan display | Implemented with an explicit unavailable state; regression test passes | Final paid-plan prices and seat allowances are externally blocked |
+| Subscription API integration | Not implemented; no backend operations or response contract found | Backend billing API contract and implementation, plus approved prices and allowances |
+| OAuth sign-in | Not implemented; no frontend OAuth controls were added | Approved providers and provider configuration, backend routes, callback/account-link contract, and session/security requirements |
+
 #### Implemented
 
 - Replaced the root placeholder with a responsive public landing page, product overview, feature sections, and workspace-type overview.
 - Added `/pricing` with workspace plan categories and an explicit unavailable state for paid plans and trial enrollment. Prices and seat allowances are absent; plan status, descriptions, and availability messaging are centralized in `lib/subscription-plans.ts`.
 - Added `/sign-in`, `/sign-up`, `/verify-email`, `/forgot-password`, and `/reset-password` with typed forms, local validation, API feedback, loading states, and success states.
 - Integrated registration, login, email verification, verification resend, password recovery, and password reset with the backend's verified `/auth/*` contracts.
-- Added `/app` as a session-confirmed post-login landing route. It fetches `/auth/me`, attempts refresh when no in-memory access token exists, and supports logout.
+- Added `/app` as a session-confirmed post-login landing route. It fetches `/auth/me`, attempts refresh when no in-memory access token exists, refreshes an expired access token once, redirects unauthorized sessions to `/sign-in`, retains recoverable network/server error feedback, and supports logout.
 - Added `app/api/backend/[...path]/route.ts` as a same-origin proxy. It forwards the backend URL from server-only `NEXUS_API_URL`, request cookies, bearer authorization, and the CSRF header; it also forwards Set-Cookie responses. This avoids browser CORS dependence while keeping the refresh cookie HttpOnly.
 - Access tokens are held in module memory only. No token is written to localStorage or sessionStorage.
 - Updated `.env.example` to the confirmed local backend base URL (`NEXUS_API_URL=http://localhost:4000/api/v1`).
 - Added AuthForm and auth-service tests.
+- Added `/app` session-boundary tests for cookie-session restoration, expired access-token refresh, unauthorized-session redirect, network failure feedback, and logout.
 - Added `/terms` and `/privacy` policy pages with a shared page template and centralized replaceable content structure. Each page visibly identifies itself as a placeholder awaiting approved legal text; links are available from sign-in, sign-up, pricing, and the public landing page.
 
 #### Awaiting approved legal content
@@ -515,15 +533,33 @@ Verified on 2026-11-03 against the frontend implementation and `../__NexusBacken
 - Final Terms of Service text has not been supplied. The current page contains labeled placeholders only.
 - Final Privacy Policy text has not been supplied. The current page contains labeled placeholders only.
 
-#### Awaiting subscription decisions and integration
+#### Awaiting subscription decisions
 
 - Paid subscription prices have not been approved; no amounts are displayed.
 - Member seat allowances have not been approved; no counts or limits are displayed.
-- The backend repository has no subscription or billing routes in its OpenAPI contract or implementation. Paid checkout, plan changes, and trial enrollment are unavailable in the UI; no mock integration was added.
+- Paid checkout, plan changes, and trial enrollment remain unavailable in the UI; no mock integration was added.
+
+#### Awaiting subscription backend integration
+
+- The backend repository currently has no subscription or billing module, route, or operation in `docs/openapi.yaml`; implemented backend route modules cover auth, users, workspaces, invitations, join requests, and email webhooks.
+- There is no established API contract for a plan catalog, current subscription or entitlements, checkout, plan changes, cancellation, or billing history. No subscription API client calls or simulated success paths were added.
+- Backend dependency: publish the approved request/response and authorization contract for the subscription information and mutations the product enables, once plan prices and seat allowances are approved. Frontend API integration and interaction tests depend on that contract.
+- The existing centralized plan configuration and explicit unavailable pricing state remain in place until then.
 
 #### Deferred future enhancement
 
-- OAuth remains out of scope until the backend provides and approves OAuth routes and provider contracts. The frontend has no OAuth buttons or independent auth path.
+- OAuth remains out of scope until the backend provides and approves the routes and provider contract. The frontend has no OAuth buttons or independent auth path.
+
+Before frontend OAuth work begins, the backend contract must specify:
+
+- Authorization-start and provider-callback operations, plus authenticated account-link and unlink operations if linking is supported. Exact route names and request/response shapes must come from the backend implementation.
+- Supported provider(s), provider application configuration, exact redirect URI(s), scopes, and identity claims used to associate an external identity with a Nexus account.
+- Callback outcomes for success, cancellation or failure, invalid or expired state, and account-link conflicts, including a safe allowlisted post-authentication redirect.
+- Whether provider identities can be linked to existing Nexus accounts, the proof required before linking, and handling for duplicate identities or email collisions. An email match alone must not silently link accounts.
+- Session handoff through Nexus's existing session contract: backend code exchange and validation, server-set HttpOnly rotating refresh cookie, CSRF cookie/header behavior where applicable, and short-lived access-token response. Provider tokens and client secrets remain server-side.
+- Security requirements including one-time short-lived state, PKCE, nonce and issuer/audience/signature validation when applicable, exact redirect URI validation, CSRF protection, rate limiting, safe redirect validation, and authorization code/token redaction in logs.
+
+These describe backend contract requirements; they are not OAuth routes implemented in this phase.
 
 #### Deployment requirement
 
@@ -535,7 +571,24 @@ Verified on 2026-11-03 against the frontend implementation and `../__NexusBacken
 - `npx tsc --noEmit` — passed after the final Next.js build.
 - `npm run build` — passed; generates the marketing, pricing, auth, policy, protected app, and dynamic auth proxy routes.
 - `npm test` — passed, 19 files and 129 tests, covering auth form validation and submission/error states, recovery/reset, token handling, proxy cookies, policy placeholders, and unavailable pricing.
-- Manual API workflow — not run; no local backend process or frontend `.env.local` was configured in this checkout.
+- Next.js reported that it ignored `/home/philip-iorwua/pnpm-lock.yaml` because the lockfile is outside this Git repository. The frontend Git/package root is `/home/philip-iorwua/Desktop/__NextFrontend__`, containing `package.json` and `package-lock.json` and no `pnpm-workspace.yaml`; the parent has no pnpm workspace file. The parent pnpm lockfile contains a separate `lucide-react`/React 19.2.8 importer, while this app declares React 19.3.0. This is an unrelated parent lockfile, so the warning is expected and does not indicate a misconfigured app root. No lockfile or workspace configuration was changed.
+- Manual auth/subscription API workflows — not run. The frontend `.env.local` is absent and the backend health endpoint at `http://localhost:4000/api/v1/health/live` did not accept a connection during this verification; a backend `.env` file exists but its contents were not inspected. Subscription operations are absent from the backend contract. Automated frontend tests do not verify a live backend.
+- Responsive code uses mobile-first layouts and breakpoint styles; viewport-by-viewport visual QA was not performed in this checkout.
+- Current-checkout verification after the session-boundary changes: `npm test` — passed, 20 files and 137 tests; `npm run lint` — passed without warnings; `npx tsc --noEmit` — passed; `npm run build` — passed with the expected parent-lockfile warning above.
+
+#### Phase 3 closure checklist
+
+Phase 3 must remain **In Progress** until these unconditional requirements are satisfied:
+
+- Approved Terms of Service and Privacy Policy content is supplied and replaces the clearly marked placeholders.
+- Paid-plan prices and seat allowances are approved; the UI continues to show unavailable states until those decisions exist.
+- The backend publishes and implements the approved subscription API contract, and the frontend integration, unavailable/error handling, and subscription interaction tests are verified against it.
+- Live authentication workflows are exercised against a configured backend, including registration, sign-in, email verification/resend, password recovery/reset, refresh/session restoration, expired-session handling, and logout.
+- Responsive behavior is reviewed at mobile, tablet, and desktop viewport sizes; automated tests, lint, type-check, and production build pass.
+
+OAuth is conditional in the Phase 3 roadmap (“if supported by the backend”). While the backend has no approved provider contract or OAuth routes, keep OAuth deferred and add no frontend controls. If product approval brings OAuth into this phase, the backend contract, provider setup, callback/account-link behavior, session handoff, security implementation, and frontend tests must all be completed before closure. If OAuth remains unsupported, record the explicit deferral as accepted scope before declaring Phase 3 complete.
+
+No other independent Phase 3 frontend implementation task is currently identified after the session-boundary redirect and its regression coverage.
 
 ## Phase 4 — User Onboarding and Profile Management
 

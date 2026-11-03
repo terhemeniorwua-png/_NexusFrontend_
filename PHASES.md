@@ -7,6 +7,25 @@ This document defines the phased implementation roadmap for the Nexus frontend.
 Nexus is a Real-Time Workspace & Project Management Platform that combines project management, team collaboration, communication, document management, meetings, scheduling, automation, and AI-powered productivity.
 
 The frontend must provide a consistent, responsive, accessible, and intuitive experience across three workspace types:
+| Check | Result |
+|---|---|
+| Framework | Next.js 16.4.2, App Router |
+| React | 19.3.0 |
+| Tailwind CSS | 4.x (`@tailwindcss/turbopack`) |
+| TypeScript | 5.x |
+| Socket.IO client | **Not installed** |
+| Form validation library | **Not installed** |
+| Test framework | **Not installed** (no `test` script in `package.json`) |
+| State management library | **Not installed** |
+| Available scripts | `dev`, `build`, `start`, `lint` |
+| App directory contents | `layout.tsx`, `page.tsx`, `globals.css`, `favicon.ico` only |
+| Feature folders | None exist (`components/`, `features/`, `hooks/`, `services/`, `types/`, `lib/`, `providers/` are all absent) |
+| Design tokens | `globals.css` uses Next.js defaults, not Nexus palette |
+| Path alias | `@/*` → repo root (defined in `tsconfig.json`) |
+| Environment file | No `.env` present |
+| Nexus features implemented | **Zero** |
+
+All phases began at `NOT_STARTED`. Phase 0 is now `COMPLETE`: all foundation tasks have been finished and committed. One item remains open (backend repository location — must be resolved before Phase 3). Phase 1 is next.
 
 1. Individual
 2. Company
@@ -16,7 +35,85 @@ All three workspace types share the same core application architecture. Their av
 
 The frontend must integrate with the existing Nexus backend rather than independently implementing backend business logic.
 
-## 2. Core Frontend Technology
+## Phase 0 — Repository Audit and Project Foundation
+
+### Objective
+Establish a verified understanding of the repository's actual state, resolve environment and tooling gaps, and create the conventions that every subsequent phase will follow. This phase produces no user-visible features but ensures that every later phase builds on a reliable foundation.
+
+### Prerequisites
+- Access to the repository.
+- `AGENTS.md` and `nexus-frontend/SKILL.md` available for reading.
+- Node.js and npm installed and working.
+
+### Implementation Tasks
+
+- [x] Read `AGENTS.md` and `nexus-frontend/SKILL.md` in full.
+- [x] Confirm the installed versions of Next.js, React, Tailwind CSS, and TypeScript.
+- [x] Confirm available npm scripts (`dev`, `build`, `start`, `lint`).
+- [x] Confirm absence of Socket.IO client, form library, test framework, and state manager.
+- [x] Confirm `app/` contains only the default Next.js bootstrap files.
+- [x] Confirm no Nexus feature folders or files exist.
+- [x] Confirm `globals.css` uses Next.js default tokens, not the Nexus palette.
+- [x] Confirm `tsconfig.json` path alias `@/*` points to the repo root.
+- [x] Confirm no `.env` file is present.
+- [x] Create `.env.example` with required variable placeholders (do not populate real values).
+- [x] Run `npm run lint` and record baseline result.
+- [x] Run `npm run build` and record baseline result.
+- [x] Document any pre-existing lint or build warnings for tracking.
+- [x] Decide on and document the folder structure convention to follow (`app/`, `components/`, `features/`, `hooks/`, `lib/`, `services/`, `types/`, `providers/`).
+- [x] Decide on and document the API client approach (fetch wrapper or thin service module).
+- [x] Decide on and document the authentication token storage strategy (HttpOnly cookie preferred per `AGENTS.md`).
+- [x] Identify which form validation and test libraries to install in Phase 1, consistent with `SKILL.md`.
+- [x] Record all backend API contracts required across phases as a dependency checklist.
+- [ ] Confirm backend repository location and documentation access.
+
+### Frontend Deliverables
+- `.env.example` with placeholder values for `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL`.
+- Documented folder structure convention (in this file or in a `CONVENTIONS.md`).
+- Baseline lint and build report.
+- Backend dependency checklist.
+
+### Backend Dependencies
+- None required for this phase. Backend documentation must be located and linked before Phase 3.
+
+### Validation and Tests
+- `npm run lint` completes without new errors.
+- `npm run build` produces a working production bundle without errors.
+- `.env.example` is committed with placeholders only (no real values).
+
+### Acceptance Criteria
+- Repository state fully documented.
+- `.env.example` committed with all required variable names.
+- Folder structure convention agreed and recorded.
+- Baseline lint and build clean (or pre-existing issues catalogued).
+- No secrets committed to the repository.
+
+### Completion Status
+`COMPLETE`
+
+### Completion Record (Phase 0)
+
+| Deliverable | Status | Commit |
+|---|---|---|
+| `.env.example` with `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` | ✅ Done | `5438cf2` |
+| `.gitignore` updated to allow `!.env.example` | ✅ Done | `5438cf2` |
+| Baseline `npm run lint` — zero errors | ✅ Done | recorded |
+| Baseline `npm run build` — zero errors (1 pre-existing pnpm warning) | ✅ Done | recorded |
+| `CONVENTIONS.md` — folder structure, API client, token storage, libraries | ✅ Done | `1072238` |
+| Backend API contracts checklist — Appendix B populated | ✅ Done | this commit |
+| Appendix C conventions reference updated | ✅ Done | this commit |
+
+**Remaining open item:**
+- Backend repository location and documentation are still unknown. This must be resolved before Phase 3 begins.
+
+### Notes and Blockers
+- The root instruction file is `AGENTS.md`, not `agent.md`. All future agents must read `AGENTS.md`.
+- `SKILL.md` is located at `nexus-frontend/SKILL.md`, not the repo root.
+- `SKILL.md` §3 refers to a `src/app` structure. This repository uses `app/` at the repo root; follow the actual structure (documented in `CONVENTIONS.md` §1).
+- Test framework decided: Vitest + Testing Library. Install in Phase 1. See `CONVENTIONS.md` §5.
+- Form validation library decided: Zod. Install in Phase 1. See `CONVENTIONS.md` §4.
+- Drag-and-drop library decided: `@dnd-kit/core`. Install in Phase 6. See `CONVENTIONS.md` §6.
+- **OPEN:** Backend repository location and documentation are unknown at audit time. This must be resolved before Phase 3.
 
 The frontend must use the technology already established in the repository.
 
@@ -1789,22 +1886,106 @@ Confirm that the frontend is ready for release.
 
 ---
 
-# 5. Future Enhancements — Not Part of Initial Implementation
+## Appendix B — Backend Contract Tracking
 
-The following features may be considered for future versions. They must not be implemented as part of the current roadmap unless explicitly approved.
+All backend contracts marked "Requires confirmation" in the phases above are listed here. Update the Status and Confirmed Date columns as contracts are verified with the backend team.
 
-- Native Android and iOS applications.
-- Advanced collaborative whiteboards.
-- Advanced knowledge base and wiki.
-- Advanced document collaboration.
-- Custom role and permission builder.
-- Workflow and automation marketplace.
-- Advanced AI agents.
-- More third-party integrations.
-- Advanced enterprise security dashboards.
-- Advanced analytics and reporting.
-- Additional workspace customisation.
-- Advanced offline capabilities.
+| Phase | Contract | Status | Confirmed Date |
+|---|---|---|---|
+| Phase 3 | `POST /auth/login` — request/response shape, cookie vs. token strategy | Pending | — |
+| Phase 3 | `POST /auth/register` — validation rules, email verification flow | Pending | — |
+| Phase 3 | `POST /auth/logout` — cookie clearing or token revocation | Pending | — |
+| Phase 3 | `POST /auth/forgot-password` | Pending | — |
+| Phase 3 | `POST /auth/reset-password` — token param, expiry behavior | Pending | — |
+| Phase 3 | `GET /auth/verify-email` — query param name and flow | Pending | — |
+| Phase 3 | `GET /users/me` — response shape including roles/workspace memberships | Pending | — |
+| Phase 3 | `PATCH /users/me` — updatable fields, validation rules | Pending | — |
+| Phase 3 | 401 response format and refresh token behavior | Pending | — |
+| Phase 4 | `GET /workspaces` — list user's workspaces | Pending | — |
+| Phase 4 | `POST /workspaces` — create workspace, validation rules | Pending | — |
+| Phase 4 | `GET /workspaces/:id` | Pending | — |
+| Phase 4 | `PATCH /workspaces/:id` | Pending | — |
+| Phase 4 | `DELETE /workspaces/:id` | Pending | — |
+| Phase 4 | `GET /workspaces/:id/members` — includes role field | Pending | — |
+| Phase 4 | `POST /workspaces/:id/invite` — email, role | Pending | — |
+| Phase 4 | `PATCH /workspaces/:id/members/:userId` — role update | Pending | — |
+| Phase 4 | `DELETE /workspaces/:id/members/:userId` | Pending | — |
+| Phase 4 | `GET /teams` or `GET /workspaces/:id/teams` | Pending | — |
+| Phase 4 | `POST /teams`, `PATCH /teams/:id`, `DELETE /teams/:id` | Pending | — |
+| Phase 4 | `POST /invitations/:token/accept` — for email-link acceptance | Pending | — |
+| Phase 4 | Role enum values: `OWNER`, `PM`, `MEMBER`, `VIEWER`, `COLLABORATOR` — confirm exact strings | Pending | — |
+| Phase 5 | `GET /workspaces/:id/projects` — pagination, filter, sort params | Pending | — |
+| Phase 5 | `POST /projects` | Pending | — |
+| Phase 5 | `GET /projects/:id` — includes progress calculation field | Pending | — |
+| Phase 5 | `PATCH /projects/:id` | Pending | — |
+| Phase 5 | `POST /projects/:id/archive` or `PATCH` with status field | Pending | — |
+| Phase 5 | `DELETE /projects/:id` | Pending | — |
+| Phase 5 | `GET /projects/:id/members` | Pending | — |
+| Phase 5 | `POST /projects/:id/members` | Pending | — |
+| Phase 5 | `DELETE /projects/:id/members/:userId` | Pending | — |
+| Phase 5 | Progress field — confirm whether backend returns a numeric percentage or raw counts | Pending | — |
+| Phase 6 | `GET /projects/:id/tasks` — filter params, sort, pagination | Pending | — |
+| Phase 6 | `POST /tasks` — required fields, validation rules | Pending | — |
+| Phase 6 | `GET /tasks/:id` — full detail including comments, activity | Pending | — |
+| Phase 6 | `PATCH /tasks/:id` | Pending | — |
+| Phase 6 | `DELETE /tasks/:id` | Pending | — |
+| Phase 6 | `PATCH /tasks/:id/status` — accepted transitions per role | **Pending (required before Kanban)** | — |
+| Phase 6 | `GET /tasks/:id/comments`, `POST /tasks/:id/comments` | Pending | — |
+| Phase 6 | `PATCH /comments/:id`, `DELETE /comments/:id` | Pending | — |
+| Phase 6 | `POST /tasks/:id/attachments`, `DELETE /attachments/:id` — file size/type limits | Pending | — |
+| Phase 6 | `GET /tasks/:id/activity` | Pending | — |
+| Phase 6 | Progress aggregation — confirm whether endpoint returns `progress` field or raw counts | Pending | — |
+| Phase 7 | `GET /projects/:id/documents` | Pending | — |
+| Phase 7 | `POST /documents` | Pending | — |
+| Phase 7 | `GET /documents/:id` | Pending | — |
+| Phase 7 | `PATCH /documents/:id` — content format (JSON blocks, Markdown, or HTML) | **Pending (required before editor install)** | — |
+| Phase 7 | `DELETE /documents/:id` | Pending | — |
+| Phase 7 | Real-time collaboration service (Yjs/OT/CRDT), if any | Pending | — |
+| Phase 7 | Document access permissions per role | Pending | — |
+| Phase 8 | `GET /conversations` — filter by type (direct/team/project) | Pending | — |
+| Phase 8 | `POST /conversations` | Pending | — |
+| Phase 8 | `GET /conversations/:id/messages` — pagination | Pending | — |
+| Phase 8 | `POST /conversations/:id/messages` — text, file attachment | Pending | — |
+| Phase 8 | `PATCH /messages/:id` | Pending | — |
+| Phase 8 | `DELETE /messages/:id` | Pending | — |
+| Phase 8 | `POST /messages/:id/reactions` | Pending | — |
+| Phase 8 | `POST /messages/:id/pin` | Pending | — |
+| Phase 8 | Message search endpoint | Pending | — |
+| Phase 8 | `POST /messages/:id/convert-to-task` | Pending | — |
+| Phase 8 | Message mention format (`@userId` or `@username`) | Pending | — |
+| Phase 8 | File attachment endpoint and size limits | Pending | — |
+| Phase 8 | Thread/reply support | Pending | — |
+| Phase 8 | Read receipt endpoint | Pending | — |
+| Phase 9 | Socket.IO gateway URL and authentication method | **Pending (required before Phase 9)** | — |
+| Phase 9 | `task:created`, `task:updated`, `task:deleted` — payload shapes | **Pending** | — |
+| Phase 9 | `message:created`, `message:edited`, `message:deleted`, `message:reaction` — payload shapes | **Pending** | — |
+| Phase 9 | `typing:start`, `typing:stop` — room/channel convention | **Pending** | — |
+| Phase 9 | `user:online`, `user:offline` — presence events and payload | Pending | — |
+| Phase 9 | `notification:created` — payload shape | **Pending** | — |
+| Phase 9 | Room naming convention (workspace/project/conversation ID based) | **Pending** | — |
+| Phase 9 | `GET /notifications` — pagination, filter params | Pending | — |
+| Phase 9 | `POST /notifications/:id/read` or `PATCH` | Pending | — |
+| Phase 9 | `POST /notifications/read-all` | Pending | — |
+| Phase 10 | Calling SDK provider and credentials model | **Pending (required before Phase 10)** | — |
+| Phase 10 | `POST /meetings` — creation params | Pending | — |
+| Phase 10 | `GET /meetings/:id` — join token/URL from backend | Pending | — |
+| Phase 10 | `POST /meetings/:id/end` | Pending | — |
+| Phase 10 | `GET /meetings` — history, filter by project/team | Pending | — |
+| Phase 10 | `POST /ai/ask` or streaming AI endpoint | Pending | — |
+| Phase 10 | `POST /ai/task-plan` | Pending | — |
+| Phase 10 | `POST /ai/summarize-project/:id` | Pending | — |
+| Phase 10 | `POST /ai/summarize-conversation/:id` | Pending | — |
+| Phase 10 | AI response streaming protocol (SSE vs. chunked JSON) | Pending | — |
+| Phase 10 | AI usage limits and rate-limit response format | Pending | — |
+| Phase 10 | Meeting recording and summary endpoints | Pending | — |
+| Phase 11 | `GET /search?q=&type=` — response shape, supported entity types | Pending | — |
+| Phase 11 | Pagination for search results | Pending | — |
+| Phase 11 | `GET /workspaces/:id/activity` | Pending | — |
+| Phase 11 | `GET /projects/:id/activity` | Pending | — |
+| Phase 11 | Activity event schema: actor, verb, resource type, resource ID | Pending | — |
+| Phase 11 | `GET /workspaces/:id/analytics` — metric list and response shape | Pending | — |
+| Phase 11 | `GET /projects/:id/analytics` | Pending | — |
+| Phase 11 | Dashboard metrics: completion, overdue, workload, deadlines, activity trend | Pending | — |
 
 ---
 
@@ -1862,6 +2043,17 @@ Before starting a phase, inspect the repository and determine what already exist
 
 Do not implement backend functionality inside the frontend. Do not invent API endpoints. Do not use mock data as a substitute for real integration in production functionality.
 
-The frontend must remain aligned with the Nexus backend, product architecture, user roles, workspace types, subscription rules, and security requirements.
+> Decisions made in Phase 0. Full details in `CONVENTIONS.md`.
 
-The objective is to build a reliable, polished, responsive, accessible, and production-ready Nexus frontend without breaking existing functionality.
+| Decision | Choice | Notes |
+|---|---|---|
+| Folder structure | `app/` at repo root (no `src/`), `@/*` alias → repo root | See `CONVENTIONS.md` §1 |
+| API client approach | Typed fetch wrapper in `lib/api.ts` | See `CONVENTIONS.md` §2 |
+| Token storage | HttpOnly cookies via `credentials: 'include'` | Confirm exact cookie config with backend in Phase 3. See `CONVENTIONS.md` §3 |
+| Form validation library | **Zod** — install in Phase 1 | See `CONVENTIONS.md` §4 |
+| Test framework | **Vitest + Testing Library** — install in Phase 1 | See `CONVENTIONS.md` §5 |
+| Drag-and-drop library | **@dnd-kit/core** — install in Phase 6, team confirm required | See `CONVENTIONS.md` §6 |
+| Document editor library | **Deferred** — pending backend content format confirmation (Phase 7) | See `CONVENTIONS.md` §7 |
+| Calling SDK | **Deferred** — pending team selection (Phase 10) | See `CONVENTIONS.md` §8 |
+| State management | React built-ins only (`useState`, `useContext`, `useReducer`) | See `CONVENTIONS.md` §9 |
+| Commit convention | `type(scope): description` — e.g., `feat(phase-3): ...` | See `CONVENTIONS.md` §10 |

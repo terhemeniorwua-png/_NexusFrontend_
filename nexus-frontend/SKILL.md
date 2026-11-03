@@ -158,7 +158,7 @@ This table is orientation only. **Always confirm the active phase and real statu
 |---|---|---|
 | Repository audit and foundation | Phase 0 | Completed and verified; see Section 14 |
 | Design system and UI primitives | Phase 1 | Completed: brand tokens, themes, and `components/ui/*` |
-| Application shell and navigation | Phase 2 | Not implemented (only the root layout exists) |
+| Application shell and navigation | Phase 2 | Completed: `AppShell`, sidebar, topbar, workspace switcher, user menu, loading/error boundaries; authenticated mounting arrives with Phase 3 |
 | Public pages and authentication UI | Phase 3 | Not implemented |
 | Onboarding and profile | Phase 4 | Not implemented |
 | Workspace creation and switching | Phase 5 | Not implemented |
@@ -224,13 +224,21 @@ Do not install any of these without explicit approval. If an approved feature re
 ```text
 __NextFrontend__/
 ├── app/
-│   ├── globals.css          # Brand tokens, dark/system overrides, motion, focus
+│   ├── globals.css          # Brand tokens, dark/system overrides, motion, z-index
 │   ├── layout.tsx           # Root layout, metadata, Inter, pre-paint theme script
+│   ├── loading.tsx          # Route loading skeleton
+│   ├── error.tsx            # Client route error boundary
 │   └── page.tsx             # Placeholder Nexus home page
 ├── components/
 │   ├── layout/
-│   │   ├── PageContainer.tsx  # Consistent page width, padding, centring
-│   │   ├── PageHeader.tsx     # Title, description, breadcrumb, actions
+│   │   ├── AppShell.tsx        # Shared authenticated page structure
+│   │   ├── Sidebar.tsx         # Collapsible desktop nav, mobile drawer
+│   │   ├── Topbar.tsx          # Search, messages, notifications, account
+│   │   ├── WorkspaceSwitcher.tsx
+│   │   ├── UserMenu.tsx
+│   │   ├── icons.tsx           # Inline SVG icons owned by the shell
+│   │   ├── PageContainer.tsx   # Consistent page width, padding, centring
+│   │   ├── PageHeader.tsx      # Title, description, breadcrumb, actions
 │   │   └── __tests__/
 │   └── ui/
 │       ├── Alert.tsx        Avatar.tsx       Badge.tsx       Breadcrumb.tsx
@@ -239,11 +247,14 @@ __NextFrontend__/
 │       ├── Radio.tsx        Select.tsx       Skeleton.tsx    Spinner.tsx
 │       ├── Tabs.tsx         Textarea.tsx     ThemeToggle.tsx Tooltip.tsx
 │       └── __tests__/       # Primitive, Dropdown, and ThemeToggle tests
+├── lib/
+│   └── navigation.ts       # Pure nav filtering and active-path helpers
 ├── providers/
 │   ├── ThemeProvider.tsx    # light/dark/system preference and DOM application
 │   └── __tests__/
 ├── types/
 │   ├── api.ts               # Generic API types; client not implemented yet
+│   ├── navigation.ts        # Shell nav, workspace, and user presentation types
 │   ├── ui.ts                # Shared UI prop, size, status, and role types
 │   └── jest-dom.d.ts
 ├── public/
@@ -267,7 +278,7 @@ __NextFrontend__/
 
 - Routes live in `app/` at the repository root. There is **no `src/` directory**.
 - `features/`, `hooks/`, `lib/`, and `services/` **do not exist yet**. They are the intended structure for later phases (Section 4.4).
-- `providers/ThemeProvider.tsx` and `components/layout/` now exist and are the shared home for theme state and page layout.
+- `providers/ThemeProvider.tsx` and `components/layout/` are the shared home for theme state, the application shell, and page layout. `lib/navigation.ts` and `types/navigation.ts` hold pure navigation helpers and presentation types.
 - No `.env` or `.env.local` file exists in the working tree. `.env.example` documents public placeholders only; it is not a source of confirmed backend configuration.
 - No API client, authentication provider, service module, real-time client, or global data-state provider exists.
 - Light, dark, and system themes are implemented through CSS variables and `ThemeProvider`. There is no separate theme stylesheet per component.
@@ -293,15 +304,15 @@ app/
   (auth)/            # authenticated routes: dashboard, workspace, profile, notifications
 components/
   ui/                # reusable primitives (exists)
-  layout/            # PageContainer and PageHeader exist; TopNav, Sidebar,
-                     # WorkspaceSwitcher, MobileNav arrive in Phase 2
+  layout/            # AppShell, Sidebar, Topbar, WorkspaceSwitcher, UserMenu,
+                     # PageContainer, PageHeader (exists)
   shared/            # cross-feature components
 features/            # domain UI and feature logic
 hooks/               # useAuth, useWorkspace, usePermissions, useSocket
-lib/                 # api.ts, routes.ts, socket.ts, utilities
+lib/                 # api.ts, routes.ts, socket.ts, navigation.ts, utilities
 providers/           # ThemeProvider exists; Auth, Workspace, Socket arrive later
 services/            # typed API functions by domain
-types/               # shared and domain types (api.ts, ui.ts exist)
+types/               # shared and domain types (api.ts, ui.ts, navigation.ts exist)
 ```
 
 Do not move existing files to match this structure. Add new folders only when the active phase requires them.
@@ -565,11 +576,17 @@ Conventions:
 
 **Navigation**
 
-- Navigation is not implemented yet. Phase 2 must implement the application shell described in `branding.md`: sidebar, workspace switcher, main content, contextual panels, global search, notifications, messages, and user menu.
-- Navigation must adapt to workspace type and permissions.
-- The sidebar must be collapsible and usable on mobile.
+- The reusable application shell exists in `components/layout/`. Use `AppShell` for authenticated pages; do not build a second shell.
+- `AppShell` composes `Sidebar`, `Topbar`, `WorkspaceSwitcher`, and `UserMenu`. It owns only layout state: desktop collapse and the mobile drawer.
+- Navigation data is supplied as `NavSection[]`/`NavItem[]`. Use `filterNavSections` from `lib/navigation.ts`; do not duplicate filtering logic in components.
+- Navigation must adapt to workspace type and permissions. Scope items with `workspaceKinds` and `permissions`. Hiding UI is not authorisation; the backend remains authoritative.
+- Permission-gated items are hidden when the caller has not supplied permissions. Do not show them optimistically.
+- The sidebar is collapsible and usable on mobile. Keep the skip link, focus handling, and Escape dismissal when extending it.
+- Use `isPathActive` for active state so parent routes match their descendants only on segment boundaries.
 - Do not hardcode navigation paths once `lib/routes.ts` exists; use typed route constants.
-- Keep the Messages entry point and the general notification bell visually and functionally separate.
+- Keep the Messages entry point and the general notification bell visually and functionally separate. `Topbar` takes `messageUnreadCount` and `notificationUnreadCount` as separate props; never combine them.
+- Mount the shell only when session, workspace, and permission data are available. Do not mount it with placeholder user or workspace data.
+- The shell is not yet mounted on a route; Phase 3 supplies authenticated routes and Phase 5 supplies real workspace switching.
 
 ### 5.8 Task status colours
 
@@ -622,7 +639,7 @@ UI primitives live in `components/ui/` and are imported through `@/components/ui
 | `Card` | `Card`, `CardHeader`, `CardBody`, `CardFooter` | `noPadding` on `Card` |
 | `Checkbox` | `Checkbox` | `label`, `id`, `errorMessage`, `helperText` |
 | `ConfirmDialog` | `ConfirmDialog` | `open`, `onClose`, `onConfirm`, `destructive`, `loading` |
-| `Dropdown` | `Dropdown` | `items`, `label`, `align`; keyboard navigation, Escape, outside click, disabled/destructive/link items |
+| `Dropdown` | `Dropdown` | `items`, `label`, `triggerLabel`, `align`, `triggerClassName`; keyboard navigation, Escape, outside click, disabled/destructive/link items |
 | `EmptyState` | `EmptyState` | `icon`, `title`, `description`, `action` |
 | `Input` | `Input` | `label`, `id`, `type`, `size`, `helperText`, `errorMessage`, `srOnlyLabel` |
 | `Modal` | `Modal` | `open`, `onClose`, `title`, `description`, `footer`, `maxWidth` |
@@ -636,6 +653,11 @@ UI primitives live in `components/ui/` and are imported through `@/components/ui
 | `Tooltip` | `Tooltip` | `content`, single focusable child, `position` |
 | `PageContainer` | `PageContainer` | `width`, `noPadding`; consistent page width and padding |
 | `PageHeader` | `PageHeader` | `title`, `description`, `breadcrumb`, `actions`; single page `h1` |
+| `AppShell` | `AppShell` | Composes sidebar, topbar, workspace switcher, user menu, and main content; owns collapse and mobile drawer state; skip link and focus management |
+| `Sidebar` | `Sidebar` | `sections`, `activePath`, `workspaceKind`, `permissions`, `collapsed`, `mobileOpen`; filters nav and keeps labels accessible when collapsed |
+| `Topbar` | `Topbar` | Breadcrumbs/title, search entry point, separate message and notification counts, theme control, user menu, mobile trigger |
+| `WorkspaceSwitcher` | `WorkspaceSwitcher` | `workspaces`, `activeWorkspaceId`, `onWorkspaceChange`; current workspace marker and empty state |
+| `UserMenu` | `UserMenu` | `user`, caller-supplied account items, optional `onSignOut`; avatar trigger |
 
 Do not duplicate these primitives in feature folders. Extend the shared component when a genuine requirement applies broadly.
 
@@ -1269,14 +1291,15 @@ A phase is not complete because its UI exists. It must satisfy its functional re
 
 Verified on 2026-11-03:
 
-- `PHASES.md` now contains an explicit phase status summary: Phase 0 **Completed**, Phase 1 **Completed**, Phases 2–33 **Not Started**.
+- `PHASES.md` phase status summary: Phase 0 **Completed**, Phase 1 **Completed**, Phase 2 **Completed**, Phases 3–33 **Not Started**.
 - Phase 0 foundation work is complete: audit recorded, `vitest.config.mts` restored, `.env.example` added, and lint, type-check, tests, and production build verified.
 - Phase 1 is complete: brand-aligned tokens, Inter typography, light/dark/system themes, shared motion, `Dropdown`, `ThemeToggle`, `PageHeader`, and `PageContainer` are implemented and tested.
-- Phase 2 (application layout and navigation) has not been implemented.
+- Phase 2 is complete: `AppShell`, `Sidebar`, `Topbar`, `WorkspaceSwitcher`, `UserMenu`, navigation filtering/types, and route loading/error boundaries are implemented and tested (14 files, 118 tests).
+- The shell is not mounted on a route yet because no authenticated routes, session provider, or workspace provider exist.
 
 Therefore:
 
-- Phase 2 is the next incomplete phase. Do not start it without an explicit instruction from the user.
+- Phase 3 is the next incomplete phase. Its authentication integration is blocked until the backend authentication and session contract is confirmed.
 - Confirm the active phase with the user or the tracker before starting.
 - Update phase status only after the corresponding requirements and checks have been verified.
 
@@ -1457,13 +1480,14 @@ These are recorded so agents do not silently guess. Resolve them with the projec
 
 1. **Role model mismatch.** `branding.md` defines Company/Institution organisation roles and separate project roles. `types/ui.ts` declares `OWNER | PM | MEMBER | VIEWER | COLLABORATOR`, which is a legacy/placeholder union. Backend permissions are authoritative; align types in Phase 7.
 2. **Task status contract.** `types/ui.ts` and the design tokens define a status workflow, but the backend contract has not been verified in this repository. Confirm transitions before building controls.
-3. **Phase status drift risk.** `PHASES.md` records Phases 0 and 1 as Completed. Keep those markers accurate; do not mark a phase complete without implementation and check evidence.
-4. **No API/auth/real-time layers implemented.** `lib/`, `services/`, and `hooks/` do not exist, and no auth, workspace, or socket provider exists. Documentation references are plans, not current capabilities.
-5. **Unconfirmed environment configuration.** `.env.example` documents `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` as placeholders only; no real environment values or backend-confirmed names exist in this repository.
-6. **Select chevron is not theme-aware.** The chevron is a static data-URI in `components/ui/Select.tsx`. It uses the muted grey and is legible in both themes, but it should be replaced by a token-driven icon when an icon system is approved.
-7. **No icon library.** Inline SVG remains the convention; do not introduce an icon package without approval.
-8. **Document filename casing.** The canonical agent instructions are `AGENTS.md` and the roadmap is `PHASES.md`; there is no `agent.md` or `phases.md`. This shared skill is `nexus-frontend/SKILL.md`.
-9. **Duplicate documentation.** `README.md` and `AGENTS.md` are currently identical, and derivative agent skill copies exist in tool-specific folders. Do not create additional duplicate `skill.md` files or diverge their standards.
+3. **Phase status drift risk.** `PHASES.md` records Phases 0–2 as Completed. Keep those markers accurate; do not mark a phase complete without implementation and check evidence.
+4. **No API/auth/real-time layers implemented.** `services/` and `hooks/` do not exist, and no auth, workspace, or socket provider exists. `lib/` currently contains only pure navigation helpers and types. Documentation references are plans, not current capabilities.
+5. **Application shell not mounted.** The reusable shell is implemented and tested but no route uses it. Phase 3 supplies authenticated routes and session; Phase 5 supplies real workspace switching.
+6. **Unconfirmed environment configuration.** `.env.example` documents `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` as placeholders only; no real environment values or backend-confirmed names exist in this repository.
+7. **Select chevron is not theme-aware.** The chevron is a static data-URI in `components/ui/Select.tsx`. It uses the muted grey and is legible in both themes, but it should be replaced by a token-driven icon when an icon system is approved.
+8. **No icon library.** Inline SVG remains the convention; do not introduce an icon package without approval.
+9. **Document filename casing.** The canonical agent instructions are `AGENTS.md` and the roadmap is `PHASES.md`; there is no `agent.md` or `phases.md`. This shared skill is `nexus-frontend/SKILL.md`.
+10. **Duplicate documentation.** `README.md` and `AGENTS.md` are currently identical, and derivative agent skill copies exist in tool-specific folders. Do not create additional duplicate `skill.md` files or diverge their standards.
 
 ---
 

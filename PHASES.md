@@ -137,13 +137,13 @@ At the end of each phase:
 
 ## Phase Status Summary
 
-Last verified: 2026-11-03, on branch `feature/phase-1-design-system`.
+Last verified: 2026-11-03, on branch `feature/phase-2-app-shell`.
 
 | Phase | Title | Status |
 |---|---|---|
 | 0 | Frontend Repository Audit and Project Foundation | Completed |
 | 1 | Design System, Branding, and UI Foundation | Completed |
-| 2 | Application Layout and Navigation Architecture | Not Started |
+| 2 | Application Layout and Navigation Architecture | Completed |
 | 3 | Public Website and Authentication Interfaces | Not Started |
 | 4 | User Onboarding and Profile Management | Not Started |
 | 5 | Workspace Creation and Workspace Switching | Not Started |
@@ -178,7 +178,7 @@ Last verified: 2026-11-03, on branch `feature/phase-1-design-system`.
 
 Status meanings: **Not Started**, **In Progress**, **Blocked**, **Completed**. A phase is only marked **Completed** when its functional requirements, integrations, and validation requirements have been verified.
 
-Only Phases 0 and 1 are complete. Phase 2 is the next incomplete phase and must not start without an explicit instruction.
+Phases 0, 1, and 2 are complete. Phase 3 is the next incomplete phase; its real authentication integration is blocked until the backend authentication and session contract is confirmed.
 
 ---
 
@@ -393,6 +393,70 @@ Build the main authenticated application structure.
 - Responsive navigation.
 - Workspace-aware navigation.
 - Shared authenticated page structure.
+
+### Phase 2 Status — Completed
+
+Verified on 2026-11-03 on branch `feature/phase-2-app-shell`. The reusable shell and its navigation behaviour are implemented and tested. Mounting the shell inside authenticated routes is intentionally deferred to Phase 3, when the session and route structure exist, and to Phase 5, when workspace switching is connected to the backend.
+
+#### Application shell
+
+- `components/layout/AppShell.tsx` composes the sidebar, topbar, workspace switcher, user menu, and main content region.
+- Owns only layout state: desktop collapse and the mobile drawer.
+- Includes a skip link targeting `<main id="main-content">`.
+- Handles Escape dismissal, background scroll lock, focus into the drawer on open, and focus restoration to the menu button on close.
+- Accepts page title, breadcrumbs, header actions, and optional sidebar footer content.
+
+#### Sidebar and navigation
+
+- `components/layout/Sidebar.tsx` renders as a persistent collapsible sidebar on desktop and an off-canvas drawer below the `lg` breakpoint.
+- Groups support optional labels and are removed when empty after filtering.
+- Active destinations use `aria-current="page"` with segment-aware matching, so `/projects` is active for `/projects/42` but `/project` is not active for `/projects`.
+- Collapsed labels remain available to assistive technology, and collapsed items expose their label as a native tooltip.
+- Badge counts render with separate accessible text, for example "3 unread messages".
+- `types/navigation.ts` defines `WorkspaceKind`, `WorkspaceSummary`, `CurrentUserSummary`, `NavItem`, `NavSection`, and `NavigationContext`.
+- `lib/navigation.ts` provides pure filtering and active-path helpers. Items can be scoped by workspace kind and by backend-supplied permission keys; items whose permissions are unknown are hidden rather than shown optimistically.
+
+#### Topbar entry points
+
+- `components/layout/Topbar.tsx` provides the mobile navigation trigger, breadcrumbs or page title, global search entry point, messages entry point, notification entry point, theme control, and user menu.
+- Keyboard shortcut metadata for search is exposed with `aria-keyshortcuts`.
+- Message unread counts and general notification unread counts are separate props and separate entry points. They are never combined.
+- Optional entry points are omitted when the caller supplies no destination or handler.
+
+#### Workspace switcher and user menu
+
+- `components/layout/WorkspaceSwitcher.tsx` displays the active workspace and kind, lists all available workspaces, marks the current one, and reports the selected workspace id to the caller. It renders a safe empty state when no workspace is available.
+- `components/layout/UserMenu.tsx` uses the shared `Avatar` and `Dropdown`, accepts caller-supplied account destinations, and appends a destructive sign-out action only when a handler is supplied.
+- `Dropdown` gained optional `triggerLabel` and `triggerClassName` props for explicit accessible names and full-width triggers. Existing behaviour is unchanged.
+
+#### Route boundaries
+
+- `app/loading.tsx` provides a shape-matched route loading state with an accessible status region.
+- `app/error.tsx` provides a client error boundary with an approved `Alert`, a retry action, and an optional error digest. It does not expose raw error details or user content.
+
+#### Backend integration
+
+- No endpoint, response field, permission key, or route was invented.
+- The shell performs no network requests. Session, workspace, permission, and unread-count data are supplied by the caller.
+- Authenticated mounting, real workspace switching, permission payloads, and unread counts remain dependent on the Phase 3–7 backend contracts listed in the Phase 0 dependency checklist.
+
+#### Validation evidence
+
+| Check | Result |
+|---|---|
+| `npm run lint` | Passed |
+| `npx tsc --noEmit` | Passed |
+| `npm test` | Passed — 14 files, 118 tests |
+| `npm run build` | Passed — static `/` and `/_not-found` routes generated |
+
+New tests cover navigation filtering and active paths, the sidebar (active state, permission scoping, collapse, drawer controls, badges, slots), the workspace switcher, the user menu, the topbar (search, separate counts, breadcrumbs, optional entry points), and the shell (skip link, drawer open/close, Escape focus restoration, navigation close, collapse, workspace switching, separate counts).
+
+#### Known limitations
+
+- The shell is not mounted on a route because no authenticated routes, session provider, or workspace provider exist yet. Phase 3 supplies the route structure and session; Phase 5 supplies workspace switching.
+- Permission filtering is a presentation concern, not authorisation. Backend checks remain authoritative.
+- The desktop collapse preference is component state and is not persisted across reloads.
+- `ThemeToggle` is hidden below the `md` breakpoint to preserve topbar space; the full preference UI belongs in settings in Phase 26.
 
 ## Phase 3 — Public Website and Authentication Interfaces
 

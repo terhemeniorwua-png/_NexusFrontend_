@@ -6,8 +6,8 @@ export interface PaidPlanPricing {
   prices: Record<BillingPeriod, number>;
   additionalMemberMonthlyPrice: number;
   additionalMemberBillingPeriod: 'monthly';
-  includedSeats: null;
-  includedSeatsStatus: 'pending-approval';
+  includedSeats: number;
+  ownerConsumesIncludedSeat: true;
 }
 
 /** Central source for approved plan and additional-member prices and open rules. */
@@ -20,8 +20,8 @@ export const subscriptionPricing = {
       prices: { monthly: 10, annual: 50 },
       additionalMemberMonthlyPrice: 0.5,
       additionalMemberBillingPeriod: 'monthly',
-      includedSeats: null,
-      includedSeatsStatus: 'pending-approval',
+      includedSeats: 15,
+      ownerConsumesIncludedSeat: true,
     },
     {
       id: 'business',
@@ -29,27 +29,33 @@ export const subscriptionPricing = {
       prices: { monthly: 15, annual: 70 },
       additionalMemberMonthlyPrice: 1,
       additionalMemberBillingPeriod: 'monthly',
-      includedSeats: null,
-      includedSeatsStatus: 'pending-approval',
+      includedSeats: 25,
+      ownerConsumesIncludedSeat: true,
     },
   ] satisfies PaidPlanPricing[],
   additionalSeatPolicy: {
     billOnlyActiveMembers: true,
     excludePendingInvitations: true,
+    excludeSuspendedMembers: true,
+    excludeRemovedMembers: true,
+    excludeDeactivatedMembers: true,
     countOwnerOnce: true,
     preventDuplicateWorkspaceMembers: true,
-    backendEnforced: true,
+    authoritativeCountSource: 'backend',
+    backendEnforcementImplemented: false,
     annualPlansStillBillAdditionalMembersMonthly: true,
-    removalUsesProviderBillingCycleAndProration: true,
+    additionsImmediateAfterPaymentAndProrated: true,
+    reductionsAtNextRenewalWithoutCredit: true,
   },
 } as const;
 
 export const paidSubscriptionAvailability = {
   status: 'approved-not-connected' as const,
+  backendEnforcementAvailable: false,
   checkoutAvailable: false,
-  seatAllowances: null,
+  seatAllowances: 'approved-but-backend-enforcement-unavailable' as const,
   trialEnrollmentAvailable: false,
-  notice: 'Prices are listed for planning. Checkout and subscription management are unavailable until the subscription backend is implemented.',
+  notice: 'Prices and included seats are approved. Checkout and subscription management remain unavailable until a payment provider and subscription backend are implemented.',
 };
 
 export function formatSubscriptionPrice(amount: number): string {

@@ -48,17 +48,20 @@ export function PricingOptions() {
             </p>
             <div className="mt-6 border-t border-[var(--color-border)] pt-5 text-sm leading-6 text-[var(--color-text-secondary)]">
               <p className="font-medium text-[var(--color-text-primary)]">
+                {plan.includedSeats} included members, including the workspace owner
+              </p>
+              <p className="font-medium text-[var(--color-text-primary)]">
                 {formatSubscriptionPrice(plan.additionalMemberMonthlyPrice)} per additional member per month
               </p>
-              <p className="mt-2">Additional members are billed monthly, including with an annual plan. Pending invitations are not billed.</p>
-              <p className="mt-2">An additional member is an active member beyond the included seat allowance. The included number is pending approval.</p>
+              <p className="mt-2">Only active members beyond the included allowance are billable. Pending invitations, suspended members, removed members, and deactivated members are not billed.</p>
+              <p className="mt-2">Additional members are billed monthly, including with an annual plan. Increases take effect after confirmed payment and are prorated; reductions take effect at renewal.</p>
             </div>
           </article>
         ))}
       </div>
 
       <p className="mx-auto mt-5 max-w-3xl text-center text-sm leading-6 text-[var(--color-text-secondary)]">
-        Additional-member billing is monthly even when the Pro or Business base subscription is billed annually. Final included-seat counts are pending approval; no total that depends on those counts is shown.
+        The workspace owner uses one included member seat and is counted once. When billing is connected, the backend will determine billable members from workspace membership records; these displayed prices are informational only.
       </p>
 
       <div className="mx-auto mt-6 max-w-3xl rounded-2xl border border-[var(--color-warning)] bg-[var(--color-warning-bg)] p-6 text-center sm:p-8">

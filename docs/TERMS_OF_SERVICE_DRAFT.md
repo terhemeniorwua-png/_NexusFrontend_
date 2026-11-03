@@ -57,23 +57,24 @@ AI outputs may be inaccurate or incomplete. Review them before relying on or sha
 
 ## 13. Subscription plans and base prices
 
-Approved base prices are Pro at **$10/month or $50/year**, and Business at **$15/month or $70/year**. Included member allowances are **pending approval**. Do not treat these base prices as the complete workspace total until included seats and additional-member charges are disclosed. Checkout and subscription management are not operational in the current frontend because no billing backend contract or implementation exists.
+Approved prices are Pro at **$10/month or $50/year**, including **15 members**, and Business at **$15/month or $70/year**, including **25 members**. The workspace owner counts once and uses an included member seat. Checkout and subscription management are not operational because no payment provider, billing API, or persistent subscription implementation exists.
 
 ## 14. Additional-member billing
 
-An additional member is an active, billable workspace member beyond the selected plan’s included allowance. The included allowance is **[PENDING APPROVAL]**. Approved recurring monthly rates are:
+An additional member is a distinct active workspace member beyond the selected plan’s included allowance. Approved recurring monthly rates are:
 
 - **Pro:** $0.50 per additional active member per month.
 - **Business:** $1.00 per additional active member per month.
 - These charges remain monthly even when the base subscription is annual.
-- Pending invitations are not charged; billing starts only after acceptance and activation.
-- Count the organization owner once and prevent duplicate charges for a member/workspace.
-- Removing an additional member stops future recurring charges for that seat under the provider-supported billing-cycle and proration rules; no exact timing or credit is promised here.
-- The backend calculates and enforces billable seats; client-supplied counts are not authoritative.
+- Only active member accounts with active workspace membership count. Pending invitations, suspended, removed, and deactivated members are not billable.
+- The workspace owner counts once and consumes one included seat.
+- An additional seat takes effect immediately only after successful payment is confirmed by the provider; its charge is prorated for the remaining monthly seat period, including on an annual base plan.
+- A reduction in committed additional-seat quantity takes effect at renewal. No automatic credit is issued for an already-paid period. The backend recounts active members and does not remove or deactivate users to meet a quantity.
+- Once billing is operational, the backend must calculate and enforce billable seats; client-supplied counts are never authoritative. Billing is not operational in this draft's current implementation context.
 
 ## 15. Monthly and annual billing
 
-Monthly and annual base subscriptions use the approved prices above. Additional-member fees remain monthly on both billing cadences. Before requesting payment, checkout must disclose the base charge, included-seat allowance, additional-member rate, and billing dates.
+Monthly and annual base subscriptions use the approved prices above. Additional-member fees remain monthly on both billing cadences. Before requesting payment, checkout must disclose the base charge, included-member allowance, additional-member rate, and billing dates.
 
 ## 16. Subscription activation and payment confirmation
 
@@ -81,15 +82,15 @@ Paid access begins only after the payment provider confirms successful payment t
 
 ## 17. Upgrades, downgrades, and seat changes
 
-Plan upgrades/downgrades and additional-seat increases/reductions require authorization from the billing owner and backend processing. Effective dates, proration, transition restrictions, and resulting access are **[PENDING BUSINESS APPROVAL]** and must be disclosed before confirmation.
+The workspace owner must authorize plan and seat changes. A Pro-to-Business upgrade takes effect immediately after provider-confirmed payment and charges the prorated plan-price difference for the remaining current period. A Business-to-Pro downgrade is scheduled for renewal; current benefits remain until then. The service identifies any conflict with the lower member allowance and does not remove members or data. Additional-seat increases are immediate after provider-confirmed payment and prorated for the remaining monthly seat period. Seat reductions take effect at renewal without an automatic credit. Billing dates and provider-calculated amounts must be shown before confirmation.
 
 ## 18. Cancellation
 
-The billing owner may request cancellation through a supported flow. Effective date, access through a current period, additional-member charge handling, and refunds are **[PENDING BUSINESS AND LEGAL APPROVAL]**. This draft makes no refund or cancellation-timing promise.
+The workspace owner may request cancellation through a supported flow. Cancellation is scheduled for the end of the current paid period, and paid benefits continue until that effective date. Cancellation does not delete workspaces, members, projects, or files. Refunds are not automatic; refund requests are handled manually under the business’s approved refund policy and applicable law. Cancellation and refund requests are separate. The refund policy and these terms require legal review and approval.
 
 ## 19. Failed recurring payments and expired subscriptions
 
-Retry schedule, notices, grace period, access restrictions, and subscription-expiry behavior are **[PENDING BUSINESS APPROVAL]**. The service must show the actual backend subscription state and must not represent an unsuccessful payment as successful.
+Failed-payment policy is deferred. Retry behavior, grace periods, notices, subscription status after repeated failures, paid-feature access, and treatment of additional-seat charges require a later business decision. No timeline or restriction is promised here. The service must show actual backend subscription state, must not grant paid access without verified payment, and must not delete customer data because payment failed.
 
 ## 20. Suspension and termination
 

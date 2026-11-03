@@ -242,7 +242,7 @@ Last verified: 2026-11-03, on branch `feature/frontend-authentication`.
 | 1 | Design System, Branding, and UI Foundation | Completed |
 | 2 | Application Layout and Navigation Architecture | Completed |
 | 3 | Public Website and Authentication Interfaces | In Progress |
-| 4 | User Onboarding and Profile Management | Not Started |
+| 4 | User Onboarding and Profile Management | Blocked |
 | 5 | Workspace Creation and Workspace Switching | Not Started |
 | 6 | Organisation Membership, Join Requests, and Invitations | Not Started |
 | 7 | Roles, Permissions, and Access-Controlled UI | Not Started |
@@ -275,7 +275,7 @@ Last verified: 2026-11-03, on branch `feature/frontend-authentication`.
 
 Status meanings: **Not Started**, **In Progress**, **Blocked**, **Completed**. A phase is only marked **Completed** when its functional requirements, integrations, and validation requirements have been verified.
 
-Phases 0, 1, and 2 are complete. Phase 3 is in progress on `feature/frontend-authentication`; the backend auth contract has been confirmed and connected through a same-origin Next.js proxy. Pro and Business base and additional-member prices are approved and displayed. Terms and Privacy drafts are prepared but require legal review and approval. Phase completion still depends on approval of included seats, billable membership statuses and remaining subscription policies, a billing API/provider implementation, legal approval, live authentication verification, and responsive viewport review. OAuth remains deferred because no provider or backend contract is approved. Phase 4 remains Not Started.
+Phases 0, 1, and 2 are complete. Phase 3 is in progress on `feature/frontend-authentication`; the backend auth contract has been confirmed and connected through a same-origin Next.js proxy. Approved Pro/Business prices, included seats, active-member billing rules, and lifecycle policies are displayed/documented and their provider-independent calculations are unit tested. Terms and Privacy drafts still require legal review and approval. Phase 3 still depends on the payment-provider/backend contract and implementation and user-owned live auth verification. Responsive review is user-confirmed. OAuth remains deferred because no provider or backend contract is approved. Phase 4 remains In Progress with the existing profile editor work.
 
 ---
 
@@ -598,8 +598,8 @@ Verified on 2026-11-03 against the frontend implementation and `../__NexusBacken
 
 | Requirement | Status | Verification or dependency |
 |---|---|---|
-| Public landing page, product overview, and feature sections | Implemented; build verified, visual behavior not fully verified | Responsive classes are present; viewport-by-viewport browser review remains outstanding |
-| Pricing page and plan pricing | Implemented and automated UI test verified | Pro is $10/month or $50/year plus $0.50 per additional member/month; Business is $15/month or $70/year plus $1 per additional member/month. Additional-member charges are monthly on annual plans; included-seat allowances remain unconfirmed. |
+| Public landing page, product overview, and feature sections | Implemented; responsive implementation reviewed per user confirmation | No agent manual visual review claimed in this task |
+| Pricing page and plan pricing | Implemented and automated UI test verified | Pro is $10/month or $50/year with 15 included members; Business is $15/month or $70/year with 25 included members. The owner counts once and uses an included seat. Only active members above the allowance incur monthly additional-member charges ($0.50 Pro, $1 Business), including on annual plans. |
 | Registration and sign-in forms | Implemented and automated request, validation, success, and error tests pass | Live backend authentication remains unverified |
 | Email verification and verification resend | Implemented and automated request tests pass | Live backend workflow remains unverified |
 | Password recovery and password reset | Implemented and automated success/error/request tests pass | Live backend workflow remains unverified |
@@ -607,14 +607,14 @@ Verified on 2026-11-03 against the frontend implementation and `../__NexusBacken
 | Session restoration, expired-session refresh, unauthenticated redirect, and logout | Implemented and automated session-boundary tests pass | Live cookie/session behavior remains unverified |
 | Network/server failure and retry feedback | Implemented and automated session error-state test passes | Live backend outage behavior remains unverified |
 | Terms and Privacy routes, draft content, and links | Drafts rendered and automated page/link tests pass | Legal review and approval; bracketed entity, contact, jurisdiction, age, provider, and deployment details remain unresolved |
-| Paid-plan display | Approved Pro/Business base and additional-member prices displayed with monthly/annual switching; checkout remains unavailable; automated pricing tests pass | Pro/Business included-seat allowances remain unconfirmed |
-| Subscription API integration | Not implemented; no billing endpoints, provider configuration, or response contract found | Backend billing contract and implementation; no purchase or management flow can be connected yet |
+| Paid-plan display | Approved Pro/Business base prices, 15/25 included-member allowances, owner inclusion, active-only billing rules, and monthly extra-member prices displayed; checkout remains unavailable; automated pricing tests pass | Provider-backed subscription contract and payment integration remain missing |
+| Subscription API integration | Not implemented; provider-independent backend calculations and lifecycle policy helpers exist and are unit tested, but no routes, persistent subscription state, provider integration, or paid entitlement enforcement exist | Provider selection, backend billing API/schema, verified payment integration, transactional membership enforcement, live verification |
 | OAuth sign-in | Not implemented; no frontend OAuth controls were added | Approved providers and provider configuration, backend routes, callback/account-link contract, and session/security requirements |
 
 #### Implemented
 
 - Replaced the root placeholder with a responsive public landing page, product overview, feature sections, and workspace-type overview.
-- Updated `/pricing` to display Pro ($10/month or $50/year) and Business ($15/month or $70/year), additional-member charges ($0.50 and $1 per member/month respectively), and that additional members remain monthly on annual plans. Pending invitations are not billed. Included seat allowances remain explicitly unconfirmed; checkout and trial enrollment remain unavailable. Pricing values and presentation policy are centralized in `lib/subscription-plans.ts`.
+- Updated `/pricing` to display Pro ($10/month or $50/year, 15 included members) and Business ($15/month or $70/year, 25 included members), owner inclusion, monthly additional-member charges ($0.50 and $1 respectively), the active-only policy, and the fact that extra members remain monthly on annual plans. Checkout and trial enrollment remain unavailable. Pricing values and presentation policy are centralized in `lib/subscription-plans.ts`; the backend's corresponding integer-cent catalog is `../__NexusBackend__/src/modules/billing/pricing.ts`.
 - Added `/sign-in`, `/sign-up`, `/verify-email`, `/forgot-password`, and `/reset-password` with typed forms, local validation, API feedback, loading states, and success states.
 - Integrated registration, login, email verification, verification resend, password recovery, and password reset with the backend's verified `/auth/*` contracts.
 - Added `/app` as a session-confirmed post-login landing route. It fetches `/auth/me`, attempts refresh when no in-memory access token exists, refreshes an expired access token once, redirects unauthorized sessions to `/sign-in`, retains recoverable network/server error feedback, and supports logout.
@@ -637,53 +637,17 @@ Verified on 2026-11-03 against the frontend implementation and `../__NexusBacken
 - Business: $15/month and $70/year.
 - Pro additional member: $0.50/member/month.
 - Business additional member: $1/member/month.
-- Additional members are charged monthly even when the base plan is annual; pending invitations are not billed.
+- Pro includes 15 members; Business includes 25. The workspace owner counts once and consumes one included seat.
+- Only active workspace members whose accounts are active count. Pending invitations, suspended, removed, and deactivated memberships do not count. Admins count by being active members; role does not create a separate billing exception.
+- Additional members are charged monthly even when the base plan is annual.
+- Upgrades and additional-seat increases are immediate after verified payment and prorated for the remaining respective billing period. Downgrades, seat reductions, and cancellation take effect at renewal/period end; benefits continue until then. Lower seat conflicts are surfaced, never resolved by removing members or data.
+- Refunds are not automatic; requests are handled manually under the approved refund policy and applicable law. No automatic credit is issued for seat reductions.
 
-#### Outstanding decisions requiring product approval
+No included-seat, membership-status, upgrade/downgrade, seat-change, cancellation effective-date, or automatic-refund decision remains open. The frontend does not calculate authoritative charges.
 
-These are proposals or unresolved policies. They are not approved billing rules, and the frontend does not calculate or enforce member charges.
+##### Deferred failed-payment policy
 
-##### A. Included-seat allowances
-
-| Plan/rule | Proposed decision | Status |
-|---|---|---|
-| Pro included members | 15 seats | **Awaiting explicit approval** |
-| Business included members | 25 seats | **Awaiting explicit approval** |
-| Organization owner included in the allowance | Yes | **Awaiting explicit approval** |
-
-No allowance is displayed as approved until confirmation is recorded.
-
-##### B. Billable membership statuses and roles
-
-| Membership/account state | Current product rule or proposal | Approval/status |
-|---|---|---|
-| Active member | An accepted, active member is the proposed billable population, after applying an approved included-seat allowance. | **Approval required:** confirm active membership is billable and clarify which roles count. |
-| Pending invitation | Not billable before acceptance and activation. | Approved product rule; recorded above and in the pricing/legal copy. |
-| Suspended member | Whether suspension stops or preserves a recurring seat charge is unresolved. | **Approval required.** |
-| Removed member | Future recurring charges should stop under provider-supported cycle/proration rules. | Principle approved; effective timing, quantity update, and proration treatment require approval. |
-| Deactivated account | Treatment of a deactivated user who still has a workspace membership is unresolved. | **Approval required.** |
-| Organization owner | Must be counted once, even if also represented by a membership row. The proposal is that the owner uses one of the included seats. | Count-once principle approved; included-seat treatment **awaits approval**. |
-| Administrators | Admins are distinct roles but may also be active members. Whether/how role affects billability is unresolved. | **Approval required; do not count or exclude based on an assumed role rule.** |
-
-Backend enforcement, distinct-member counting, and duplicate-charge prevention are not implemented. Frontend state and client-supplied counts must not be used as billing authority.
-
-##### C. Subscription changes and cancellation
-
-| Policy | Decision required |
-|---|---|
-| Pro-to-Business upgrade | Effective date and billing/proration treatment. |
-| Business-to-Pro downgrade | Effective date, billing treatment, and resulting access/limits. |
-| Additional-seat increase | When the increased quantity is charged and whether a partial-cycle charge applies. |
-| Additional-seat removal | When future charges stop and whether/how provider proration or credit applies. |
-| Cancellation | Effective date and treatment of already-paid amounts. |
-| Paid feature access after cancellation | Whether access continues to the end of the paid billing period. |
-| Refunds | Eligibility, timing, and refund policy. No refund rule is assumed. |
-
-All items in this table are **awaiting product/legal approval**. Do not invent proration, effective dates, feature-access periods, or refunds.
-
-##### D. Failed payments
-
-Approval is required for payment retry behavior; the grace period before restricting paid features; notices to workspace/account owners; subscription state after repeated failures; and how failed additional-seat charges affect seat billing and access. No retry count, grace-period length, or restriction schedule is assumed.
+Retry behavior, grace period, owner notifications, subscription status after repeated payment failures, paid-feature access, and treatment of additional-seat charges are explicitly deferred for later business decision. No timeline or action is assumed. Never grant paid access without verified payment and never delete customer data because payment failed.
 
 #### Legal approval still required
 
@@ -692,7 +656,7 @@ The Terms and Privacy drafts remain **DRAFT — REQUIRES LEGAL REVIEW AND APPROV
 - Legal entity name, registration details if applicable, and registered/business address are missing.
 - Official Terms contact and privacy contact details are missing.
 - Governing law, jurisdiction, venue, and dispute-resolution process have not been selected.
-- Refund, cancellation, upgrade/downgrade, failed-payment, and seat-proration wording requires product/legal approval.
+- Refund and cancellation wording requires legal review against the business's approved manual refund policy and applicable law. Subscription disclosures and proration language also require legal review.
 - Privacy wording on retention, deletion schedules, processors, hosting regions, transfers, minors/eligibility, and user rights requires legal and deployment review.
 - Required bracketed placeholders remain in `docs/TERMS_OF_SERVICE_DRAFT.md` and `docs/PRIVACY_POLICY_DRAFT.md`.
 
@@ -701,9 +665,10 @@ The Terms and Privacy drafts remain **DRAFT — REQUIRES LEGAL REVIEW AND APPROV
 - **Payment provider:** none selected or configured in the inspected backend.
 - **Subscription endpoints/API contract:** none found in `../__NexusBackend__/docs/openapi.yaml` or the backend modules.
 - **Payment verification/webhooks:** no payment verification or payment webhook exists. The backend has a signed transactional-email webhook; that is not a payment webhook.
-- **Additional-seat billing:** not implemented. No authoritative active-seat calculation, provider quantity synchronization, duplicate-charge prevention, or backend enforcement exists. The database uniqueness constraint on `(workspaceId, userId)` prevents duplicate membership rows only; it does not implement billing.
-- **Subscription lifecycle:** activation-after-verified-payment, changes, cancellation, retry/expiry, invoices, and billing history are not implemented or verified.
-- Required contract and data safeguards are documented in `docs/SUBSCRIPTION_BILLING_BACKEND_REQUIREMENTS.md`. Checkout, subscription management, and paid feature entitlement changes remain unavailable; no simulated billing path exists.
+- **Provider-independent helpers:** backend integer-cent pricing, workspace-scoped active-member counting/deduplication, seat charge calculation, proration, lifecycle scheduling, cancellation timing, owner policy, and deferred failure policy are unit tested in `../__NexusBackend__/src/modules/billing/`.
+- **Additional-seat charging/enforcement:** not operational. Helpers are not connected to routes, persisted subscription state, provider quantity synchronization, transactional membership mutations, or paid entitlements. Client counts remain non-authoritative.
+- **Subscription lifecycle:** provider-confirmed activation, webhook signature verification/replay protection, durable idempotency, scheduled-change persistence, invoices, and billing history are not implemented or verified.
+- No provider is selected. The exact provider-dependent API, schema/migration, webhook, and live-verification requirements are in `docs/SUBSCRIPTION_BILLING_BACKEND_REQUIREMENTS.md`. Checkout and subscription management remain unavailable; there is no simulated payment flow.
 
 #### Live authentication verification still required
 
@@ -721,9 +686,9 @@ Test these workflows against a configured, running backend and record results se
 
 OAuth remains deferred until its provider and backend contract are approved.
 
-#### Responsive viewport review still required
+#### Responsive viewport review — user-confirmed
 
-Responsive utility classes and a successful production build are not manual viewport verification. Review the following pages at mobile (**375×812**), tablet (**768×1024**), and desktop (**1440×900**) viewports; record visual and keyboard findings:
+The user confirms that the current responsive implementation has been reviewed and is responsive. This is recorded as user-confirmed; this agent did not perform or claim a manual viewport review in this task. The viewport set below remains a useful repeatable regression checklist, but no exact dimensions or screenshots were supplied with the confirmation:
 
 - Public landing page (`/`).
 - Pricing and billing-period selector (`/pricing`).
@@ -731,7 +696,7 @@ Responsive utility classes and a successful production build are not manual view
 - Terms and Privacy drafts (`/terms`, `/privacy`).
 - Authenticated session landing/error states (`/app`).
 
-Check navigation/header fit, card and legal-text readability, forms and buttons, overflow, focus visibility, and loading/error layouts. **Not reviewed.**
+When repeating the review, check navigation/header fit, card and legal-text readability, forms and buttons, overflow, focus visibility, and loading/error layouts.
 
 #### Billing implementation dependency
 
@@ -763,31 +728,31 @@ These describe backend contract requirements; they are not OAuth routes implemen
 - `npm run build` — passed; generates the marketing, pricing, auth, policy, protected app, and dynamic auth proxy routes.
 - `npm test` — passed, 20 files and 144 tests, including Pro/Business base and additional-member pricing, monthly billing on annual plans, unresolved included seats, draft Terms/Privacy route rendering, cross-links, and unavailable checkout.
 - Next.js reported that it ignored `/home/philip-iorwua/pnpm-lock.yaml` because the lockfile is outside this Git repository. The frontend Git/package root is `/home/philip-iorwua/Desktop/__NextFrontend__`, containing `package.json` and `package-lock.json` and no `pnpm-workspace.yaml`; the parent has no pnpm workspace file. The parent pnpm lockfile contains a separate `lucide-react`/React 19.2.8 importer, while this app declares React 19.3.0. This is an unrelated parent lockfile, so the warning is expected and does not indicate a misconfigured app root. No lockfile or workspace configuration was changed.
-- Manual auth/subscription API workflows — not run. The frontend `.env.local` is absent and the backend health endpoint at `http://localhost:4000/api/v1/health/live` did not accept a connection during this verification; a backend `.env` file exists but its contents were not inspected. Subscription operations are absent from the backend contract. Automated frontend tests do not verify a live backend.
-- Responsive code uses mobile-first layouts and breakpoint styles; viewport-by-viewport visual QA was not performed in this checkout.
-- Current commercial/legal-draft verification: `npm test` — passed, 20 files and 144 tests; `npm run lint` — passed; `npx tsc --noEmit` — passed; `npm run build` — passed with the expected parent-lockfile warning above. These checks verify frontend presentation and draft rendering only; they do not verify live authentication or subscription behavior against a backend. Server-side seat-counting, duplicate-charge prevention, and payment-webhook tests remain dependent on the unimplemented billing backend.
+- Historical auth verification: no live auth workflow was completed in the previous run. The user owns live verification and will perform it; automated frontend tests remain mock-based and are not live-backend evidence.
+- Responsive viewport review: the user confirms the current responsive implementation has been reviewed and is responsive. This is user-confirmed; no manual viewport review is claimed by this agent in this task.
+
+#### Validation for approved commercial policies — 2026-11-03
+
+- Frontend: `npm test` passed (21 files, 147 tests); `npm run lint`, `npx tsc --noEmit`, `npm run build`, and `git diff --check` passed. The Next.js build emitted its existing warning about an unrelated parent-directory `pnpm-lock.yaml` and completed successfully.
+- Backend: `npm test` passed (136 tests, 0 failures, 1 optional test skipped); `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run build`, and `git diff --check` passed on the current backend worktree. The new billing policy suite contains 14 unit tests.
+- The backend database-backed optional suites were not run; no billing migration was added because there is no persisted subscription contract or selected provider. Prisma Client generation and backend compilation did succeed.
+- Automated tests exercise policy calculations only. No live payment provider, subscription endpoint, authentication workflow, payment webhook, or entitlement change was verified. Live authentication remains user-owned; responsive review is user-confirmed, not agent-manually-verified.
 
 #### Phase 3 closure checklist
 
-Phase 3 must remain **In Progress** until these unconditional requirements are satisfied:
+Phase 3 remains **In Progress** until these requirements are satisfied:
 
-- Approved Terms of Service and Privacy Policy content is supplied and replaces the clearly marked placeholders.
-- Approved Pro and Business base prices and additional-member rates are shown on `/pricing`; additional members remain monthly on annual plans. Included seat allowances for both paid plans remain outstanding and are not advertised.
-- Terms and Privacy drafts are available, but legal review/approval and all required legal/business/deployment placeholders must be resolved.
-- The backend publishes and implements the approved subscription API contract, and the frontend integration, unavailable/error handling, and subscription interaction tests are verified against it.
-- Live authentication workflows are exercised against a configured backend, including registration, sign-in, email verification/resend, password recovery/reset, refresh/session restoration, expired-session handling, and logout.
-- Responsive behavior is reviewed at mobile, tablet, and desktop viewport sizes; automated tests, lint, type-check, and production build pass.
+- Approved Terms of Service and Privacy Policy are reviewed and approved, and required legal/business/deployment placeholders are resolved.
+- Approved plan prices, included seats, owner inclusion, member-status rules, and lifecycle rules are accurately shown/documented. These commercial approvals are now recorded; frontend tests verify pricing presentation.
+- A payment provider is selected and the backend implements the persistent subscription API, verified payment/webhook behavior, idempotency, authorization, and transactional membership enforcement; frontend integration is verified against it.
+- Live authentication workflows are exercised by the user against a configured backend, including registration, sign-in, email verification/resend, password recovery/reset, refresh/session restoration, expired-session handling, and logout.
+- Responsive behavior has been reviewed and confirmed by the user. This is user-confirmed, not agent-manually-verified evidence. Automated tests, lint, type-check, and production build must also pass for current implementation.
 
-##### Explicit commercial approval gate
+##### Commercial approval gate — satisfied
 
-Phase 3 cannot be marked **Complete** until you explicitly approve both:
+The user approved Pro 15 and Business 25 included members; the owner counts once and uses an included seat; only active member accounts and active workspace memberships count; pending, suspended, removed, and deactivated memberships do not count; administrators count as active members without a role-based exception. Upgrades, downgrades, seat increases/reductions, cancellation, and manual refund handling are also approved as stated above. The business deferred failed-payment policy. The gate is recorded as satisfied, but this does not mean provider-backed enforcement is implemented.
 
-1. Included-seat allowances: Pro 15, Business 25, and whether the organization owner is included (proposed: yes).
-2. Billable membership statuses and role handling, including active, invited, suspended, removed, deactivated members, owners, and administrators.
-
-These are proposals awaiting approval, not current billing behavior. No billing calculation may be based on them before approval and backend implementation.
-
-Other outstanding approval and verification conditions are legal approval of the Terms and Privacy drafts, a subscription backend API/provider implementation, live authentication verification, and responsive viewport review. OAuth remains deferred until its provider and backend contract are approved. Phase 3 remains **In Progress**; Phase 4 remains **Not Started**.
+Remaining Phase 3 blockers are legal approval/placeholders and the provider-dependent billing API, persistent implementation, and live verification. Live authentication is user-owned and pending user execution. Responsive review is user-confirmed; agent manual review was not performed. OAuth remains deferred until its provider and backend contract are approved. Phase 3 remains **In Progress**; Phase 4 is tracked separately below. Phase 5 has not started.
 
 OAuth is conditional in the Phase 3 roadmap (“if supported by the backend”). While the backend has no approved provider contract or OAuth routes, keep OAuth deferred and add no frontend controls. If product approval brings OAuth into this phase, the backend contract, provider setup, callback/account-link behavior, session handoff, security implementation, and frontend tests must all be completed before closure. If OAuth remains unsupported, record the explicit deferral as accepted scope before declaring Phase 3 complete.
 
@@ -795,14 +760,40 @@ No other independent Phase 3 frontend implementation task is currently identifie
 
 ## Phase 4 — User Onboarding and Profile Management
 
-### Status — Not Started
+### Status — Blocked
+
+Started on 2026-11-03 on `feature/frontend-authentication` at the user's direction to proceed while Phase 3 approval blockers remain open. Phase 3 has not been marked complete.
+
+#### Phase 4 progress
+
+| Requirement | Status | Verification or dependency |
+|---|---|---|
+| Profile setup and editing | Implemented in progress at `/app/profile`; validation and API integration covered by frontend tests | Uses the verified `/users/me` GET/PATCH contract. Manual live-backend verification and responsive viewport review remain outstanding. |
+| Profile picture | URL field supported by the profile contract; file upload is not implemented | No upload/storage API contract was found for this phase task. |
+| Time zone and locale preferences | Editable through the profile contract | UI/backend integration tests pass; confirm values against a live backend before completion. |
+| First-time onboarding progress and return behavior | Not implemented | No onboarding-completion API or persistence contract was found. |
+| Account security and session/device management | Implemented against confirmed auth contracts | Password change, verified email-change request, active-session listing, and confirmed sign-out-all use `/auth/password/change`, `/auth/email/change`, `/auth/sessions`, and `/auth/logout-all`. Individual session revocation and 2FA are not supported by the inspected backend contract. |
+| Account deletion interface | Blocked | The backend has a 30-day deletion request, but cleanup behavior does not fully match the approved retention policy. Do not expose until aligned. |
+| Mobile, tablet, and desktop review | User-confirmed reviewed and responsive | This agent did not perform a manual viewport review in the current task. |
+
+Profile setup/editing, timezone and locale preferences, password/email security, and session review are implemented. Focused tests passed (8 tests); full frontend validation is recorded below. Phase 4 is **Blocked** because first-time onboarding completion/return behavior has no persistence contract, avatar upload has no backend contract, and the approved account-deletion retention policy is not fully aligned with backend cleanup. Phase 5 has not started.
+
+#### Phase 4 validation — 2026-11-03
+
+- `npm test -- --run components/profile/__tests__/AccountSecurity.test.tsx app/app/profile/page.test.tsx` — passed, 2 files and 8 tests.
+- `npm test` — passed, 22 files and 152 tests.
+- `npm run lint` — passed.
+- `npx tsc --noEmit` — passed.
+- `npm run build` — passed; `/app/profile` is generated. Next.js emitted its existing warning about the unrelated parent-directory `pnpm-lock.yaml`.
+- Live backend workflows and agent-performed viewport review were not run. Responsive behavior remains user-confirmed only.
+- Files changed for this progress: `components/profile/AccountSecurity.tsx`, `components/profile/__tests__/AccountSecurity.test.tsx`, `services/account-security.ts`, and the existing in-progress `/app/profile` page and test.
 
 #### Approved account-deletion policy for future implementation
 
 - Account deletion requires authentication and explicit confirmation, followed by a 30-day secure recovery period.
 - After the recovery period, permanent deletion removes the personal workspace and exclusively owned data while preserving shared organization content and assets referenced by valid shared resources.
 - If the user is the only eligible organization owner, ownership must be transferred or separately resolved. Organization deletion remains a distinct authorized action.
-- This is a product-policy decision only; no Phase 4 account-deletion interface work is included in the current task.
+- This is a product-policy decision only; no account-deletion interface work is included in the current Phase 4 implementation scope.
 - Backend alignment must be reviewed before the flow is exposed. The current cleanup worker can hold deletion for manual resolution when a personal workspace has collaborators or file metadata and blocks deletion while workspace ownership remains; its storage cleanup behavior is not equivalent to the complete approved policy.
 
 ### Objectives

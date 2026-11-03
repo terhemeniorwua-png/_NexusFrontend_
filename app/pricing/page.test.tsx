@@ -14,22 +14,34 @@ describe('subscription pricing configuration', () => {
     expect(subscriptionPricing.plans.find((plan) => plan.id === 'business')?.prices).toEqual({ monthly: 15, annual: 70 });
   });
 
-  it('contains approved additional-member monthly prices and leaves included seats pending', () => {
-    expect(subscriptionPricing.plans.find((plan) => plan.id === 'pro')?.additionalMemberMonthlyPrice).toBe(0.5);
-    expect(subscriptionPricing.plans.find((plan) => plan.id === 'business')?.additionalMemberMonthlyPrice).toBe(1);
+  it('contains approved additional-member prices and included allowances', () => {
+    expect(subscriptionPricing.plans.find((plan) => plan.id === 'pro')).toMatchObject({
+      additionalMemberMonthlyPrice: 0.5,
+      includedSeats: 15,
+      ownerConsumesIncludedSeat: true,
+    });
+    expect(subscriptionPricing.plans.find((plan) => plan.id === 'business')).toMatchObject({
+      additionalMemberMonthlyPrice: 1,
+      includedSeats: 25,
+      ownerConsumesIncludedSeat: true,
+    });
     expect(subscriptionPricing.plans.every((plan) => plan.additionalMemberBillingPeriod === 'monthly')).toBe(true);
-    expect(subscriptionPricing.plans.every((plan) => plan.includedSeats === null && plan.includedSeatsStatus === 'pending-approval')).toBe(true);
   });
 
   it('declares additional-seat rules for backend enforcement', () => {
     expect(subscriptionPricing.additionalSeatPolicy).toEqual({
       billOnlyActiveMembers: true,
       excludePendingInvitations: true,
+      excludeSuspendedMembers: true,
+      excludeRemovedMembers: true,
+      excludeDeactivatedMembers: true,
       countOwnerOnce: true,
       preventDuplicateWorkspaceMembers: true,
-      backendEnforced: true,
+      authoritativeCountSource: 'backend',
+      backendEnforcementImplemented: false,
       annualPlansStillBillAdditionalMembersMonthly: true,
-      removalUsesProviderBillingCycleAndProration: true,
+      additionsImmediateAfterPaymentAndProrated: true,
+      reductionsAtNextRenewalWithoutCredit: true,
     });
   });
 });
@@ -61,20 +73,21 @@ describe('PricingPage', () => {
     expect(screen.getAllByText(/billed monthly, including with an annual plan/i)).toHaveLength(2);
   });
 
-  it('does not bill pending invitations or imply unapproved included allowances', () => {
+  it('displays approved included allowances and excludes inactive memberships', () => {
     render(<PricingPage />);
 
-    expect(screen.getAllByText(/pending invitations are not billed/i)).toHaveLength(2);
-    expect(screen.getAllByText(/included number is pending approval/i)).toHaveLength(2);
-    expect(screen.queryByText(/\d+ included seats/i)).not.toBeInTheDocument();
+    expect(screen.getByText('15 included members, including the workspace owner')).toBeInTheDocument();
+    expect(screen.getByText('25 included members, including the workspace owner')).toBeInTheDocument();
+    expect(screen.getAllByText(/pending invitations, suspended members, removed members, and deactivated members are not billed/i)).toHaveLength(2);
   });
 
   it('keeps checkout unavailable without a purchase action', () => {
     render(<PricingPage />);
 
     expect(paidSubscriptionAvailability.checkoutAvailable).toBe(false);
+    expect(paidSubscriptionAvailability.backendEnforcementAvailable).toBe(false);
     expect(screen.getByText('Checkout unavailable')).toBeInTheDocument();
-    expect(screen.getByText(/until the subscription backend is implemented/i)).toBeInTheDocument();
+    expect(screen.getByText(/until a payment provider and subscription backend are implemented/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /subscribe|checkout|start trial/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /subscribe|checkout|start trial/i })).not.toBeInTheDocument();
   });

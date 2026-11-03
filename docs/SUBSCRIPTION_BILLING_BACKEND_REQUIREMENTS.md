@@ -1,73 +1,77 @@
 # Nexus Subscription and Billing Backend Requirements
 
-**Status: Requirements only — no billing API or payment integration is currently implemented.**
+**Status: Approved product rules and provider-independent calculation helpers are implemented; no billing API or payment integration is operational.**
 
-This note records approved billing policies and the backend work needed before frontend checkout or subscription management can be enabled. It does not define route names, provider configuration, or a working API contract.
+This document separates implemented backend policy code from persistent billing and payment-provider work. Checkout and subscription management remain unavailable.
 
 ## Repository findings
 
-The adjacent backend OpenAPI contract and modules contain authentication, users, workspaces, memberships, invitations, join requests, and email webhooks. They do not contain subscription, payment, checkout, invoice, or billing operations. No payment-provider SDK or billing configuration was found. The email provider webhook is for transactional email and is not a payment integration.
+The frontend and backend are separate repositories. The backend at `../__NexusBackend__` uses Express, TypeScript, Prisma, and PostgreSQL. It contains workspace membership, invitation, and email-webhook modules, but no subscription models or migrations, subscription endpoints, payment SDK/configuration, payment webhook, invoice service, or lifecycle persistence. The signed email webhook is not a payment integration.
 
-The backend already has a `WorkspaceMembership` uniqueness constraint on `(workspaceId, userId)`. This helps prevent duplicate membership rows but does not implement billable-seat calculations, subscription state, payment verification, or provider-side seat synchronization.
+The `WorkspaceMembership` model has a unique `(workspaceId, userId)` constraint. This prevents duplicate membership rows but alone does not prevent provider-side duplicate charges.
 
 ## Approved commercial configuration
 
-| Plan | Monthly base | Annual base | Additional member |
-|---|---:|---:|---:|
-| Pro | $10/month | $50/year | $0.50 per member per month |
-| Business | $15/month | $70/year | $1.00 per member per month |
+| Plan | Monthly base | Annual base | Included members | Extra active member |
+|---|---:|---:|---:|---:|
+| Pro | $10/month | $50/year | 15 | $0.50/member/month |
+| Business | $15/month | $70/year | 25 | $1/member/month |
 
-The number of included members in either plan is **pending approval**. Until it is decided, do not calculate or advertise a total price that depends on the allowance.
+The workspace owner counts once and consumes an included seat. These prices and allowances are centralized in the frontend `lib/subscription-plans.ts` and backend `src/modules/billing/pricing.ts` catalogs. Checkout remains disabled because the backend has no payment or subscription integration.
 
-## Approved seat policy
+## Approved membership billing policy
 
-- An additional seat is an additional billable member beyond the selected plan's included allowance.
-- Only an accepted, active workspace member is eligible for an additional-member charge. Pending invitations are not billable.
-- Pro additional members cost $0.50/member/month; Business additional members cost $1.00/member/month.
-- Additional-member charges recur monthly even when the base subscription is annual.
-- Do not count the workspace owner twice if the owner also has a membership row.
-- Do not create duplicate billing for the same member and workspace.
-- Removing an additional member stops future recurring charges under the provider's supported billing-cycle and proration rules. Do not promise an unapproved credit or proration amount.
-- The backend calculates and enforces billable seats. Client-submitted member counts are display hints only and must never set the charge.
+- Only distinct active workspace members whose account is active count as billable members.
+- Pending invitations, suspended members, removed members, and deactivated accounts do not count.
+- The workspace owner counts once as an active member and consumes one included seat, if the owner account is active.
+- Additional-member charges apply only above the selected plan's included allowance.
+- Pro additional members cost $0.50/member/month; Business additional members cost $1/member/month.
+- Additional members remain monthly charges when the base subscription is annual.
+- A new additional seat takes effect immediately only after verified successful payment and is prorated for the remaining applicable monthly seat period.
+- A committed seat reduction takes effect at renewal; there is no automatic credit for an already-paid period.
+- Membership changes in one workspace do not affect another workspace. The server derives counts from the requested workspace's database state; frontend counts are not authoritative.
+- Billing calculations must not deactivate/remove members, charge pending invitations, or count an owner twice.
 
-Before implementation, product must confirm which membership statuses and roles are billable (including guests and suspended memberships), the included-seat allowances, and any provider-specific behavior needed to honor removal timing.
+The backend currently implements a server-owned integer-cent catalog, a Prisma-backed workspace-scoped active-member lookup/deduplicator, seat-quantity/monthly-charge calculation, and provider-independent lifecycle/proration policy helpers in `src/modules/billing/`. Unit tests cover these calculations. These helpers are not called by API routes and do not enforce membership mutations or persist subscription state.
 
-## Required contract operations
+## Approved lifecycle policy
 
-The backend team should define actual route names, schemas, authorization, errors, and idempotency behavior for these operation categories. These are requirements, not proposed or implemented endpoints:
+- **Upgrade:** Pro to Business takes effect immediately after provider-confirmed successful payment. Calculate the prorated old/new plan difference for the remaining current billing period. Until confirmation, preserve the old plan and entitlements.
+- **Downgrade:** Schedule Business to Pro at renewal. Keep the old plan active through the paid period. Report target allowance conflicts; do not remove members, workspaces, projects, or files.
+- **Increase seats:** Apply immediately only after provider-confirmed successful payment, prorated for the remaining monthly seat period. Seat charges stay monthly with an annual base plan.
+- **Reduce seats:** Apply the lower committed quantity at renewal, recount active membership from the database, and issue no automatic credit. Never remove/deactivate users to fit a quantity.
+- **Cancellation:** Schedule cancellation at the end of the current paid period, retain benefits until that effective date, persist the request/date, and make repeat operations idempotent.
+- **Refunds:** No automatic refunds. A request is handled manually under the approved refund policy and applicable law. Cancellation and refund requests remain separate.
+- **Authorization:** Only the workspace owner may perform billing changes. Server authorization must not rely on client roles or IDs.
 
-1. Read the server-owned plan catalog, current subscription state, included-seat allowance, current active billable-member count, additional-member rate, billing period, and next billing dates.
-2. Start checkout using a server-calculated amount and a server-created provider checkout session. The browser must not supply an authoritative price, allowance, member count, or payment result.
-3. Preview and apply plan changes and additional-seat quantity changes, returning provider-calculated timing and proration details before the user confirms.
-4. Request cancellation and read its confirmed effective date and status.
-5. Read payment status, failed-payment actions, invoices/receipts, and provider customer/payment-method references as supported by the selected provider.
-6. Receive provider payment/subscription webhooks through a server endpoint with provider signature verification and replay protection.
+The current policy module computes charge/timing intent only. It cannot activate a subscription, persist scheduled changes, verify a payment, or make an operation idempotent in durable storage. The catalog and calculation code must not be mistaken for a live billing system.
 
-All reads and mutations must use the existing authentication and workspace authorization architecture. Only the authorized billing owner may perform billing mutations. Every response that changes displayed entitlements must report the backend's authoritative state.
+## Required backend API and persistent implementation
 
-## Required server-side data and safeguards
+After a payment provider is selected, establish and implement an API contract and subscription data model for:
 
-- A workspace-to-subscription association; plan and pricing version; monthly/annual base cadence; subscription/payment state; current period; cancellation state; and provider customer/subscription references.
-- The approved included-seat count and billable-member policy once supplied. Until then, checkout must remain disabled.
-- A backend-derived set/count of unique billable `(workspaceId, userId)` memberships. Count an owner once; exclude pending invitations; prevent duplicate member charges; reconcile membership changes with provider quantities.
-- Securely stored provider identifiers and billing records. Never store or log raw card data or provider secrets in the frontend.
-- A durable provider-event record with a unique provider event identifier, verified signature result, processing outcome, and idempotent handling. Replayed events must not duplicate charges, entitlements, or state transitions.
-- Subscription activation only after an authentic server-verified successful-payment event. A redirect or client-provided success status is not evidence of payment.
-- Audit records for billing-owner actions and relevant subscription state changes without exposing secrets or payment credentials.
+1. Reading the server-owned plan catalog and subscription status, period dates, included allowance, authoritative active-member count, committed additional-seat quantity, cancellation status, and next renewal.
+2. Creating checkout/payment operations from server-calculated prices and quantities; the browser cannot submit authoritative prices, seat counts, subscription status, or payment outcomes.
+3. Previewing and applying owner-authorized upgrades, downgrades, seat increases/reductions, and cancellation with provider timing/proration.
+4. Recording provider subscription/customer identifiers, plan/pricing version, billing cadence, state, current period, committed seat quantity, scheduled changes, and effective cancellation date.
+5. Receiving authenticated provider events with signature verification, replay protection, durable unique event IDs, idempotent processing, and transactional entitlement updates.
+6. Exposing billing history, payment methods, invoices, and receipts only where supported by the approved provider contract.
+7. Enforcing membership seat obligations transactionally against authoritative database state before membership activation can create a charge or exceed a paid quantity.
 
-## Business decisions still required
+All billing mutations must be owner-authorized and audited. A client redirect or success message is never proof of payment. Do not store raw card data or expose provider credentials. Provider event processing and membership/subscription state changes require database transactions and duplicate-event protection.
 
-- Included-seat allowances for Pro and Business.
-- Whether guests, suspended members, or other membership roles are billable.
-- Upgrade/downgrade effective dates and proration behavior.
-- Seat reduction/removal timing and any provider-supported proration or credit behavior.
-- Cancellation effective date and any refund policy.
-- Failed-payment retry schedule, notices, grace period, and access restrictions.
-- Expired-subscription behavior and when paid features are restricted.
-- Payment provider, supported currencies, tax handling, invoice requirements, and production webhook configuration.
+## Explicitly deferred failed-payment requirements
 
-Do not invent refund periods, proration amounts, grace-period lengths, cancellation dates, provider settings, or access restrictions. Obtain product/legal approval and the provider contract first.
+The business has deferred failed-payment policy. Retry behavior/count, grace period, notifications, repeated-failure subscription status, continued paid access, and treatment of additional-seat charges remain undecided. Do not implement speculative retries, timelines, notices, or access restrictions. Existing failure handling must never grant paid access without verified payment or destroy customer data because payment failed.
 
-## Frontend dependency
+## Provider-dependent blockers
 
-The frontend may show the approved base and additional-member rates as informational pricing. Checkout, plan changes, cancellation, payment methods, invoices, and subscription entitlements remain unavailable until the backend publishes and implements this contract. Frontend seat totals are never authoritative.
+- Payment provider selection, supported currencies, tax handling, invoice requirements, production credentials and webhook configuration.
+- Provider API contract, secure payment confirmation, signatures/replay protection, durable idempotency, and provider-backed proration behavior.
+- Subscription schema/migration, routes, subscription lifecycle persistence, entitlement integration, billing authorization, and transactional membership enforcement.
+- Live provider and backend verification, including duplicate webhook behavior and payment-success/failure paths.
+- Legal approval of the Terms and Privacy drafts and applicable refund/cancellation wording.
+
+## Frontend behavior
+
+The pricing page shows the approved base prices, included-member allowances, owner inclusion, and additional-member monthly rates. It explains that only active members beyond the allowance are billable. Checkout, plan changes, cancellation, payment methods, invoices, and paid entitlement changes remain unavailable. Do not calculate authoritative totals in the browser.

@@ -1,18 +1,33 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google';
+import { ThemeProvider } from '@/providers/ThemeProvider';
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
   display: 'swap',
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-  display: 'swap',
-});
+/**
+ * Applies the stored theme before first paint so the interface never flashes
+ * the wrong colour scheme. The value is controlled by ThemeProvider; this
+ * script only reads it. It is static and contains no user input.
+ */
+const themeInitScript = `
+(function () {
+  try {
+    var stored = localStorage.getItem('nexus-theme');
+    var theme =
+      stored === 'light' || stored === 'dark' || stored === 'system'
+        ? stored
+        : 'system';
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (error) {
+    document.documentElement.setAttribute('data-theme', 'system');
+  }
+})();
+`;
 
 export const metadata: Metadata = {
   title: {
@@ -27,6 +42,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F8F9FC' },
+    { media: '(prefers-color-scheme: dark)', color: '#0F1117' },
+  ],
 };
 
 interface RootLayoutProps {
@@ -37,9 +56,13 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

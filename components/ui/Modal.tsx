@@ -121,7 +121,7 @@ export function Modal({
       {/* Dimmed overlay */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-black/40 animate-[nx-fade-in_var(--duration-fast)_var(--ease-standard)]"
       />
 
       {/* Dialog panel */}
@@ -134,7 +134,7 @@ export function Modal({
         className={[
           'relative z-10 w-full rounded-[var(--radius-xl)]',
           'bg-[var(--color-surface)] shadow-[var(--shadow-lg)]',
-          'flex flex-col',
+          'flex flex-col animate-[nx-dialog-in_var(--duration-base)_var(--ease-standard)]',
           maxWidthClasses[maxWidth],
           className,
         ]

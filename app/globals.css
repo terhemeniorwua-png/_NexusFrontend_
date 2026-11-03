@@ -2,17 +2,25 @@
 
 /* ─────────────────────────────────────────────────────────────
    Nexus Design Tokens — Tailwind CSS v4 @theme configuration
+   Palette and typography follow branding.md:
+   restrained indigo and charcoal identity, Inter primary font.
    ───────────────────────────────────────────────────────────── */
 @theme {
-  /* Colors */
-  --color-background:        #F8FAFC;
+  /* Brand colours */
+  --color-primary:           #5146D8;
+  --color-primary-hover:     #3730A3;
+  --color-primary-soft:      #EEF0FF;
+
+  /* Surfaces and text */
+  --color-background:        #F8F9FC;
   --color-surface:           #FFFFFF;
-  --color-surface-secondary: #F1F5F9;
-  --color-text-primary:      #0F172A;
-  --color-text-secondary:    #64748B;
-  --color-border:            #E2E8F0;
-  --color-primary:           #2563EB;
-  --color-primary-hover:     #1D4ED8;
+  --color-surface-secondary: #F0F1F5;
+  --color-text-primary:      #20232D;
+  --color-text-secondary:    #454B59;
+  --color-text-muted:        #858B9B;
+  --color-border:            #E4E6ED;
+
+  /* Semantic colours */
   --color-success:           #059669;
   --color-success-bg:        #ECFDF5;
   --color-error:             #DC2626;
@@ -22,9 +30,9 @@
   --color-info:              #0284C7;
   --color-info-bg:           #F0F9FF;
 
-  /* Task status colors */
-  --color-status-assigned:          #2563EB;
-  --color-status-assigned-bg:       #EFF6FF;
+  /* Task status colours */
+  --color-status-assigned:          #5146D8;
+  --color-status-assigned-bg:       #EEF0FF;
   --color-status-in-progress:       #D97706;
   --color-status-in-progress-bg:    #FFFBEB;
   --color-status-submitted:         #7C3AED;
@@ -36,9 +44,9 @@
   --color-status-changes-requested: #DC2626;
   --color-status-changes-bg:        #FEF2F2;
 
-  /* Typography */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* Typography — Inter is the approved primary font */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
   /* Border radius */
   --radius-sm:   0.25rem;   /* 4px  */
@@ -49,15 +57,118 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 2px 0 rgb(16 18 27 / 0.06);
+  --shadow-md: 0 4px 6px -1px rgb(16 18 27 / 0.08), 0 2px 4px -2px rgb(16 18 27 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(16 18 27 / 0.10), 0 4px 6px -4px rgb(16 18 27 / 0.06);
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
   /* Z-index scale */
   --z-dropdown:  1000;
   --z-modal:     1300;
   --z-tooltip:   1400;
   --z-toast:     1500;
+}
+
+/* Allow `dark:` utilities to follow the active theme attribute.
+   Prefer semantic tokens over dark: overrides in shared components. */
+@custom-variant dark (&:where([data-theme="dark"] *), &:where([data-theme="dark"]));
+
+/* ─────────────────────────────────────────────────────────────
+   Theme tokens
+   Light values come from @theme. Dark values override the same
+   custom properties, so every component that consumes tokens adapts
+   without per-component dark: classes.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-primary:           #7C74E8;
+  --color-primary-hover:     #918AF0;
+  --color-primary-soft:      #23214A;
+
+  --color-background:        #0F1117;
+  --color-surface:           #151821;
+  --color-surface-secondary: #1C202B;
+  --color-text-primary:      #F4F5F8;
+  --color-text-secondary:    #A8AEBD;
+  --color-text-muted:        #858B9B;
+  --color-border:            #2A2F3D;
+
+  --color-success:           #6EE7B7;
+  --color-success-bg:        #06302A;
+  --color-error:             #FCA5A5;
+  --color-error-bg:          #3B1214;
+  --color-warning:           #FCD34D;
+  --color-warning-bg:        #3A2A06;
+  --color-info:              #7DD3FC;
+  --color-info-bg:           #082F49;
+
+  --color-status-assigned:          #A5A0F0;
+  --color-status-assigned-bg:       #23214A;
+  --color-status-in-progress:       #FBBF24;
+  --color-status-in-progress-bg:    #3A2A06;
+  --color-status-submitted:         #C4B5FD;
+  --color-status-submitted-bg:      #2A1F4D;
+  --color-status-under-review:      #FDBA74;
+  --color-status-under-review-bg:   #3A2008;
+  --color-status-approved:          #6EE7B7;
+  --color-status-approved-bg:       #06302A;
+  --color-status-changes-requested: #FCA5A5;
+  --color-status-changes-bg:        #3B1214;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+/* System preference applies only while the user has chosen "system". */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+
+    --color-primary:           #7C74E8;
+    --color-primary-hover:     #918AF0;
+    --color-primary-soft:      #23214A;
+
+    --color-background:        #0F1117;
+    --color-surface:           #151821;
+    --color-surface-secondary: #1C202B;
+    --color-text-primary:      #F4F5F8;
+    --color-text-secondary:    #A8AEBD;
+    --color-text-muted:        #858B9B;
+    --color-border:            #2A2F3D;
+
+    --color-success:           #6EE7B7;
+    --color-success-bg:        #06302A;
+    --color-error:             #FCA5A5;
+    --color-error-bg:          #3B1214;
+    --color-warning:           #FCD34D;
+    --color-warning-bg:        #3A2A06;
+    --color-info:              #7DD3FC;
+    --color-info-bg:           #082F49;
+
+    --color-status-assigned:          #A5A0F0;
+    --color-status-assigned-bg:       #23214A;
+    --color-status-in-progress:       #FBBF24;
+    --color-status-in-progress-bg:    #3A2A06;
+    --color-status-submitted:         #C4B5FD;
+    --color-status-submitted-bg:      #2A1F4D;
+    --color-status-under-review:      #FDBA74;
+    --color-status-under-review-bg:   #3A2008;
+    --color-status-approved:          #6EE7B7;
+    --color-status-approved-bg:       #06302A;
+    --color-status-changes-requested: #FCA5A5;
+    --color-status-changes-bg:        #3B1214;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -75,6 +186,24 @@ body {
   min-height: 100dvh;
   background-color: var(--color-background);
   color: var(--color-text-primary);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Motion — shared, subtle entrance animations
+   ───────────────────────────────────────────────────────────── */
+@keyframes nx-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes nx-pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes nx-dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ─────────────────────────────────────────────────────────────

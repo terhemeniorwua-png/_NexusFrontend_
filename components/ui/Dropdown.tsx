@@ -23,11 +23,18 @@ interface DropdownProps {
   items: DropdownItem[];
   /** Accessible name for the trigger and the menu */
   label: string;
+  /**
+   * Optional explicit accessible name for the trigger. Use when the trigger
+   * content (for example an avatar) would not produce a clear name on its own.
+   */
+  triggerLabel?: string;
   /** Optional trigger content; defaults to the label text */
   children?: React.ReactNode;
   /** Menu alignment relative to the trigger */
   align?: 'start' | 'end';
   className?: string;
+  /** Extra classes for the trigger button — useful for full-width triggers */
+  triggerClassName?: string;
   menuClassName?: string;
 }
 
@@ -43,9 +50,11 @@ interface DropdownProps {
 export function Dropdown({
   items,
   label,
+  triggerLabel,
   children,
   align = 'start',
   className = '',
+  triggerClassName = '',
   menuClassName = '',
 }: DropdownProps) {
   const [open, setOpen] = useState(false);
@@ -178,6 +187,7 @@ export function Dropdown({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
+        aria-label={triggerLabel}
         onClick={() => setOpen((previous) => !previous)}
         onKeyDown={handleTriggerKeyDown}
         className={[
@@ -186,6 +196,7 @@ export function Dropdown({
           'text-sm font-medium text-[var(--color-text-primary)]',
           'transition-colors duration-150 hover:bg-[var(--color-surface-secondary)]',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]',
+          triggerClassName,
         ].join(' ')}
       >
         {children ?? label}

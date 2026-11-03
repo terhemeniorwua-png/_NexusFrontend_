@@ -69,6 +69,9 @@
 
   /* Z-index scale */
   --z-dropdown:  1000;
+  --z-topbar:    1100;
+  --z-sidebar-backdrop: 1190;
+  --z-sidebar:   1200;
   --z-modal:     1300;
   --z-tooltip:   1400;
   --z-toast:     1500;

@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   },
   description:
     'Nexus — One connected workspace for projects, people, and progress.',
-  robots: { index: false, follow: false },
+  robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {

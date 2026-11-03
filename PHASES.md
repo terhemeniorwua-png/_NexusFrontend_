@@ -137,14 +137,14 @@ At the end of each phase:
 
 ## Phase Status Summary
 
-Last verified: 2026-11-03, on branch `feature/phase-2-app-shell`.
+Last verified: 2026-11-03, on branch `feature/frontend-authentication`.
 
 | Phase | Title | Status |
 |---|---|---|
 | 0 | Frontend Repository Audit and Project Foundation | Completed |
 | 1 | Design System, Branding, and UI Foundation | Completed |
 | 2 | Application Layout and Navigation Architecture | Completed |
-| 3 | Public Website and Authentication Interfaces | Not Started |
+| 3 | Public Website and Authentication Interfaces | In Progress |
 | 4 | User Onboarding and Profile Management | Not Started |
 | 5 | Workspace Creation and Workspace Switching | Not Started |
 | 6 | Organisation Membership, Join Requests, and Invitations | Not Started |
@@ -178,7 +178,7 @@ Last verified: 2026-11-03, on branch `feature/phase-2-app-shell`.
 
 Status meanings: **Not Started**, **In Progress**, **Blocked**, **Completed**. A phase is only marked **Completed** when its functional requirements, integrations, and validation requirements have been verified.
 
-Phases 0, 1, and 2 are complete. Phase 3 is the next incomplete phase; its real authentication integration is blocked until the backend authentication and session contract is confirmed.
+Phases 0, 1, and 2 are complete. Phase 3 is in progress on `feature/frontend-authentication`; the backend auth contract has now been confirmed and connected through a same-origin Next.js proxy. Phase completion still depends on approved legal copy and exact paid-plan pricing/allowances. OAuth is omitted because the backend has no OAuth route.
 
 ---
 
@@ -259,18 +259,19 @@ Verified on 2026-11-03 on branch `feature/phase-1-design-system`.
 
 #### Backend dependency checklist
 
-The following must be supplied by the backend before dependent phases begin. None of these contracts is confirmed inside this repository, and none may be invented.
+The following contracts must be verified against the backend before dependent phases begin. Phase 0 only inspected the frontend repository; Phase 3 has now verified the auth contracts against the adjacent backend repository.
 
 | Dependency | Needed by | Status |
 |---|---|---|
-| API base URL and versioning convention | Phase 3 | Unconfirmed |
-| Authentication/session contract (cookie vs token, refresh, logout) | Phase 3 | Unconfirmed |
-| User, session, and permission response shapes | Phase 3–4 | Unconfirmed |
+| API base URL and versioning convention | Phase 3 | Confirmed: backend OpenAPI server is `/api/v1`; local upstream is `http://localhost:4000` |
+| Authentication/session contract (cookie vs token, refresh, logout) | Phase 3 | Confirmed: short-lived bearer access token in response; rotating refresh token in HttpOnly cookie; CSRF cookie plus header; session logout endpoints |
+| User and session response shapes | Phase 3 | Confirmed in OpenAPI and auth controller; workspace permission shapes remain unconfirmed for later phases |
 | Workspace list, switching, and scoping contract | Phase 5 | Unconfirmed |
 | Membership, join request, and invitation contracts | Phase 6 | Unconfirmed |
 | Role and permission payloads for Company and Institution | Phase 7 | Unconfirmed |
 | Project, task, and visibility contracts | Phase 9–10 | Unconfirmed |
-| Pagination, filtering, sorting, and error envelope | Phase 3 onward | Unconfirmed |
+| Pagination, filtering, and sorting | Phase 3 onward | Unconfirmed |
+| Error envelope | Phase 3 | Confirmed: `{ success: false, error: { code, message, details?, requestId } }` |
 | Socket.IO URL, auth method, event names, and payloads | Phase 11, 25 | Unconfirmed |
 | File upload/download and signed URL contract | Phase 13 | Unconfirmed |
 | AI request, streaming, and action-approval contract | Phase 22–24 | Unconfirmed |
@@ -453,7 +454,7 @@ New tests cover navigation filtering and active paths, the sidebar (active state
 
 #### Known limitations
 
-- The shell is not mounted on a route because no authenticated routes, session provider, or workspace provider exist yet. Phase 3 supplies the route structure and session; Phase 5 supplies workspace switching.
+- The shared shell remains unmounted. Phase 3 now provides auth routes and a session-confirmed `/app` boundary; the workspace-aware shell remains deferred until a workspace context and workspace-scoped routes are implemented.
 - Permission filtering is a presentation concern, not authorisation. Backend checks remain authoritative.
 - The desktop collapse preference is component state and is not persisted across reloads.
 - `ThemeToggle` is hidden below the `md` breakpoint to preserve topbar space; the full preference UI belongs in settings in Phase 26.
@@ -491,6 +492,50 @@ Implement the public-facing pages and authentication experience.
 - Public website.
 - Authentication interfaces.
 - Connected authentication workflows.
+
+### Phase 3 Progress — In Progress
+
+Verified on 2026-11-03 against the frontend implementation and `../__NexusBackend__/docs/openapi.yaml`, `src/modules/auth/auth.routes.ts`, `src/modules/auth/auth.controller.ts`, and `src/modules/auth/auth.schemas.ts`.
+
+#### Implemented
+
+- Replaced the root placeholder with a responsive public landing page, product overview, feature sections, and workspace-type overview.
+- Added `/pricing` with workspace plan categories and an explicit unavailable state for paid plans and trial enrollment. Prices and seat allowances are absent; plan status, descriptions, and availability messaging are centralized in `lib/subscription-plans.ts`.
+- Added `/sign-in`, `/sign-up`, `/verify-email`, `/forgot-password`, and `/reset-password` with typed forms, local validation, API feedback, loading states, and success states.
+- Integrated registration, login, email verification, verification resend, password recovery, and password reset with the backend's verified `/auth/*` contracts.
+- Added `/app` as a session-confirmed post-login landing route. It fetches `/auth/me`, attempts refresh when no in-memory access token exists, and supports logout.
+- Added `app/api/backend/[...path]/route.ts` as a same-origin proxy. It forwards the backend URL from server-only `NEXUS_API_URL`, request cookies, bearer authorization, and the CSRF header; it also forwards Set-Cookie responses. This avoids browser CORS dependence while keeping the refresh cookie HttpOnly.
+- Access tokens are held in module memory only. No token is written to localStorage or sessionStorage.
+- Updated `.env.example` to the confirmed local backend base URL (`NEXUS_API_URL=http://localhost:4000/api/v1`).
+- Added AuthForm and auth-service tests.
+- Added `/terms` and `/privacy` policy pages with a shared page template and centralized replaceable content structure. Each page visibly identifies itself as a placeholder awaiting approved legal text; links are available from sign-in, sign-up, pricing, and the public landing page.
+
+#### Awaiting approved legal content
+
+- Final Terms of Service text has not been supplied. The current page contains labeled placeholders only.
+- Final Privacy Policy text has not been supplied. The current page contains labeled placeholders only.
+
+#### Awaiting subscription decisions and integration
+
+- Paid subscription prices have not been approved; no amounts are displayed.
+- Member seat allowances have not been approved; no counts or limits are displayed.
+- The backend repository has no subscription or billing routes in its OpenAPI contract or implementation. Paid checkout, plan changes, and trial enrollment are unavailable in the UI; no mock integration was added.
+
+#### Deferred future enhancement
+
+- OAuth remains out of scope until the backend provides and approves OAuth routes and provider contracts. The frontend has no OAuth buttons or independent auth path.
+
+#### Deployment requirement
+
+- Production deployment must set `NEXUS_API_URL` to the reachable backend API base.
+
+#### Validation
+
+- `npm run lint` — passed.
+- `npx tsc --noEmit` — passed after the final Next.js build.
+- `npm run build` — passed; generates the marketing, pricing, auth, policy, protected app, and dynamic auth proxy routes.
+- `npm test` — passed, 19 files and 129 tests, covering auth form validation and submission/error states, recovery/reset, token handling, proxy cookies, policy placeholders, and unavailable pricing.
+- Manual API workflow — not run; no local backend process or frontend `.env.local` was configured in this checkout.
 
 ## Phase 4 — User Onboarding and Profile Management
 

@@ -19,15 +19,22 @@ export function PolicyPage({ policy }: { policy: LegalPolicyContent }) {
         <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{policy.title}</h1>
         <p className="mt-4 text-base leading-7 text-[var(--color-text-secondary)]">{policy.summary}</p>
 
-        <Alert variant="warning" title="Placeholder — approval pending" className="mt-8">
-          No approved policy language has been supplied. The headings below are structure only; each section must be replaced with approved content before this page can serve as a final policy.
+        <Alert variant="warning" title="DRAFT — REQUIRES LEGAL REVIEW AND APPROVAL" className="mt-8">
+          This draft is not a final or legally approved policy. Bracketed items identify missing business, deployment, or legal decisions that must be resolved before publication.
         </Alert>
 
         <div className="mt-8 space-y-4">
           {policy.sections.map((section) => (
             <section key={section.id} id={section.id} aria-labelledby={`${section.id}-heading`} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
               <h2 id={`${section.id}-heading`} className="text-lg font-semibold">{section.heading}</h2>
-              <p className="mt-3 text-sm leading-6 text-[var(--color-text-secondary)]">Placeholder: approved policy text for this section has not been provided.</p>
+              <div className="mt-3 space-y-3 text-sm leading-6 text-[var(--color-text-secondary)]">
+                {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                {section.bullets && (
+                  <ul className="list-disc space-y-1 pl-5">
+                    {section.bullets.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                )}
+              </div>
             </section>
           ))}
         </div>

@@ -800,6 +800,13 @@ Profile setup/editing, timezone and locale preferences, password/email security,
 - Live backend workflows and agent-performed viewport review were not run. Responsive behavior remains user-confirmed only.
 - Files changed for this progress: `components/profile/AccountSecurity.tsx`, `components/profile/__tests__/AccountSecurity.test.tsx`, `services/account-security.ts`, and the existing in-progress `/app/profile` page and test.
 
+#### Phase 4 next-phase audit — 2026-11-05
+
+- After committing the Phase 3 authentication follow-up, Phase 4 was re-inspected as the next roadmap phase. Existing `/app/profile`, `AccountSecurity`, profile API, and same-browser onboarding intent functionality are present; no duplicate implementation was added.
+- `npm test -- --run components/profile/__tests__/AccountSecurity.test.tsx app/app/profile/page.test.tsx` passed (2 files, 8 tests).
+- No new Phase 4 feature could be safely implemented against the inspected contracts: cross-device onboarding requires backend-persisted intent; avatar upload, replacement, signature validation, and removal require authorized backend storage contracts; deletion remains blocked by the provisional immediate-deletion policy conflicting with the backend's 30-day recovery flow. Live profile/session verification is also blocked by the backend environment configuration documented under Phase 3.
+- Phase 4 remains **Blocked**. Resume implementation when these backend and product-policy dependencies are resolved; do not treat the existing profile editor's avatar URL field as the required secure upload workflow.
+
 #### Account-deletion policy update — 2026-11-04
 
 - The user's latest provisional product policy supersedes the previous 30-day product-policy assumption: access should be revoked immediately after explicit confirmation, without a user-facing recovery period; eligible personal information is removed asynchronously; shared organizational content is preserved/anonymized as applicable; workspace ownership is transferred or access is restricted; recurring billing is stopped.

@@ -124,6 +124,34 @@ describe('AuthForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('That email and password combination was not recognised.');
   });
 
+  it('offers password-verified account reactivation and requires a fresh sign-in', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: false,
+        error: { code: 'ACCOUNT_PENDING_DELETION', message: 'This account is pending deletion. Recover it before signing in.' },
+      }), { status: 403, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        data: { user: { id: 'user-id', email: 'ada@example.com', name: 'Ada', status: 'ACTIVE', emailVerifiedAt: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' } },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(<AuthForm mode="sign-in" />);
+
+    await user.type(screen.getByLabelText(/Email address/), 'ada@example.com');
+    await user.type(screen.getByLabelText(/Password/), 'Nexus-password-42');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByRole('button', { name: 'Reactivate account' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Reactivate account' }));
+
+    expect(await screen.findByText('Your account is restored. Sign in again to start a new secure session.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/backend/auth/reactivate', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ email: 'ada@example.com', password: 'Nexus-password-42' }),
+    }));
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
   it('stores the returned access token in memory and continues to the app after sign-in', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       success: true,

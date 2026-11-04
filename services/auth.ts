@@ -47,6 +47,16 @@ export async function signIn(input: {
   return result;
 }
 
+export async function reactivateAccount(input: {
+  email: string;
+  password: string;
+}): Promise<{ user: AuthUser }> {
+  return apiRequest('/auth/reactivate', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export async function verifyEmail(token: string): Promise<{ user: AuthUser }> {
   return apiRequest('/auth/verify-email', {
     method: 'POST',
@@ -79,9 +89,14 @@ export async function resetPassword(input: {
 }
 
 export async function refreshSession(): Promise<AuthResponse> {
-  const result = await apiRequest<AuthResponse>('/auth/refresh', { method: 'POST' });
-  setAccessToken(result.accessToken);
-  return result;
+  try {
+    const result = await apiRequest<AuthResponse>('/auth/refresh', { method: 'POST' });
+    setAccessToken(result.accessToken);
+    return result;
+  } catch (error) {
+    setAccessToken(null);
+    throw error;
+  }
 }
 
 export async function signOut(): Promise<void> {

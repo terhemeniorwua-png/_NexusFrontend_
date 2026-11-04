@@ -73,17 +73,17 @@ Hosting provider, data locations, and transfer safeguards: **[DEPLOYMENT DETAILS
 
 ## 16. Data retention
 
-Service records are retained as needed to provide the service, protect security, resolve disputes, and meet legal obligations. No retention period for ordinary workspace data, logs, or backups is set by this draft. The 30-day account-deletion recovery period is described below.
+Service records are retained as needed to provide the service, protect security, resolve disputes, and meet legal obligations. No retention period for ordinary workspace data, logs, or backups is set by this draft. The provisional product policy proposes immediate account-access revocation after a confirmed deletion request, with no recovery period, followed by asynchronous deletion of eligible personal data. This is not legally approved, and the current backend instead schedules deletion after a 30-day recovery period.
 
-## 17. Account deletion and 30-day recovery
+## 17. Account deletion — provisional policy; implementation mismatch
 
-Account deletion requires authentication and confirmation and begins a 30-day recovery period. During that period, the user may recover the account through a secure process. Afterward, permanent deletion removes the personal workspace and exclusively owned data, subject to legal obligations and technically necessary cleanup.
+The provisional product policy proposes immediate session revocation and loss of sign-in access after an authenticated, explicitly confirmed request, followed by asynchronous deletion of eligible personal information. It provides no recovery period. The current backend still implements a 30-day pending-deletion/recovery period, so this proposed policy does not describe the behavior currently available in the service and must not be presented as an implemented feature.
 
-Shared organization workspaces and other members’ content must be preserved. If the deleting user is the only eligible organization owner, ownership must be transferred or separately resolved. Shared assets must remain while referenced by valid shared resources. Organization deletion is separate and requires authorization.
+The proposal preserves eligible organizational records, anonymizes retained shared content where appropriate, transfers workspace ownership to an eligible successor, and archives/restricts a workspace if no successor exists. Personal avatars are to be deleted. Legally required financial records may be retained, but retention periods and exceptions are unresolved. Workspace ownership, billing cancellation, storage deletion, anonymization, and cleanup behavior must be aligned and verified before this section is approved or published as final policy.
 
 ## 18. Personal workspace deletion
 
-Permanent account deletion includes the personal workspace and exclusively owned data under the approved product policy. Shared content must not be deleted while other members or valid shared resources rely on it. Any separate workspace deletion action must be authorized, confirmed, and explain its effect.
+The provisional product policy proposes removing the personal workspace and eligible personal data while preserving shared content that other members or valid shared resources rely on. Exact timing and exceptions remain subject to backend alignment and legal review.
 
 ## 19. Shared organization data
 

@@ -97,15 +97,17 @@ Failed-payment policy is deferred. Retry behavior, grace periods, notices, subsc
 
 Access may need to be restricted for security, legal requirements, non-payment, or material violations. Notice, review, appeal, and restoration procedures are **[PENDING LEGAL AND BUSINESS APPROVAL]**, subject to non-waivable legal rights.
 
-## 21. Account deletion and 30-day recovery
+## 21. Account deletion — provisional policy; implementation mismatch
 
-Deletion requires authentication and confirmation and starts a **30-day recovery period**. During that period, the user may recover the account through a secure process. After it ends, permanent deletion removes the personal workspace and exclusively owned data, subject to legal obligations and disclosed technical cleanup schedules.
+The current provisional product policy proposes immediate account-access revocation after an authenticated, explicitly confirmed deletion request, with no user-facing cancellation or recovery period. Eligible personal information is then scheduled for deletion. This policy is not legally approved.
 
-Shared organization workspaces and other members’ content must be preserved. If the user is the only eligible organization owner, ownership must be transferred or separately resolved. Shared assets remain while referenced by valid shared resources. Organization deletion is a separate authorized process.
+The backend currently schedules deletion with a 30-day recovery period. The frontend does not expose account deletion. Do not publish this proposed behavior as an available service until the product policy, legal text, and backend lifecycle contract are aligned and the ownership, billing, retention, anonymization, and object-storage requirements are implemented and verified.
 
-## 22. Personal workspace deletion
+The proposed policy preserves eligible organizational content, transfers ownership to an eligible active member where possible, and archives/restricts a workspace if no eligible successor exists. Personal avatars and other eligible personal data are deleted; legally required financial records may be retained. Organization deletion remains a separate authorized action. The exact legal exceptions and retention periods require review.
 
-Permanent account deletion removes the user’s personal workspace and exclusively owned data under the approved policy. A separate personal-workspace deletion flow must explain its consequences and require confirmation. Shared content is not removed while it remains part of a valid shared resource.
+## 22. Personal workspace and shared content
+
+Under the provisional policy, deletion removes eligible personal information and the personal workspace while preserving valid shared organizational content and records needed for workspace continuity. Do not promise exact deletion timing or retention until the backend lifecycle and applicable legal requirements are aligned.
 
 ## 23. Shared organization content
 

@@ -781,14 +781,14 @@ Started on 2026-11-03 on `feature/frontend-authentication` at the user's directi
 | Requirement | Status | Verification or dependency |
 |---|---|---|
 | Profile setup and editing | Implemented in progress at `/app/profile`; validation and API integration covered by frontend tests | Uses the verified `/users/me` GET/PATCH contract. Manual live-backend verification and responsive viewport review remain outstanding. |
-| Profile picture | URL field supported by the profile contract; file upload is not implemented | No upload/storage API contract was found for this phase task. |
+| Profile picture | URL field implemented; required upload/replace/remove workflow blocked | The provisional product policy specifies private AWS S3 storage, formats JPEG/JPG, PNG, WebP, GIF, and AVIF, and a strict size below 1,000,000 bytes. The backend exposes only a profile `avatarUrl` field; no authorized upload, replacement, removal, signature validation, or object-deletion contract exists. Do not send files directly to S3 from the browser or treat a user-entered URL as satisfying avatar management. |
 | Time zone and locale preferences | Editable through the profile contract | UI/backend integration tests pass; confirm values against a live backend before completion. |
-| First-time onboarding progress and return behavior | Not implemented | No onboarding-completion API or persistence contract was found. |
+| First-time onboarding progress and return behavior | Partially implemented; cross-device persistence blocked | The frontend stores account-type intent in browser local storage and can resume or reuse a matching workspace on that browser. The new provisional product policy requires backend persistence across browsers/devices. No onboarding status endpoint or registration/verification persistence contract exists. |
 | Account security and session/device management | Implemented against confirmed auth contracts | Password change, verified email-change request, active-session listing, and confirmed sign-out-all use `/auth/password/change`, `/auth/email/change`, `/auth/sessions`, and `/auth/logout-all`. Individual session revocation and 2FA are not supported by the inspected backend contract. |
-| Account deletion interface | Blocked | The backend has a 30-day deletion request, but cleanup behavior does not fully match the approved retention policy. Do not expose until aligned. |
+| Account deletion interface | Blocked; current contract conflicts with latest provisional product policy | The latest policy proposes immediate access revocation with no recovery period, ownership transfer or workspace restriction, asynchronous deletion/anonymization, and billing cancellation. The backend still schedules deletion with a 30-day recovery period and its worker can block on ownership, shared personal-workspace membership, or file metadata. No deletion UI is exposed. Backend lifecycle, ownership, billing, storage, anonymization, and retention must align before frontend implementation. |
 | Mobile, tablet, and desktop review | User-confirmed reviewed and responsive | This agent did not perform a manual viewport review in the current task. |
 
-Profile setup/editing, timezone and locale preferences, password/email security, and session review are implemented. Focused tests passed (8 tests); full frontend validation is recorded below. Phase 4 is **Blocked** because first-time onboarding completion/return behavior has no persistence contract, avatar upload has no backend contract, and the approved account-deletion retention policy is not fully aligned with backend cleanup. Phase 5 work is tracked below.
+Profile setup/editing, timezone and locale preferences, password/email security, and session review are implemented. Focused tests passed (8 tests); full frontend validation is recorded below. Phase 4 is **Blocked** because cross-device onboarding persistence and avatar upload/removal have no backend contracts, and the latest provisional immediate-deletion policy conflicts with the backend's 30-day recovery contract and cleanup behavior. Phase 5 work is tracked below.
 
 #### Phase 4 validation — 2026-11-03
 
@@ -800,13 +800,20 @@ Profile setup/editing, timezone and locale preferences, password/email security,
 - Live backend workflows and agent-performed viewport review were not run. Responsive behavior remains user-confirmed only.
 - Files changed for this progress: `components/profile/AccountSecurity.tsx`, `components/profile/__tests__/AccountSecurity.test.tsx`, `services/account-security.ts`, and the existing in-progress `/app/profile` page and test.
 
-#### Approved account-deletion policy for future implementation
+#### Account-deletion policy update — 2026-11-04
 
-- Account deletion requires authentication and explicit confirmation, followed by a 30-day secure recovery period.
-- After the recovery period, permanent deletion removes the personal workspace and exclusively owned data while preserving shared organization content and assets referenced by valid shared resources.
-- If the user is the only eligible organization owner, ownership must be transferred or separately resolved. Organization deletion remains a distinct authorized action.
-- This is a product-policy decision only; no account-deletion interface work is included in the current Phase 4 implementation scope.
-- Backend alignment must be reviewed before the flow is exposed. The current cleanup worker can hold deletion for manual resolution when a personal workspace has collaborators or file metadata and blocks deletion while workspace ownership remains; its storage cleanup behavior is not equivalent to the complete approved policy.
+- The user's latest provisional product policy supersedes the previous 30-day product-policy assumption: access should be revoked immediately after explicit confirmation, without a user-facing recovery period; eligible personal information is removed asynchronously; shared organizational content is preserved/anonymized as applicable; workspace ownership is transferred or access is restricted; recurring billing is stopped.
+- The supplied policy pack remains a fictional working draft pending product-owner confirmation and legal review. Nigeria is an assumption, not an approved governing jurisdiction. The supplied terms, privacy, subscription, and refund policies must not be represented as legally approved.
+- The current backend still schedules account deletion after 30 days and does not provide the complete ownership-transfer, billing, avatar-object deletion, and data-retention lifecycle specified by the new policy. Do not expose a frontend deletion workflow until the backend contract and implementation match an explicitly approved product decision.
+- Avatar policy now proposes AWS S3, JPEG/JPG, PNG, WebP, GIF, AVIF, and a strict maximum below 1,000,000 bytes. This does not supply a backend upload/signature-validation/removal endpoint; frontend upload remains blocked.
+- Onboarding policy requires backend persistence across devices. The current browser-local account-type intent is only a same-browser fallback and does not satisfy this requirement; no matching backend contract was found.
+
+#### Legal and lifecycle policy handoff — 2026-11-04
+
+- Added `docs/LEGAL_IMPLEMENTATION_GUIDE.md` to record draft lifecycle states, public-page requirements, registration-consent dependencies, checkout disclosures, and the verified onboarding, avatar, and account-deletion backend gaps.
+- Updated `docs/TERMS_OF_SERVICE_DRAFT.md`, `docs/PRIVACY_POLICY_DRAFT.md`, `docs/CANCELLATION_REFUND_POLICY_DRAFT.md`, and the public draft copy in `lib/legal-policies.ts` to replace the superseded 30-day policy claim with the latest provisional immediate-revocation proposal and an explicit statement that the backend still has a 30-day recovery period.
+- The provided pack remains a fictional working draft; Nigeria is only a jurisdiction assumption. No legal or product approval state is inferred, and Phase 3 remains open pending required approvals and live integration checks.
+- `npm test -- --run components/legal/__tests__/PolicyPage.test.tsx` — passed (1 file, 3 tests); `npx tsc --noEmit` — passed; `npm run lint` — passed with the same three unrelated unused-function warnings recorded above. Full suite was not rerun for this documentation/copy update.
 
 ### Objectives
 
@@ -880,6 +887,15 @@ Support Individual, Company, and Institution workspaces.
 **Validation:** `npx tsc --noEmit` passed; `npm run lint` passed; `npm run build` passed and emitted `/app/workspaces`; focused Phase 5 tests passed (16/16). The full Vitest suite reported 155 passing and 3 tests outside the touched feature areas timing out at the configured 5-second limit (auth form, sidebar, and legal policy); the cause was not established. `git diff --check` passed.
 
 **Remaining before completion:** backend-defined workspace branding support or an approved reduction of that requirement, live authenticated workflow verification, and responsive/manual review. No backend source or schema was modified.
+
+#### Verification follow-up — 2026-11-04
+
+- `npx tsc --noEmit` — passed.
+- `npm run lint` — passed with three existing unused-function warnings in Phase 6 files (`app/app/discover/page.tsx`, `components/members/InvitationsPanel.tsx`, and `components/members/JoinRequestsPanel.tsx`).
+- `npm run build` — passed; `/app/workspaces` was generated. Next.js reported the existing parent-directory `pnpm-lock.yaml` warning.
+- `npm test` — 35 of 36 test files passed (252 of 254 tests). Two invitation acceptance tests failed because `refreshSession()` returned `undefined` in the test setup and the component called `.then()` on it. This failure is in Phase 6 code and was not changed as part of the Phase 5 audit.
+- Backend workspace API docs and `workspace.schemas.ts` were inspected in the adjacent `__NexusBackend__` repository. They confirm name, description, and visibility updates, but expose no logo, colour, or other workspace-branding fields. Branding remains blocked on a backend contract or approved scope reduction.
+- No live authenticated workflow or manual responsive viewport review was performed; those requirements remain open.
 
 ## Phase 6 — Organisation Membership, Join Requests, and Invitations
 
@@ -2101,3 +2117,12 @@ Do not implement backend functionality inside the frontend. Do not invent API en
 - Paid seat-capacity enforcement status in `lib/subscription-plans.ts` now matches the backend’s transactionally enforced membership activation checks. The Free plan has no backend subscription catalog entry or defined feature/seat/storage/project limits. The public card therefore states only the verified personal-workspace inclusion and routes to account creation; Free usage-limit enforcement remains a backend/product-policy gap.
 - Cross-browser/device onboarding intent is not stored by the backend: registration accepts only `{ name, email, password }`, and the verification URL contains only its token. The browser-local intent survives reloads and browser closure on that browser. On another browser/device, the user can still choose the account type at sign-in to resume the correct path, but automatic type recovery requires a backend-persisted registration intent or an approved verification-link contract change.
 - Frontend automated tests cover identity payloads, local intent restore, verification resend/recovery, matching and missing workspace paths, typed creation, existing-workspace reuse, uncertain-create retry, session expiry, and Free plan display. All 27 test files passed (184 tests total) on 2026-11-04. Live email delivery and live backend registration/verification/workspace creation were not exercised in this review. Phase 3 remains In Progress.
+
+#### Sequential phase audit follow-up — 2026-11-04
+
+- Re-read the canonical `AGENTS.md`, `README.md`, `PHASES.md`, `branding.md`, `nexus-frontend/SKILL.md`, and `CONVENTIONS.md`; the lowercase filenames referenced by some instructions are not present. `README.md` duplicates `AGENTS.md`. The adjacent backend references are in `../__NexusBackend__/docs/API.md`, `docs/openapi.yaml`, and the relevant source schemas/controllers.
+- Phase 0 — **VERIFIED COMPLETE** for repository/configuration deliverables: package/lockfile, environment template, TypeScript/Next configuration, conventions, and backend dependency record are present. The Phase 0 historical note that the backend repository is unknown is obsolete; the adjacent repository and API docs are available. This does not establish completion of later backend-dependent functionality.
+- Phases 1–2 — **VERIFIED COMPLETE** for their design-system and application-shell scope: the tokenized themes, UI primitives, shell/navigation components, and their focused tests are present. The current grouped foundation/shell/Phase 3 workflow run passed 25 files and 192 tests.
+- Phase 3 — remains **PARTIALLY COMPLETE / IN PROGRESS**. The draft legal pack is not legal approval, live auth/email workflow verification remains outstanding, and billing still requires merchant USD enablement, migration/provider verification, and remaining backend lifecycle/reconciliation work. No additional independent frontend workflow can be completed safely against the current approved contracts.
+- This audit is intentionally sequential. It does not advance Phase 4 or later phases while Phase 3 remains open.
+- Full-suite state from the 2026-11-04 audit is recorded above: 252/254 tests passed, with two invitation-acceptance failures in Phase 6 test setup. That later-phase defect is documented for its phase and was not changed out of sequence.

@@ -66,4 +66,12 @@ describe('account selection authentication flow', () => {
     await user.click(screen.getByRole('button', { name: 'Close dialog' }));
     expect(router.replace).toHaveBeenCalledWith('/');
   });
+
+  it('skips account-type selection when a redirect target already defines the workflow', () => {
+    render(<AuthPage mode="sign-in" redirectPath="/workspaces/invitations/accept?token=abc" />);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Change account type/ })).not.toBeInTheDocument();
+  });
 });

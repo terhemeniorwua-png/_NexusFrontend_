@@ -142,7 +142,7 @@ export function Sidebar({
                     className="flex flex-col gap-0.5"
                   >
                     {section.items.map((item) => {
-                      const active = isPathActive(item.href, activePath);
+                      const active = isPathActive(item.href, activePath, item.exact === true);
 
                       return (
                         <li key={item.id}>

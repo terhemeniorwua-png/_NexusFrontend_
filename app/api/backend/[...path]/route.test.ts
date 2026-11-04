@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from './route';
+import { GET, POST } from './route';
 
 describe('same-origin backend proxy', () => {
   beforeEach(() => {
@@ -48,12 +48,11 @@ describe('same-origin backend proxy', () => {
   });
 
   it('proxies the confirmed workspace API for account-type workspace resolution', async () => {
-    process.env.NEXUS_API_URL = 'http://localhost:4000/api/v1';
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const request = new NextRequest('http://localhost/api/backend/workspaces');
 
-    const response = await (await import('./route')).GET(request, {
+    const response = await GET(request, {
       params: Promise.resolve({ path: ['workspaces'] }),
     });
 
@@ -61,14 +60,50 @@ describe('same-origin backend proxy', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe('http://localhost:4000/api/v1/workspaces');
   });
 
-  it('does not proxy routes outside the confirmed auth and workspace APIs', async () => {
+  it.each([
+    [['users', 'me'], 'http://localhost:4000/api/v1/users/me'],
+    [['billing', 'plans'], 'http://localhost:4000/api/v1/billing/plans'],
+    [['invitations'], 'http://localhost:4000/api/v1/invitations'],
+  ])('proxies the confirmed %s module', async (path, expectedUrl) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const request = new NextRequest(`http://localhost/api/backend/${path.join('/')}`);
+
+    const response = await GET(request, { params: Promise.resolve({ path }) });
+
+    expect(response.status).toBe(200);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(expectedUrl);
+  });
+
+  it('forwards base64url invitation tokens without mangling them', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: {} }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const token = 'AbC_-123xyz';
+    const request = new NextRequest(`http://localhost/api/backend/invitations/${token}`);
+
+    const response = await GET(request, { params: Promise.resolve({ path: ['invitations', token] }) });
+
+    expect(response.status).toBe(200);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(`http://localhost:4000/api/v1/invitations/${token}`);
+  });
+
+  it('does not proxy modules outside the confirmed allowlist', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    const request = new NextRequest('http://localhost/api/backend/users');
+    const request = new NextRequest('http://localhost/api/backend/teams');
 
-    const response = await (await import('./route')).GET(request, {
-      params: Promise.resolve({ path: ['users'] }),
-    });
+    const response = await GET(request, { params: Promise.resolve({ path: ['teams'] }) });
+
+    expect(response.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe path segments', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const request = new NextRequest('http://localhost/api/backend/workspaces/%2E%2E');
+
+    const response = await GET(request, { params: Promise.resolve({ path: ['workspaces', '..'] }) });
 
     expect(response.status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();

@@ -1,8 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AppHomePage from './page';
-import { signOut } from '@/services/auth';
 
 const mocks = vi.hoisted(() => ({
   router: { push: vi.fn(), replace: vi.fn() },
@@ -23,7 +21,6 @@ vi.mock('next/link', () => ({
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => mocks.router }));
 vi.mock('@/providers/WorkspaceProvider', () => ({ useWorkspaceContext: () => mocks.context }));
-vi.mock('@/services/auth', () => ({ signOut: vi.fn() }));
 
 describe('AppHomePage workspace context', () => {
   beforeEach(() => {
@@ -31,7 +28,6 @@ describe('AppHomePage workspace context', () => {
     mocks.context.loading = false;
     mocks.context.error = null;
     mocks.context.activeWorkspace = { ...mocks.context.workspaces[0], name: 'Personal' };
-    vi.mocked(signOut).mockResolvedValue(undefined);
   });
 
   it('shows the active workspace and links to workspace management', () => {
@@ -42,15 +38,6 @@ describe('AppHomePage workspace context', () => {
     expect(screen.getByRole('link', { name: 'Manage workspaces' })).toHaveAttribute('href', '/app/workspaces');
   });
 
-  it('allows signing out from the authenticated application', async () => {
-    const user = userEvent.setup();
-    render(<AppHomePage />);
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
-
-    await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
-    expect(mocks.router.push).toHaveBeenCalledWith('/');
-  });
-
   it('provides a retry state when workspace data cannot be loaded', () => {
     mocks.context.activeWorkspace = null;
     mocks.context.workspaces = [];
@@ -59,5 +46,14 @@ describe('AppHomePage workspace context', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Workspace service unavailable.');
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('offers workspace creation when the caller belongs to no workspace', () => {
+    mocks.context.activeWorkspace = null;
+    mocks.context.workspaces = [];
+    render(<AppHomePage />);
+
+    expect(screen.getByText('No workspaces are available')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Create workspace' })).toHaveAttribute('href', '/app/workspaces');
   });
 });

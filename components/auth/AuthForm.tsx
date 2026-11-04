@@ -47,7 +47,7 @@ function friendlyError(error: unknown): string {
   return error.message;
 }
 
-export function AuthForm({ mode, initialToken = '', initialEmail = '', accountType, onSwitchMode, onBackToAccountType }: { mode: AuthMode; initialToken?: string; initialEmail?: string; accountType?: AuthAccountType; onSwitchMode?: (mode: 'sign-in' | 'sign-up') => void; onBackToAccountType?: () => void }) {
+export function AuthForm({ mode, initialToken = '', initialEmail = '', accountType, redirectPath, onSwitchMode, onBackToAccountType }: { mode: AuthMode; initialToken?: string; initialEmail?: string; accountType?: AuthAccountType; redirectPath?: string; onSwitchMode?: (mode: 'sign-in' | 'sign-up') => void; onBackToAccountType?: () => void }) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState(initialEmail);
@@ -66,6 +66,13 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
   );
 
   const content = modeContent[mode];
+
+  /** Keeps an existing redirect target when linking between auth screens. */
+  function withRedirect(path: string): string {
+    if (!redirectPath) return path;
+    const separator = path.includes('?') ? '&' : '?';
+    return `${path}${separator}redirect=${encodeURIComponent(redirectPath)}`;
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,7 +104,10 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
     try {
       if (mode === 'sign-in') {
         await signIn({ email, password });
-        if (accountType) {
+        if (redirectPath) {
+          clearPendingOnboardingIntent(email);
+          router.push(redirectPath);
+        } else if (accountType) {
           const workspaces = await listWorkspaces();
           const wantedType = accountType === 'personal' ? 'INDIVIDUAL' : accountType === 'business' ? 'COMPANY' : 'INSTITUTION';
           const workspace = accountType === 'personal'
@@ -194,12 +204,12 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
       {mode === 'sign-up' && complete ? (
         <div className="space-y-4">
           <Button className="w-full" onClick={handleResend} loading={busy}>Resend verification email</Button>
-          <p className="text-center text-sm text-[var(--color-text-secondary)]">Already verified? {onSwitchMode ? <button type="button" onClick={() => onSwitchMode('sign-in')} className="font-medium text-[var(--color-primary)] hover:underline">Sign in</button> : <Link className="font-medium text-[var(--color-primary)] hover:underline" href="/sign-in">Sign in</Link>}</p>
+          <p className="text-center text-sm text-[var(--color-text-secondary)]">Already verified? {onSwitchMode ? <button type="button" onClick={() => onSwitchMode('sign-in')} className="font-medium text-[var(--color-primary)] hover:underline">Sign in</button> : <Link className="font-medium text-[var(--color-primary)] hover:underline" href={withRedirect('/sign-in')}>Sign in</Link>}</p>
         </div>
       ) : mode === 'verify-email' && complete ? (
-        <Button className="w-full" onClick={() => router.push(verifiedAccountType ? `/sign-in?accountType=${verifiedAccountType}` : '/sign-in')}>Continue to sign in</Button>
+        <Button className="w-full" onClick={() => router.push(verifiedAccountType ? withRedirect(`/sign-in?accountType=${verifiedAccountType}`) : withRedirect('/sign-in'))}>Continue to sign in</Button>
       ) : mode === 'reset-password' && complete ? (
-        <Button className="w-full" onClick={() => router.push('/sign-in')}>Sign in with your new password</Button>
+        <Button className="w-full" onClick={() => router.push(withRedirect('/sign-in'))}>Sign in with your new password</Button>
       ) : mode === 'forgot-password' && complete ? (
         <p className="text-sm text-[var(--color-text-secondary)]">For your security, the response is the same whether or not that address has a Nexus account.</p>
       ) : (
@@ -218,8 +228,8 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
 
       {mode === 'verify-email' && !complete && <div className="mt-5 space-y-3 border-t border-[var(--color-border)] pt-5"><Input id="resend-email" label="Email for a new verification link" type="email" autoComplete="email" value={email || pendingEmail} onChange={(event) => setEmail(event.target.value)} maxLength={254} /><Button className="w-full" variant="secondary" onClick={handleResend} loading={busy}>Resend verification email</Button></div>}
 
-      {(mode === 'sign-in' || mode === 'sign-up') && <p className="mt-6 text-center text-sm text-[var(--color-text-secondary)]">{mode === 'sign-in' ? 'New to Nexus?' : 'Already have an account?'}{' '}{onSwitchMode ? <button type="button" onClick={() => onSwitchMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')} className="font-medium text-[var(--color-primary)] hover:underline">{mode === 'sign-in' ? 'Create an account' : 'Sign in'}</button> : <Link className="font-medium text-[var(--color-primary)] hover:underline" href={mode === 'sign-in' ? '/sign-up' : '/sign-in'}>{mode === 'sign-in' ? 'Create an account' : 'Sign in'}</Link>}</p>}
-      {(mode === 'forgot-password' || mode === 'reset-password') && <p className="mt-6 text-center text-sm"><Link className="font-medium text-[var(--color-primary)] hover:underline" href="/sign-in">Back to sign in</Link></p>}
+      {(mode === 'sign-in' || mode === 'sign-up') && <p className="mt-6 text-center text-sm text-[var(--color-text-secondary)]">{mode === 'sign-in' ? 'New to Nexus?' : 'Already have an account?'}{' '}{onSwitchMode ? <button type="button" onClick={() => onSwitchMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')} className="font-medium text-[var(--color-primary)] hover:underline">{mode === 'sign-in' ? 'Create an account' : 'Sign in'}</button> : <Link className="font-medium text-[var(--color-primary)] hover:underline" href={withRedirect(mode === 'sign-in' ? '/sign-up' : '/sign-in')}>{mode === 'sign-in' ? 'Create an account' : 'Sign in'}</Link>}</p>}
+      {(mode === 'forgot-password' || mode === 'reset-password') && <p className="mt-6 text-center text-sm"><Link className="font-medium text-[var(--color-primary)] hover:underline" href={withRedirect('/sign-in')}>Back to sign in</Link></p>}
       {mode === 'sign-up' && <p className="mt-5 text-center text-xs leading-5 text-[var(--color-text-muted)]">The policy pages are placeholders awaiting approved content.</p>}
       <PolicyLinks className="mt-4" />
     </section>

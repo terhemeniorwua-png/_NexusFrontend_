@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceProvider, useWorkspaceContext } from '../WorkspaceProvider';
-import { createWorkspace, listWorkspaces, switchWorkspace, updateWorkspace } from '@/services/workspaces';
+import { createWorkspace, listWorkspaces, switchWorkspace, updateWorkspace, type Workspace } from '@/services/workspaces';
 import { ApiRequestError } from '@/lib/api';
 
 const mocks = vi.hoisted(() => ({
@@ -28,15 +28,15 @@ vi.mock('@/services/workspaces', () => ({
   updateWorkspace: mocks.updateWorkspace,
 }));
 
-const personal = {
+const personal: Workspace = {
   id: 'workspace-personal', name: 'Personal', slug: 'personal', description: null,
-  type: 'INDIVIDUAL' as const, isPersonal: true, visibility: 'PRIVATE' as const, status: 'ACTIVE' as const,
+  type: 'INDIVIDUAL', isPersonal: true, visibility: 'PRIVATE', status: 'ACTIVE',
   ownerId: 'user-1', role: 'OWNER', organizationRole: null, joinCodeEnabled: false,
   memberCount: 1, projectCount: 0, teamCount: 0,
   createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-01T00:00:00.000Z',
 };
-const company = { ...personal, id: 'workspace-company', name: 'Company', slug: 'company', type: 'COMPANY' as const, isPersonal: false, organizationRole: 'COMPANY_OWNER' };
-const institute = { ...personal, id: 'workspace-new', name: 'New Institute', slug: 'new-institute', type: 'INSTITUTION' as const, isPersonal: false, organizationRole: 'INSTITUTION_OWNER' };
+const company: Workspace = { ...personal, id: 'workspace-company', name: 'Company', slug: 'company', type: 'COMPANY', isPersonal: false, organizationRole: 'COMPANY_OWNER' };
+const institute: Workspace = { ...personal, id: 'workspace-new', name: 'New Institute', slug: 'new-institute', type: 'INSTITUTION', isPersonal: false, organizationRole: 'INSTITUTION_OWNER' };
 
 function Probe() {
   const context = useWorkspaceContext();

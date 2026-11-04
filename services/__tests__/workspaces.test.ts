@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setAccessToken } from '@/lib/api';
 import {
+  addWorkspaceMember,
   createWorkspace,
   listWorkspaceMembers,
   listWorkspaces,
+  removeWorkspaceMember,
+  restoreWorkspaceMember,
+  suspendWorkspaceMember,
   switchWorkspace,
   updateWorkspace,
+  updateWorkspaceMemberRole,
 } from '../workspaces';
 
 function response(data: unknown): Response {
@@ -58,5 +63,56 @@ describe('workspace API service', () => {
 
     await expect(listWorkspaceMembers('workspace-1')).resolves.toEqual([]);
     expect(fetch).toHaveBeenCalledWith('/api/backend/workspaces/workspace-1/members', expect.any(Object));
+  });
+
+  it('adds an existing account with an organization role', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response({ userId: 'user-2' }));
+
+    await addWorkspaceMember('workspace-1', {
+      email: 'ada@example.com',
+      organizationRole: 'COMPANY_COLLABORATOR',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/backend/workspaces/workspace-1/members',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ email: 'ada@example.com', organizationRole: 'COMPANY_COLLABORATOR' }),
+      }),
+    );
+  });
+
+  it('changes a member’s shared role with a PATCH', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response({ userId: 'user-2' }));
+
+    await updateWorkspaceMemberRole('workspace-1', 'user-2', { role: 'COLLABORATOR' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/backend/workspaces/workspace-1/members/user-2',
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ role: 'COLLABORATOR' }) }),
+    );
+  });
+
+  it('removes a member with the delete-body contract the backend validates', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(removeWorkspaceMember('workspace-1', 'user-2')).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/backend/workspaces/workspace-1/members/user-2',
+      expect.objectContaining({ method: 'DELETE', body: JSON.stringify({}) }),
+    );
+  });
+
+  it('suspends and restores membership through their dedicated routes', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(response({ userId: 'user-2', membershipStatus: 'SUSPENDED' }))
+      .mockResolvedValueOnce(response({ userId: 'user-2', membershipStatus: 'ACTIVE' }));
+
+    await suspendWorkspaceMember('workspace-1', 'user-2');
+    await restoreWorkspaceMember('workspace-1', 'user-2');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/backend/workspaces/workspace-1/members/user-2/suspend', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/backend/workspaces/workspace-1/members/user-2/restore', expect.objectContaining({ method: 'POST' }));
   });
 });

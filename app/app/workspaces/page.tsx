@@ -179,19 +179,19 @@ export default function WorkspacesPage() {
     }
   }
 
-  if (loading) return <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8"><p role="status">Loading workspaces…</p></main>;
-  if (contextError && workspaces.length === 0) return <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8"><Alert variant="error" title="Workspaces unavailable">{contextError}</Alert><Button className="mt-4" onClick={retry}>Try again</Button></main>;
+  if (loading) return <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8"><p role="status">Loading workspaces…</p></div>;
+  if (contextError && workspaces.length === 0) return <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8"><Alert variant="error" title="Workspaces unavailable">{contextError}</Alert><Button className="mt-4" onClick={retry}>Try again</Button></div>;
 
   const existingOnboardingWorkspace = onboardingType ? workspaces.find((workspace) => workspace.type === onboardingType) : null;
   const resumingWorkspace = Boolean(existingOnboardingWorkspace && !resumeError);
-  if (resumingWorkspace) return <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8"><p role="status">Opening your existing workspace…</p></main>;
+  if (resumingWorkspace) return <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8"><p role="status">Opening your existing workspace…</p></div>;
 
   const activeMembers = memberState.status === 'success' && memberState.workspaceId === activeWorkspace?.id ? memberState.members : null;
   const memberError = memberState.status === 'error' && memberState.workspaceId === activeWorkspace?.id ? memberState.message : null;
   const membersLoading = Boolean(activeWorkspace && !activeMembers && !memberError);
 
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-7 px-5 py-8 sm:px-8">
+    <div className="mx-auto w-full max-w-5xl space-y-7 px-5 py-8 sm:px-8">
       <header className="flex flex-wrap items-start justify-between gap-4"><div><Link href="/app" className="text-sm font-medium text-[var(--color-primary)] hover:underline">← Back to workspace</Link><h1 className="mt-3 text-3xl font-semibold tracking-tight">Workspaces</h1><p className="mt-2 text-sm text-[var(--color-text-secondary)]">Create and manage Company and Institution workspaces, and switch between the workspaces you belong to.</p></div></header>
       {contextError && <Alert variant="error" title="Workspace switch failed">{contextError}</Alert>}
       {resumeError && <Alert variant="error" title="Workspace onboarding could not resume">{resumeError}</Alert>}
@@ -203,6 +203,6 @@ export default function WorkspacesPage() {
 
         {activeWorkspace ? <div className="space-y-6"><WorkspaceSettings key={activeWorkspace.id} workspaceId={activeWorkspace.id} /><Card className="p-5 sm:p-7"><div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Members</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">People who currently belong to {activeWorkspace.name}.</p></div><span className="rounded-full bg-[var(--color-primary-soft)] px-2.5 py-1 text-xs font-medium text-[var(--color-primary)]">{activeMembers?.length ?? activeWorkspace.memberCount}</span></div>{membersLoading ? <p role="status" className="mt-5 text-sm text-[var(--color-text-secondary)]">Loading members…</p> : memberError ? <Alert variant="error" title="Members unavailable" className="mt-5">{memberError}</Alert> : activeMembers?.length ? <ul className="mt-5 divide-y divide-[var(--color-border)]">{activeMembers.map((member) => <li key={member.id} className="flex flex-col gap-1 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">{member.name}{member.owner && <span className="ml-2 text-xs text-[var(--color-primary)]">Owner</span>}</p><p className="text-xs text-[var(--color-text-secondary)]">{member.email}</p></div><p className="text-xs text-[var(--color-text-secondary)]">{member.organizationRole ?? member.role} · {member.membershipStatus.toLowerCase()}</p></li>)}</ul> : <EmptyState title="No members found" description="The backend returned no members for this workspace." />}</Card></div> : <Card className="p-5 sm:p-7"><EmptyState title="Choose a workspace" description="Create a Company or Institution workspace, or select an existing one." /></Card>}
       </section>
-    </main>
+    </div>
   );
 }

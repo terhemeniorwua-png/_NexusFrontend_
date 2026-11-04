@@ -7,11 +7,14 @@ import { AuthForm } from './AuthForm';
 
 type AuthMode = 'sign-in' | 'sign-up' | 'forgot-password' | 'reset-password' | 'verify-email';
 
-export function AuthPage({ mode, token, email, initialAccountType }: { mode: AuthMode; token?: string; email?: string; initialAccountType?: AuthAccountType }) {
+export function AuthPage({ mode, token, email, initialAccountType, redirectPath }: { mode: AuthMode; token?: string; email?: string; initialAccountType?: AuthAccountType; redirectPath?: string }) {
   const router = useRouter();
   const [accountType, setAccountType] = useState<AuthAccountType | null>(initialAccountType ?? null);
   const [entryMode, setEntryMode] = useState<'sign-in' | 'sign-up'>(mode === 'sign-in' ? 'sign-in' : 'sign-up');
-  const requiresAccountSelection = mode === 'sign-in' || mode === 'sign-up';
+  // A redirect target, such as an invitation link, already determines the
+  // workflow, so asking for an account type first would add a step that
+  // cannot change the outcome.
+  const requiresAccountSelection = (mode === 'sign-in' || mode === 'sign-up') && !redirectPath;
   const activeMode = requiresAccountSelection ? (accountType ? entryMode : mode) : mode;
 
   return (
@@ -23,6 +26,7 @@ export function AuthPage({ mode, token, email, initialAccountType }: { mode: Aut
           initialToken={token}
           initialEmail={email}
           accountType={accountType ?? undefined}
+          redirectPath={redirectPath}
           onSwitchMode={requiresAccountSelection ? setEntryMode : undefined}
           onBackToAccountType={requiresAccountSelection ? () => setAccountType(null) : undefined}
         />

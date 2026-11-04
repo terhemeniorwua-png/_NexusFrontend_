@@ -148,11 +148,11 @@ export default function BillingPage() {
     }
   }
 
-  if (workspaceLoading || (activeWorkspace && !summary && !error)) return <main className="mx-auto max-w-5xl px-5 py-10"><p role="status">Loading workspace billing…</p></main>;
-  if (!activeWorkspace) return <main className="mx-auto max-w-5xl px-5 py-10"><EmptyState title="Choose a workspace" description="Select a workspace before viewing its billing." action={<Link href="/app/workspaces" className="text-[var(--color-primary)] underline">Manage workspaces</Link>} /></main>;
+  if (workspaceLoading || (activeWorkspace && !summary && !error)) return <div className="mx-auto max-w-5xl px-5 py-10"><p role="status">Loading workspace billing…</p></div>;
+  if (!activeWorkspace) return <div className="mx-auto max-w-5xl px-5 py-10"><EmptyState title="Choose a workspace" description="Select a workspace before viewing its billing." action={<Link href="/app/workspaces" className="text-[var(--color-primary)] underline">Manage workspaces</Link>} /></div>;
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 px-5 py-8 sm:px-8 sm:py-10">
+    <div className="mx-auto max-w-5xl space-y-6 px-5 py-8 sm:px-8 sm:py-10">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div><p className="text-sm font-medium text-[var(--color-primary)]">{activeWorkspace.name}</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Subscription and billing</h1><p className="mt-2 text-sm text-[var(--color-text-secondary)]">USD billing for this workspace. Only the workspace owner can make changes.</p></div>
         <Link href="/app" className="text-sm text-[var(--color-primary)] hover:underline">Back to workspace</Link>
@@ -200,6 +200,6 @@ export default function BillingPage() {
       </Card>
 
       <ConfirmDialog open={confirmCancel} onClose={() => setConfirmCancel(false)} onConfirm={() => void confirmCancellation()} title="Cancel this subscription?" description={`Renewal will stop. Your current benefits remain until ${dateLabel(summary?.subscription?.currentPeriodEnd ?? null)}.`} confirmLabel="Cancel at renewal" destructive loading={working} />
-    </main>
+    </div>
   );
 }

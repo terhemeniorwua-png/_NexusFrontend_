@@ -162,13 +162,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-5 py-8 sm:px-8">
-      <header className="flex items-center justify-between gap-4">
-        <Link href="/app" className="flex items-center gap-2 font-semibold"><span className="grid size-8 place-items-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">N</span>Nexus</Link>
-        <Link href="/app" className="text-sm font-medium text-[var(--color-primary)] hover:underline">Back to account</Link>
-      </header>
-
-      <section className="my-auto py-10 sm:py-14">
+    <div className="mx-auto flex w-full max-w-4xl flex-col px-5 py-8 sm:px-8">
+      <section className="py-2 sm:py-4">
         <p className="text-sm font-semibold text-[var(--color-primary)]">Account setup</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Your profile</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--color-text-secondary)]">Add or update the profile details shown across Nexus. Your email address is managed separately.</p>
@@ -203,6 +198,6 @@ export default function ProfilePage() {
         {!profileLoading && fields && profile && <AccountSecurity />}
       </section>
       <footer className="text-xs text-[var(--color-text-muted)]">Nexus · Profile setup and management</footer>
-    </main>
+    </div>
   );
 }

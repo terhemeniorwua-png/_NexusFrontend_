@@ -1,9 +1,22 @@
 import { apiRequest, ApiRequestError } from '@/lib/api';
 import { refreshSession } from '@/services/auth';
+import type {
+  MembershipStatus,
+  OrganizationRole,
+  WorkspaceRole,
+  WorkspaceStatus,
+  WorkspaceType,
+  WorkspaceVisibility,
+} from '@/types/workspace';
 
-export type WorkspaceType = 'INDIVIDUAL' | 'COMPANY' | 'INSTITUTION';
-export type WorkspaceVisibility = 'PRIVATE' | 'PUBLIC';
-export type WorkspaceStatus = 'ACTIVE' | 'ARCHIVED';
+export type {
+  MembershipStatus,
+  OrganizationRole,
+  WorkspaceRole,
+  WorkspaceStatus,
+  WorkspaceType,
+  WorkspaceVisibility,
+} from '@/types/workspace';
 
 export interface Workspace {
   id: string;
@@ -15,8 +28,8 @@ export interface Workspace {
   visibility: WorkspaceVisibility;
   status: WorkspaceStatus;
   ownerId: string;
-  role: string;
-  organizationRole: string | null;
+  role: WorkspaceRole;
+  organizationRole: OrganizationRole | null;
   joinCodeEnabled: boolean;
   memberCount: number;
   projectCount: number;
@@ -31,9 +44,9 @@ export interface WorkspaceMember {
   name: string;
   email: string;
   status: string;
-  role: string;
-  organizationRole: string | null;
-  membershipStatus: 'ACTIVE' | 'SUSPENDED';
+  role: WorkspaceRole;
+  organizationRole: OrganizationRole | null;
+  membershipStatus: MembershipStatus;
   joinedAt: string;
   owner: boolean;
 }
@@ -51,6 +64,16 @@ export interface UpdateWorkspaceInput {
   visibility: WorkspaceVisibility;
 }
 
+export interface AddWorkspaceMemberInput {
+  email: string;
+  organizationRole?: OrganizationRole;
+  role?: WorkspaceRole;
+}
+
+export type UpdateWorkspaceMemberInput =
+  | { organizationRole: OrganizationRole }
+  | { role: WorkspaceRole };
+
 async function authorizedRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
     return await apiRequest<T>(path, { ...options, authenticated: true });
@@ -61,12 +84,16 @@ async function authorizedRequest<T>(path: string, options: RequestInit = {}): Pr
   }
 }
 
+function workspacePath(workspaceId: string, suffix = ''): string {
+  return `/workspaces/${encodeURIComponent(workspaceId)}${suffix}`;
+}
+
 export function listWorkspaces(): Promise<Workspace[]> {
   return authorizedRequest<Workspace[]>('/workspaces');
 }
 
 export function switchWorkspace(workspaceId: string): Promise<Workspace> {
-  return authorizedRequest<Workspace>(`/workspaces/${encodeURIComponent(workspaceId)}/switch`, { method: 'POST' });
+  return authorizedRequest<Workspace>(workspacePath(workspaceId, '/switch'), { method: 'POST' });
 }
 
 export function createWorkspace(input: CreateWorkspaceInput): Promise<Workspace> {
@@ -74,12 +101,55 @@ export function createWorkspace(input: CreateWorkspaceInput): Promise<Workspace>
 }
 
 export function updateWorkspace(workspaceId: string, input: UpdateWorkspaceInput): Promise<Workspace> {
-  return authorizedRequest<Workspace>(`/workspaces/${encodeURIComponent(workspaceId)}`, {
+  return authorizedRequest<Workspace>(workspacePath(workspaceId), {
     method: 'PATCH',
     body: JSON.stringify(input),
   });
 }
 
 export function listWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
-  return authorizedRequest<WorkspaceMember[]>(`/workspaces/${encodeURIComponent(workspaceId)}/members`);
+  return authorizedRequest<WorkspaceMember[]>(workspacePath(workspaceId, '/members'));
+}
+
+/** Adds an existing Nexus account to the workspace. Invite by email instead for people without accounts. */
+export function addWorkspaceMember(
+  workspaceId: string,
+  input: AddWorkspaceMemberInput,
+): Promise<WorkspaceMember> {
+  return authorizedRequest<WorkspaceMember>(workspacePath(workspaceId, '/members'), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateWorkspaceMemberRole(
+  workspaceId: string,
+  userId: string,
+  input: UpdateWorkspaceMemberInput,
+): Promise<WorkspaceMember> {
+  return authorizedRequest<WorkspaceMember>(
+    workspacePath(workspaceId, `/members/${encodeURIComponent(userId)}`),
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+}
+
+export function removeWorkspaceMember(workspaceId: string, userId: string): Promise<void> {
+  return authorizedRequest<void>(workspacePath(workspaceId, `/members/${encodeURIComponent(userId)}`), {
+    method: 'DELETE',
+    body: JSON.stringify({}),
+  });
+}
+
+export function suspendWorkspaceMember(workspaceId: string, userId: string): Promise<WorkspaceMember> {
+  return authorizedRequest<WorkspaceMember>(
+    workspacePath(workspaceId, `/members/${encodeURIComponent(userId)}/suspend`),
+    { method: 'POST' },
+  );
+}
+
+export function restoreWorkspaceMember(workspaceId: string, userId: string): Promise<WorkspaceMember> {
+  return authorizedRequest<WorkspaceMember>(
+    workspacePath(workspaceId, `/members/${encodeURIComponent(userId)}/restore`),
+    { method: 'POST' },
+  );
 }

@@ -3,6 +3,16 @@ import type { NextRequest } from 'next/server';
 const REQUEST_HEADERS = ['authorization', 'content-type', 'cookie', 'user-agent', 'x-csrf-token'] as const;
 const RESPONSE_HEADERS = ['cache-control', 'content-type', 'x-request-id'] as const;
 
+/**
+ * Backend API prefixes the browser is allowed to reach through the same-origin
+ * proxy. Every prefix is a module the frontend actually consumes; anything
+ * else is rejected so the proxy cannot become an open relay.
+ */
+const ALLOWED_API_PREFIXES = ['auth', 'users', 'workspaces', 'invitations', 'billing'] as const;
+
+/** Path segments must be URL-safe; invitation and join-code tokens are base64url. */
+const SEGMENT_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
 async function forwardRequest(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
@@ -15,7 +25,9 @@ async function forwardRequest(
   let upstreamUrl: URL;
   try {
     const { path } = await context.params;
-    if (!['auth', 'workspaces'].includes(path[0] ?? '') || path.some((segment) => !/^[a-zA-Z0-9-]+$/.test(segment))) {
+    const prefix = path[0] ?? '';
+    if (!(ALLOWED_API_PREFIXES as readonly string[]).includes(prefix)
+      || path.some((segment) => !SEGMENT_PATTERN.test(segment))) {
       return Response.json({ success: false, error: { code: 'NOT_FOUND', message: 'The requested API route was not found.' } }, { status: 404 });
     }
     const base = new URL(configuredBase);

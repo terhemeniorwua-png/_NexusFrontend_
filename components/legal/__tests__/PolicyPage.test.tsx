@@ -26,8 +26,8 @@ describe('PolicyPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Terms of Service', level: 1 })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('DRAFT — REQUIRES LEGAL REVIEW AND APPROVAL');
-    expect(screen.getByRole('heading', { name: /Additional-member billing/ })).toBeInTheDocument();
-    expect(screen.getByText(/\$0\.50 per additional active member per month/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Additional-seat billing/ })).toBeInTheDocument();
+    expect(screen.getByText(/\$0\.50 per additional active seat/)).toBeInTheDocument();
     expect(screen.getByText(/30-day recovery period/)).toBeInTheDocument();
     expect(screen.getByText(/\[JURISDICTION — REQUIRED LEGAL DECISION\]/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
@@ -38,7 +38,7 @@ describe('PolicyPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Privacy Policy', level: 1 })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('DRAFT — REQUIRES LEGAL REVIEW AND APPROVAL');
-    expect(screen.getByText(/No subscription API, payment integration, or billing-provider contract was found/i)).toBeInTheDocument();
+    expect(screen.getByText(/Paystack hosted checkout collects payment details directly/i)).toBeInTheDocument();
     expect(screen.getByText(/End-to-end encryption has not been verified or claimed/i)).toBeInTheDocument();
     expect(screen.getByText(/\[PRIVACY CONTACT — REQUIRED\]/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms');

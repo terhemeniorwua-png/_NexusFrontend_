@@ -21,6 +21,9 @@ vi.mock('@/services/profile', () => ({
   getUserProfile: vi.fn(),
   updateUserProfile: vi.fn(),
 }));
+vi.mock('@/providers/WorkspaceProvider', () => ({
+  useWorkspaceContext: () => ({ user: profile.user, loading: false, error: null, retry: vi.fn() }),
+}));
 
 const profile = {
   user: {

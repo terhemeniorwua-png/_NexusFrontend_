@@ -599,7 +599,7 @@ Verified on 2026-11-03 against the frontend implementation and `../__NexusBacken
 | Requirement | Status | Verification or dependency |
 |---|---|---|
 | Public landing page, product overview, and feature sections | Implemented; responsive implementation reviewed per user confirmation | No agent manual visual review claimed in this task |
-| Pricing page and plan pricing | Implemented and automated UI test verified | Pro is $10/month or $50/year with 15 included members; Business is $15/month or $70/year with 25 included members. The owner counts once and uses an included seat. Only active members above the allowance incur monthly additional-member charges ($0.50 Pro, $1 Business), including on annual plans. |
+| Pricing page and plan pricing | Implemented and automated UI test verified | Pro is $10/month or $50/year with 15 included seats; Business is $15/month or $70/year with 25 included seats. The owner counts once and uses an included seat. Additional-seat rates are $0.50 Pro and $1 Business per selected billing period. |
 | Registration and sign-in forms | Implemented and automated request, validation, success, and error tests pass | Live backend authentication remains unverified |
 | Email verification and verification resend | Implemented and automated request tests pass | Live backend workflow remains unverified |
 | Password recovery and password reset | Implemented and automated success/error/request tests pass | Live backend workflow remains unverified |
@@ -607,14 +607,14 @@ Verified on 2026-11-03 against the frontend implementation and `../__NexusBacken
 | Session restoration, expired-session refresh, unauthenticated redirect, and logout | Implemented and automated session-boundary tests pass | Live cookie/session behavior remains unverified |
 | Network/server failure and retry feedback | Implemented and automated session error-state test passes | Live backend outage behavior remains unverified |
 | Terms and Privacy routes, draft content, and links | Drafts rendered and automated page/link tests pass | Legal review and approval; bracketed entity, contact, jurisdiction, age, provider, and deployment details remain unresolved |
-| Paid-plan display | Approved Pro/Business base prices, 15/25 included-member allowances, owner inclusion, active-only billing rules, and monthly extra-member prices displayed; checkout remains unavailable; automated pricing tests pass | Provider-backed subscription contract and payment integration remain missing |
-| Subscription API integration | Not implemented; provider-independent backend calculations and lifecycle policy helpers exist and are unit tested, but no routes, persistent subscription state, provider integration, or paid entitlement enforcement exist | Provider selection, backend billing API/schema, verified payment integration, transactional membership enforcement, live verification |
+| Paid-plan display and workspace billing | Implemented in progress; pricing, workspace plan/status, authoritative active-seat count, target quantity, checkout, changes, cancellation, and billing history are connected to backend API contracts | USD account capability and credentials must be configured; migration/provider validation remains |
+| Subscription API and persistence | Implemented in progress in adjacent backend worktree; Prisma models/migration, routes, Paystack API client, transaction verification, HMAC webhook verification, encrypted provider management tokens, event/payment persistence, owner authorization, and transactionally enforced seat capacity are present | Migration not applied; worktree checks/provider tests and live Paystack test verification pending; removal-to-seat-reduction synchronization and provider reconciliation remain |
 | OAuth sign-in | Not implemented; no frontend OAuth controls were added | Approved providers and provider configuration, backend routes, callback/account-link contract, and session/security requirements |
 
 #### Implemented
 
 - Replaced the root placeholder with a responsive public landing page, product overview, feature sections, and workspace-type overview.
-- Updated `/pricing` to display Pro ($10/month or $50/year, 15 included members) and Business ($15/month or $70/year, 25 included members), owner inclusion, monthly additional-member charges ($0.50 and $1 respectively), the active-only policy, and the fact that extra members remain monthly on annual plans. Checkout and trial enrollment remain unavailable. Pricing values and presentation policy are centralized in `lib/subscription-plans.ts`; the backend's corresponding integer-cent catalog is `../__NexusBackend__/src/modules/billing/pricing.ts`.
+- Updated `/pricing` to display Pro ($10/month or $50/year, 15 included seats) and Business ($15/month or $70/year, 25 included seats), owner inclusion, selected-period additional-seat charges ($0.50 and $1 respectively), and active-only seat rules. Pricing is centralized in `lib/subscription-plans.ts`; the matching backend catalog is `../__NexusBackend__/src/modules/billing/pricing.ts`.
 - Added `/sign-in`, `/sign-up`, `/verify-email`, `/forgot-password`, and `/reset-password` with typed forms, local validation, API feedback, loading states, and success states.
 - Integrated registration, login, email verification, verification resend, password recovery, and password reset with the backend's verified `/auth/*` contracts.
 - Added `/app` as a session-confirmed post-login landing route. It fetches `/auth/me`, attempts refresh when no in-memory access token exists, refreshes an expired access token once, redirects unauthorized sessions to `/sign-in`, retains recoverable network/server error feedback, and supports logout.
@@ -633,17 +633,14 @@ Verified on 2026-11-03 against the frontend implementation and `../__NexusBacken
 
 #### Subscription decisions provided
 
-- Pro: $10/month and $50/year.
-- Business: $15/month and $70/year.
-- Pro additional member: $0.50/member/month.
-- Business additional member: $1/member/month.
-- Pro includes 15 members; Business includes 25. The workspace owner counts once and consumes one included seat.
-- Only active workspace members whose accounts are active count. Pending invitations, suspended, removed, and deactivated memberships do not count. Admins count by being active members; role does not create a separate billing exception.
-- Additional members are charged monthly even when the base plan is annual.
-- Upgrades and additional-seat increases are immediate after verified payment and prorated for the remaining respective billing period. Downgrades, seat reductions, and cancellation take effect at renewal/period end; benefits continue until then. Lower seat conflicts are surfaced, never resolved by removing members or data.
-- Refunds are not automatic; requests are handled manually under the approved refund policy and applicable law. No automatic credit is issued for seat reductions.
+- Pro: $10/month and $50/year; 15 included seats.
+- Business: $15/month and $70/year; 25 included seats.
+- Additional seat: Pro $0.50 and Business $1.00 per selected billing period. Annual seat billing is annual.
+- Workspace owner counts once and consumes one included seat. Only active workspace members with active accounts count; pending, suspended, removed, and deactivated memberships do not.
+- Upgrades and seat increases are immediate after verified payment and prorated for remaining base period. Downgrades and seat reductions take effect at renewal; no automatic credit. Cancellation takes effect at period end and benefits continue until then.
+- Refunds are manual under the approved policy and applicable law. Failed-payment schedules remain deferred.
 
-No included-seat, membership-status, upgrade/downgrade, seat-change, cancellation effective-date, or automatic-refund decision remains open. The frontend does not calculate authoritative charges.
+The backend owns authoritative charges and membership counts; the frontend displays the returned count and never treats a checkout redirect as payment confirmation.
 
 ##### Deferred failed-payment policy
 
@@ -662,13 +659,13 @@ The Terms and Privacy drafts remain **DRAFT — REQUIRES LEGAL REVIEW AND APPROV
 
 #### Billing provider, API, and implementation status
 
-- **Payment provider:** none selected or configured in the inspected backend.
-- **Subscription endpoints/API contract:** none found in `../__NexusBackend__/docs/openapi.yaml` or the backend modules.
-- **Payment verification/webhooks:** no payment verification or payment webhook exists. The backend has a signed transactional-email webhook; that is not a payment webhook.
-- **Provider-independent helpers:** backend integer-cent pricing, workspace-scoped active-member counting/deduplication, seat charge calculation, proration, lifecycle scheduling, cancellation timing, owner policy, and deferred failure policy are unit tested in `../__NexusBackend__/src/modules/billing/`.
-- **Additional-seat charging/enforcement:** not operational. Helpers are not connected to routes, persisted subscription state, provider quantity synchronization, transactional membership mutations, or paid entitlements. Client counts remain non-authoritative.
-- **Subscription lifecycle:** provider-confirmed activation, webhook signature verification/replay protection, durable idempotency, scheduled-change persistence, invoices, and billing history are not implemented or verified.
-- No provider is selected. The exact provider-dependent API, schema/migration, webhook, and live-verification requirements are in `docs/SUBSCRIPTION_BILLING_BACKEND_REQUIREMENTS.md`. Checkout and subscription management remain unavailable; there is no simulated payment flow.
+- **Provider:** Paystack. The adjacent backend worktree implements hosted checkout, server-side transaction verification, recurring plans/subscriptions, cancellation, payment history, signature-checked webhook, unique event/payment references, encrypted subscription management tokens, and owner-only mutation routes.
+- **API:** `GET /billing/plans`, `GET /billing/workspaces/:workspaceId`, `GET /billing/workspaces/:workspaceId/payments`, `POST /billing/workspaces/:workspaceId/checkout`, `/verify`, `/change`, `/cancel`, and `POST /webhooks/paystack`.
+- **Database:** subscription, provider plan, checkout, payment, and webhook event models are added in `../__NexusBackend__/prisma/migrations/20261103160000_phase3_paystack_billing/migration.sql`. Migration has not been applied to a database.
+- **Paystack limitation:** plan amounts are fixed; the backend uses one provider plan per plan, interval, and billable seat quantity. Prorated one-time charges are separate from recurring plan setup. Provider/database failure reconciliation needs test coverage.
+- **USD:** `PAYSTACK_USD_ENABLED=false` by default. Only the merchant Dashboard/account can confirm and enable USD. No exchange rate or silent currency conversion is used.
+- **Seat enforcement:** billing calculates server-side active seats and validates the requested target quantity. Invitation acceptance, approved join requests, direct member creation, and suspended-member restoration check paid capacity inside their transactions. Removal/suspension does not yet automatically schedule seat reductions.
+- Current implementation details and external setup requirements are in `docs/SUBSCRIPTION_BILLING_BACKEND_REQUIREMENTS.md`. No real Paystack account or transaction was used.
 
 #### Live authentication verification still required
 
@@ -700,7 +697,7 @@ When repeating the review, check navigation/header fit, card and legal-text read
 
 #### Billing implementation dependency
 
-The backend/provider findings and required contract categories are recorded in “Billing provider, API, and implementation status” above and `docs/SUBSCRIPTION_BILLING_BACKEND_REQUIREMENTS.md`. Checkout and subscription management remain unavailable until the decisions are approved and the backend contract and implementation exist.
+The Paystack billing API and UI are implemented in the current worktrees. USD account enablement, migration validation, Paystack test-mode verification, removal-to-seat-reduction synchronization, and provider reconciliation remain outstanding; billing stays disabled until the merchant enables USD and supplies deployment credentials.
 
 #### Deferred future enhancement
 
@@ -726,7 +723,7 @@ These describe backend contract requirements; they are not OAuth routes implemen
 - `npm run lint` — passed.
 - `npx tsc --noEmit` — passed after the final Next.js build.
 - `npm run build` — passed; generates the marketing, pricing, auth, policy, protected app, and dynamic auth proxy routes.
-- `npm test` — passed, 20 files and 144 tests, including Pro/Business base and additional-member pricing, monthly billing on annual plans, unresolved included seats, draft Terms/Privacy route rendering, cross-links, and unavailable checkout.
+- Historical checks above predate the current Paystack work. Current billing-specific test results are recorded in the validation continuation below; do not use historical passing checks as evidence for these changes.
 - Next.js reported that it ignored `/home/philip-iorwua/pnpm-lock.yaml` because the lockfile is outside this Git repository. The frontend Git/package root is `/home/philip-iorwua/Desktop/__NextFrontend__`, containing `package.json` and `package-lock.json` and no `pnpm-workspace.yaml`; the parent has no pnpm workspace file. The parent pnpm lockfile contains a separate `lucide-react`/React 19.2.8 importer, while this app declares React 19.3.0. This is an unrelated parent lockfile, so the warning is expected and does not indicate a misconfigured app root. No lockfile or workspace configuration was changed.
 - Historical auth verification: no live auth workflow was completed in the previous run. The user owns live verification and will perform it; automated frontend tests remain mock-based and are not live-backend evidence.
 - Responsive viewport review: the user confirms the current responsive implementation has been reviewed and is responsive. This is user-confirmed; no manual viewport review is claimed by this agent in this task.
@@ -752,7 +749,22 @@ Phase 3 remains **In Progress** until these requirements are satisfied:
 
 The user approved Pro 15 and Business 25 included members; the owner counts once and uses an included seat; only active member accounts and active workspace memberships count; pending, suspended, removed, and deactivated memberships do not count; administrators count as active members without a role-based exception. Upgrades, downgrades, seat increases/reductions, cancellation, and manual refund handling are also approved as stated above. The business deferred failed-payment policy. The gate is recorded as satisfied, but this does not mean provider-backed enforcement is implemented.
 
-Remaining Phase 3 blockers are legal approval/placeholders and the provider-dependent billing API, persistent implementation, and live verification. Live authentication is user-owned and pending user execution. Responsive review is user-confirmed; agent manual review was not performed. OAuth remains deferred until its provider and backend contract are approved. Phase 3 remains **In Progress**; Phase 4 is tracked separately below. Phase 5 has not started.
+Remaining Phase 3 blockers are legal approval/placeholders, USD merchant configuration, migration validation, Paystack test-mode verification, subscription provider reconciliation, automatic seat reduction synchronization on member removal/suspension, and full integration coverage for provider lifecycle events. Live authentication is user-owned and pending user execution. Responsive review is user-confirmed; agent manual review was not performed. OAuth remains deferred until its provider and backend contract are approved. Phase 3 remains **In Progress**; Phase 4 is tracked separately below. Phase 5 work was started by explicit user direction on 2026-11-03, without revisiting the earlier phases.
+
+#### Phase 3 billing implementation and validation — 2026-11-03
+
+This addendum records the authorized subscription and Paystack implementation in the frontend and adjacent backend worktrees. It supersedes earlier Phase 3 statements that a provider had not been selected or that paid-seat activation checks did not exist. Paystack was selected by the user; merchant configuration and external verification remain outstanding.
+
+- Frontend billing page and pricing connect to the workspace-scoped billing API for plan comparison, monthly/annual selection, current status, active seats, target seat quantity, checkout, scheduled changes, period-end cancellation, renewal dates, and billing history.
+- Backend adds the subscription/payment/checkout/Paystack-plan/webhook-event persistence schema and migration; owner-authorized routes; server-owned USD pricing; transaction verification; raw-body HMAC-SHA512 webhook verification; encrypted recurring-management tokens; payment/event idempotency; recurring plan/subscription handling; and paid-seat-capacity enforcement in invitation acceptance, join approval, direct member creation, and suspended-member restoration.
+- API operations: `GET /billing/plans`, `GET /billing/workspaces/:workspaceId`, `GET /billing/workspaces/:workspaceId/payments`, `POST /billing/workspaces/:workspaceId/checkout`, `POST /billing/workspaces/:workspaceId/verify`, `POST /billing/workspaces/:workspaceId/change`, `POST /billing/workspaces/:workspaceId/cancel`, and `POST /webhooks/paystack`.
+- Paystack integration uses hosted transaction initialization, server verification, plan/subscription creation and cancellation, and documented subscription/transaction webhooks. Paystack fixed-amount plans are keyed by product, interval, and seat quantity; Nexus calculates server-owned prorated checkout amounts. Provider-side actions and local persistence still need durable reconciliation tests for partial failures.
+- Backend environment names are `PAYSTACK_SECRET_KEY`, `PAYSTACK_ENCRYPTION_KEY`, `PAYSTACK_USD_ENABLED`, `PAYSTACK_CALLBACK_URL`, `PAYSTACK_API_URL`, and `PAYSTACK_REQUEST_TIMEOUT_MS`. The hosted checkout flow needs no browser public key or separate webhook secret. Examples and setup instructions are in the backend `.env.example` and `docs/SUBSCRIPTION_BILLING_BACKEND_REQUIREMENTS.md`.
+- Added/updated backend tests cover catalog amounts, annual seat cadence, owner de-duplication, excluded membership states, seat-capacity policy, lifecycle/proration helpers, cancellation behavior, checkout request shape, safe reference verification, and raw-body signature validation. Frontend billing/pricing/legal tests cover visible subscription state, owner-only controls, cancellation confirmation, and approved prices.
+- Latest validation: backend `npm test` passed 204 tests with 0 failures; 2 optional suites were skipped. Backend `npm run build`, `npm run lint`, and `npm run typecheck` passed; focused Prettier checks passed for changed billing/config/workspace files, and billing-focused tests passed 21/21 after the final seat-target correction. Frontend `npm test` passed (26 files, 163 tests), `npm run lint`, `npx tsc --noEmit`, production build, and `git diff --check` passed. Backend repository-wide `npm run format:check` reports a style issue only in unrelated `src/modules/auth/account-deletion.service.ts`; changed files pass focused formatting checks. The new tests are unit/helper and frontend UI tests; full billing-service API, database, and webhook event idempotency integration tests remain outstanding. No migration was applied because no disposable database configuration was verified. No Paystack test credentials were configured, so no provider transactions or webhook delivery were exercised.
+- Legal drafts now include Terms, Privacy, Subscription/Billing, Cancellation, Refund, retention, and account-deletion topics. All require legal/business review and confirmation of bracketed entity, contact, jurisdiction, and other facts.
+
+Phase 3 stays **In Progress** until frontend/backend validations are complete, the migration is applied and verified on a disposable database, Paystack test credentials and USD capability are confirmed, provider integration/idempotency/reconciliation paths pass test-mode verification, remaining membership-removal seat lifecycle work is completed, legal drafts are approved, and the user performs the live authentication checklist.
 
 OAuth is conditional in the Phase 3 roadmap (“if supported by the backend”). While the backend has no approved provider contract or OAuth routes, keep OAuth deferred and add no frontend controls. If product approval brings OAuth into this phase, the backend contract, provider setup, callback/account-link behavior, session handoff, security implementation, and frontend tests must all be completed before closure. If OAuth remains unsupported, record the explicit deferral as accepted scope before declaring Phase 3 complete.
 
@@ -776,7 +788,7 @@ Started on 2026-11-03 on `feature/frontend-authentication` at the user's directi
 | Account deletion interface | Blocked | The backend has a 30-day deletion request, but cleanup behavior does not fully match the approved retention policy. Do not expose until aligned. |
 | Mobile, tablet, and desktop review | User-confirmed reviewed and responsive | This agent did not perform a manual viewport review in the current task. |
 
-Profile setup/editing, timezone and locale preferences, password/email security, and session review are implemented. Focused tests passed (8 tests); full frontend validation is recorded below. Phase 4 is **Blocked** because first-time onboarding completion/return behavior has no persistence contract, avatar upload has no backend contract, and the approved account-deletion retention policy is not fully aligned with backend cleanup. Phase 5 has not started.
+Profile setup/editing, timezone and locale preferences, password/email security, and session review are implemented. Focused tests passed (8 tests); full frontend validation is recorded below. Phase 4 is **Blocked** because first-time onboarding completion/return behavior has no persistence contract, avatar upload has no backend contract, and the approved account-deletion retention policy is not fully aligned with backend cleanup. Phase 5 work is tracked below.
 
 #### Phase 4 validation — 2026-11-03
 
@@ -847,6 +859,27 @@ Support Individual, Company, and Institution workspaces.
 - Workspace switcher.
 - Workspace settings.
 - Workspace-aware application context.
+
+### Implementation Status (2026-11-03)
+
+**Status: In Progress — partially implemented.** This phase was started at the user's explicit direction to skip earlier phases; the Phase 3 and Phase 4 findings above were not reopened or changed.
+
+| Requirement | Status | Evidence / limitation |
+|---|---|---|
+| Workspace-aware session and membership context | Implemented | `providers/WorkspaceProvider.tsx` restores the authenticated user, loads memberships, validates the selected workspace through the backend switch endpoint, and exposes loading/error/retry state. |
+| Workspace switcher and workspace information | Implemented | `/app` uses the existing `WorkspaceSwitcher`, displays workspace type and counts, and switches through the provider. |
+| Company and Institution creation | Implemented | `/app/workspaces` submits the documented create payload and activates the returned workspace. Personal workspace creation remains account-provisioned by the backend. |
+| Workspace settings | Partially implemented | Name, description, and visibility use the documented update endpoint; permission denials surface from the backend. |
+| Workspace profile and branding settings | Blocked in part | Workspace profile fields are present. The current backend schema has no logo, colour, or other branding fields/upload contract, so those controls cannot be safely implemented. |
+| Workspace member overview | Implemented | `/app/workspaces` loads members from the workspace-scoped member endpoint and clears stale results during switches. |
+| Responsive success, loading, empty, and error states | Implemented in UI | Creation and switching feedback, empty workspace/member states, and request errors are included. Manual device/browser review remains outstanding. |
+| Live end-to-end backend workflow | Not verified | The frontend service/provider tests cover the confirmed API paths; no live authenticated backend session was used in this run. |
+
+**Files added or changed:** `services/workspaces.ts`, `providers/WorkspaceProvider.tsx`, `app/app/workspaces/page.tsx`, `app/app/workspaces/page.test.tsx`, `app/app/layout.tsx`, `app/app/page.tsx`, `app/app/page.test.tsx`, `app/app/profile/page.tsx`, `app/app/profile/page.test.tsx`, `services/__tests__/workspaces.test.ts`, and `providers/__tests__/WorkspaceProvider.test.tsx`.
+
+**Validation:** `npx tsc --noEmit` passed; `npm run lint` passed; `npm run build` passed and emitted `/app/workspaces`; focused Phase 5 tests passed (16/16). The full Vitest suite reported 155 passing and 3 tests outside the touched feature areas timing out at the configured 5-second limit (auth form, sidebar, and legal policy); the cause was not established. `git diff --check` passed.
+
+**Remaining before completion:** backend-defined workspace branding support or an approved reduction of that requirement, live authenticated workflow verification, and responsive/manual review. No backend source or schema was modified.
 
 ## Phase 6 — Organisation Membership, Join Requests, and Invitations
 
@@ -2048,3 +2081,13 @@ Do not implement backend functionality inside the frontend. Do not invent API en
 | Calling SDK | **Deferred** — pending team selection (Phase 10) | See `CONVENTIONS.md` §8 |
 | State management | React built-ins only (`useState`, `useContext`, `useReducer`) | See `CONVENTIONS.md` §9 |
 | Commit convention | `type(scope): description` — e.g., `feat(phase-3): ...` | See `CONVENTIONS.md` §10 |
+
+#### Phase 3 account selection and Free plan follow-up — 2026-11-04
+
+- Added the account-type selection dialog to both sign-in and account-creation entry routes. Personal, Institution, and Business selections retain the visitor’s original intent; the form lets visitors switch intent or return to account selection.
+- Sign-in still uses the shared `/auth/login` identity contract. After login, the frontend lists backend-authorized workspaces, switches only to a matching membership, and sends users without a matching organization workspace to workspace management.
+- Personal registration uses the existing `{ name, email, password }` contract; backend email verification initializes the personal workspace. Institution and Business registrations use the same verified identity contract with type-specific owner copy. After verification, the visitor is directed to sign in and create the workspace through the existing authenticated `/workspaces` contract, which makes its creator the Owner.
+- The auth proxy now forwards the documented `/workspaces/*` routes needed for this flow, while continuing to reject unrelated API paths.
+- `/pricing` now shows Free beside Pro and Business. Free displays only the verified included personal workspace and states no unapproved usage limits. Exact Free feature, seat, storage, and project limits are not defined in the approved source and remain undecided, so they are omitted. The approved Pro and Business prices and seat terms are unchanged. All plan actions lead into account creation; paid subscription activation remains in the authenticated billing flow.
+- Backend integration gap: `/auth/register` accepts only name, email, and password and creates an identity, not a company/institution workspace. `/workspaces` requires a verified authenticated session and accepts only name, optional description, workspace type, and visibility. There is no registration-time organization workspace contract or support for institution type, business industry, company size, country, or website. The UI does not submit or retain unsupported fields; after identity verification, organization creation currently happens as a separate workspace-management step.
+- Added/updated selector, authentication request, workspace-resolution, proxy, and pricing tests. On 2026-11-04, all 27 frontend test files passed (173 tests total), `npm run lint`, `npx tsc --noEmit`, `npm run build`, and `git diff --check` passed. The suite was run in two groups because a single invocation exceeded the command runner’s 30-second limit. This does not complete Phase 3 or any other phase.

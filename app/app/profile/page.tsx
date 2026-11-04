@@ -10,9 +10,10 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { AccountSecurity } from '@/components/profile/AccountSecurity';
-import { ApiRequestError, getAccessToken } from '@/lib/api';
+import { ApiRequestError } from '@/lib/api';
 import { refreshSession } from '@/services/auth';
 import { getUserProfile, updateUserProfile, type UserProfileView } from '@/services/profile';
+import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 
 interface ProfileFields {
   name: string;
@@ -56,6 +57,7 @@ function validateFields(fields: ProfileFields): string | null {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { user: sessionUser, loading: workspaceLoading, error: workspaceError, retry: retryWorkspace } = useWorkspaceContext();
   const [profile, setProfile] = useState<UserProfileView | null>(null);
   const [fields, setFields] = useState<ProfileFields | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,10 +67,14 @@ export default function ProfilePage() {
   const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
+    if (workspaceLoading) return;
+    if (!sessionUser) {
+      if (!workspaceError) router.replace('/sign-in');
+      return;
+    }
     let active = true;
     async function load() {
       try {
-        if (!getAccessToken()) await refreshSession();
         let result: UserProfileView;
         try {
           result = await getUserProfile();
@@ -94,11 +100,12 @@ export default function ProfilePage() {
     }
     void load();
     return () => { active = false; };
-  }, [router, loadAttempt]);
+  }, [router, loadAttempt, workspaceLoading, sessionUser, workspaceError]);
 
   function retryLoadProfile() {
     setLoading(true);
     setError(null);
+    if (!sessionUser && workspaceError) retryWorkspace();
     setLoadAttempt((attempt) => attempt + 1);
   }
 
@@ -109,6 +116,8 @@ export default function ProfilePage() {
   }
 
   const isDirty = Boolean(profile && fields && JSON.stringify(fields) !== JSON.stringify(profileToFields(profile)));
+  const displayedError = error ?? (!sessionUser ? workspaceError : null);
+  const profileLoading = workspaceLoading || (loading && !(!sessionUser && workspaceError));
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -164,15 +173,15 @@ export default function ProfilePage() {
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Your profile</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--color-text-secondary)]">Add or update the profile details shown across Nexus. Your email address is managed separately.</p>
 
-        {loading ? <p role="status" className="mt-8 text-sm text-[var(--color-text-secondary)]">Loading your profile…</p> : error && !fields ? (
-          <div className="mt-8"><Alert variant="error" title="Profile unavailable">{error}</Alert><Button className="mt-4" onClick={retryLoadProfile}>Try again</Button></div>
+        {profileLoading ? <p role="status" className="mt-8 text-sm text-[var(--color-text-secondary)]">Loading your profile…</p> : displayedError && !fields ? (
+          <div className="mt-8"><Alert variant="error" title="Profile unavailable">{displayedError}</Alert><Button className="mt-4" onClick={retryLoadProfile}>Try again</Button></div>
         ) : fields && profile ? (
           <Card className="mt-8 p-5 sm:p-8">
             <div className="mb-7 flex items-center gap-4">
               <Avatar src={fields.avatarUrl || null} name={fields.name || profile.user.name} size="lg" />
               <div><p className="font-medium">Profile details</p><p className="text-sm text-[var(--color-text-secondary)]">Avatar URL only; image uploads are not available yet.</p></div>
             </div>
-            {error && <Alert variant="error" title="Profile not saved" className="mb-5">{error}</Alert>}
+            {displayedError && <Alert variant="error" title="Profile not saved" className="mb-5">{displayedError}</Alert>}
             {success && <Alert variant="success" title="Saved" className="mb-5">{success}</Alert>}
             <form onSubmit={handleSave} className="space-y-5">
               <Input id="profile-name" label="Full name" required maxLength={100} value={fields.name} onChange={(event) => updateField('name', event.target.value)} />
@@ -191,7 +200,7 @@ export default function ProfilePage() {
             </form>
           </Card>
         ) : null}
-        {!loading && fields && profile && <AccountSecurity />}
+        {!profileLoading && fields && profile && <AccountSecurity />}
       </section>
       <footer className="text-xs text-[var(--color-text-muted)]">Nexus · Profile setup and management</footer>
     </main>

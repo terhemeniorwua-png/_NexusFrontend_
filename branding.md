@@ -738,7 +738,7 @@ The proposed pricing structure is a hybrid model:
 - Included member seats.
 - Additional paid seats where applicable.
 
-Exact pricing and seat allowances remain to be determined.
+Approved company and institution workspace subscription prices are Pro at $10 monthly or $50 annually, including 15 seats, and Business at $15 monthly or $70 annually, including 25 seats. The owner consumes one included seat. Additional seats cost $0.50 for Pro or $1 for Business per selected billing period; annual plans bill them annually. Only active workspace members with active accounts count. These approved values supersede the earlier proposal below. Payment checkout remains gated on merchant USD capability and configuration.
 
 ## 8.4 Institution Plans
 
@@ -753,7 +753,7 @@ They may provide tailored allowances for:
 - Students.
 - External collaborators.
 
-Exact pricing remains to be determined.
+The approved Pro and Business prices above apply to organization workspaces unless a separately approved enterprise agreement is configured. No custom institution price or enterprise rate is defined here.
 
 ## 8.5 Premium Trial
 

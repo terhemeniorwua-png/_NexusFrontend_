@@ -47,7 +47,21 @@ describe('same-origin backend proxy', () => {
     ]);
   });
 
-  it('does not proxy routes outside the auth API', async () => {
+  it('proxies the confirmed workspace API for account-type workspace resolution', async () => {
+    process.env.NEXUS_API_URL = 'http://localhost:4000/api/v1';
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const request = new NextRequest('http://localhost/api/backend/workspaces');
+
+    const response = await (await import('./route')).GET(request, {
+      params: Promise.resolve({ path: ['workspaces'] }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('http://localhost:4000/api/v1/workspaces');
+  });
+
+  it('does not proxy routes outside the confirmed auth and workspace APIs', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const request = new NextRequest('http://localhost/api/backend/users');

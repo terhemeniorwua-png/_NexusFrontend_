@@ -57,32 +57,33 @@ AI outputs may be inaccurate or incomplete. Review them before relying on or sha
 
 ## 13. Subscription plans and base prices
 
-Approved prices are Pro at **$10/month or $50/year**, including **15 members**, and Business at **$15/month or $70/year**, including **25 members**. The workspace owner counts once and uses an included member seat. Checkout and subscription management are not operational because no payment provider, billing API, or persistent subscription implementation exists.
+Approved prices are Pro at **$10/month or $50/year**, including **15 seats**, and Business at **$15/month or $70/year**, including **25 seats**. The workspace owner counts once and uses an included seat. Paystack checkout and subscription management are implemented in the application but remain disabled until merchant USD capability and credentials are configured and test-environment verification is completed.
 
-## 14. Additional-member billing
+## 14. Additional-seat billing
 
-An additional member is a distinct active workspace member beyond the selected plan’s included allowance. Approved recurring monthly rates are:
+An additional seat is a distinct active workspace member beyond the selected plan’s included allowance. The approved rate for the selected subscription billing period is:
 
-- **Pro:** $0.50 per additional active member per month.
-- **Business:** $1.00 per additional active member per month.
-- These charges remain monthly even when the base subscription is annual.
+- **Pro:** $0.50 per additional active seat.
+- **Business:** $1.00 per additional active seat.
+- Monthly subscriptions bill these charges monthly; annual subscriptions bill them annually.
 - Only active member accounts with active workspace membership count. Pending invitations, suspended, removed, and deactivated members are not billable.
 - The workspace owner counts once and consumes one included seat.
-- An additional seat takes effect immediately only after successful payment is confirmed by the provider; its charge is prorated for the remaining monthly seat period, including on an annual base plan.
+- Each additional seat costs **$0.50 for Pro** or **$1.00 for Business** per selected subscription billing period. Monthly plans renew this charge monthly; annual plans renew it annually.
+- An additional seat takes effect immediately only after successful payment is confirmed by the provider; its charge is prorated for the remaining applicable billing period.
 - A reduction in committed additional-seat quantity takes effect at renewal. No automatic credit is issued for an already-paid period. The backend recounts active members and does not remove or deactivate users to meet a quantity.
-- Once billing is operational, the backend must calculate and enforce billable seats; client-supplied counts are never authoritative. Billing is not operational in this draft's current implementation context.
+- The backend calculates prices and validates requested seat quantities against authoritative membership state; the client does not set prices or payment outcomes.
 
 ## 15. Monthly and annual billing
 
-Monthly and annual base subscriptions use the approved prices above. Additional-member fees remain monthly on both billing cadences. Before requesting payment, checkout must disclose the base charge, included-member allowance, additional-member rate, and billing dates.
+Monthly and annual base subscriptions use the approved prices above. Additional-seat charges follow the same cadence as the base subscription. Before requesting payment, checkout must disclose the base charge, included-seat allowance, additional-seat rate, and billing dates.
 
 ## 16. Subscription activation and payment confirmation
 
-Paid access begins only after the payment provider confirms successful payment through a server-verified, authentic provider event. A browser redirect or client-supplied status is not proof of payment. Webhook authenticity and idempotency are required before subscription state changes.
+Paid access begins only after the backend verifies the Paystack transaction server-side against the expected reference, amount, and USD currency. A browser redirect or client-supplied status is not proof of payment. Webhook authenticity and idempotency are required before subscription state changes.
 
 ## 17. Upgrades, downgrades, and seat changes
 
-The workspace owner must authorize plan and seat changes. A Pro-to-Business upgrade takes effect immediately after provider-confirmed payment and charges the prorated plan-price difference for the remaining current period. A Business-to-Pro downgrade is scheduled for renewal; current benefits remain until then. The service identifies any conflict with the lower member allowance and does not remove members or data. Additional-seat increases are immediate after provider-confirmed payment and prorated for the remaining monthly seat period. Seat reductions take effect at renewal without an automatic credit. Billing dates and provider-calculated amounts must be shown before confirmation.
+The workspace owner must authorize plan and seat changes. A Pro-to-Business upgrade takes effect immediately after provider-confirmed payment and charges the prorated plan-price difference for the remaining current period. A Business-to-Pro downgrade is scheduled for renewal; current benefits remain until then. The service identifies any conflict with the lower seat allowance and does not remove members or data. Additional-seat increases are immediate after provider-confirmed payment and prorated for the remaining applicable billing period. Seat reductions take effect at renewal without an automatic credit. Billing dates and provider-calculated amounts must be shown before confirmation.
 
 ## 18. Cancellation
 

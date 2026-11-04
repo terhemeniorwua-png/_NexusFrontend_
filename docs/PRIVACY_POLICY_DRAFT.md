@@ -33,7 +33,7 @@ The backend schema includes file-attachment metadata, but the reviewed frontend 
 
 ## 7. Subscription and payment-related information
 
-No subscription API, payment integration, or billing-provider contract was found. The frontend displays approved prices for planning but does not collect payment data or activate subscriptions. Provider and payment-data details must be confirmed before billing is introduced.
+The backend stores workspace subscription status, billing interval, seat quantity, period dates, pending changes, provider references, payment amounts/statuses, and billing history. Paystack hosted checkout collects payment details directly; Nexus does not receive or store raw card details. Checkout and USD entitlements remain disabled until the merchant enables USD and configures credentials. Paystack is the payment processor for test/live configurations. Deployment-specific processor terms, data locations, retention, and contact details require legal review before publication.
 
 ## 8. Technical, device, and log information
 
@@ -59,7 +59,7 @@ The backend sets `nexus_rt` as an HttpOnly refresh cookie and uses `nexus_csrf` 
 
 The backend has a configurable, provider-agnostic transactional email transport. It may use SMTP or a console/disabled adapter depending on deployment; the production mail provider is not identified by this repository. Payment, hosting, analytics, AI, and storage processors must be identified before related features are offered.
 
-Processor, purpose, location, and transfer mechanism: **[PRODUCTION PROCESSOR REGISTER — REQUIRED]**.
+Paystack processes payment transactions and recurring authorizations when billing is enabled. Production processor locations, transfer mechanism, contract, and retention must be confirmed in deployment: **[PRODUCTION PROCESSOR REGISTER — REQUIRED]**.
 
 ## 14. Third-party integrations
 

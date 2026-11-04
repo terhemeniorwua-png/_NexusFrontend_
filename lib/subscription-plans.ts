@@ -5,10 +5,19 @@ export interface PaidPlanPricing {
   name: 'Pro' | 'Business';
   prices: Record<BillingPeriod, number>;
   additionalMemberMonthlyPrice: number;
-  additionalMemberBillingPeriod: 'monthly';
+  additionalMemberAnnualPrice: number;
+  additionalMemberBillingPeriod: 'same-as-base';
   includedSeats: number;
   ownerConsumesIncludedSeat: true;
 }
+
+export const freePlan = {
+  id: 'free',
+  name: 'Free',
+  monthlyPrice: 0,
+  annualPrice: 0,
+  verifiedFeatures: ['A personal workspace is created when your account is activated.'],
+} as const;
 
 /** Central source for approved plan and additional-member prices and open rules. */
 export const subscriptionPricing = {
@@ -19,7 +28,8 @@ export const subscriptionPricing = {
       name: 'Pro',
       prices: { monthly: 10, annual: 50 },
       additionalMemberMonthlyPrice: 0.5,
-      additionalMemberBillingPeriod: 'monthly',
+      additionalMemberAnnualPrice: 0.5,
+      additionalMemberBillingPeriod: 'same-as-base',
       includedSeats: 15,
       ownerConsumesIncludedSeat: true,
     },
@@ -28,7 +38,8 @@ export const subscriptionPricing = {
       name: 'Business',
       prices: { monthly: 15, annual: 70 },
       additionalMemberMonthlyPrice: 1,
-      additionalMemberBillingPeriod: 'monthly',
+      additionalMemberAnnualPrice: 1,
+      additionalMemberBillingPeriod: 'same-as-base',
       includedSeats: 25,
       ownerConsumesIncludedSeat: true,
     },
@@ -43,20 +54,11 @@ export const subscriptionPricing = {
     preventDuplicateWorkspaceMembers: true,
     authoritativeCountSource: 'backend',
     backendEnforcementImplemented: false,
-    annualPlansStillBillAdditionalMembersMonthly: true,
+    additionalSeatsUseBaseSubscriptionDuration: true,
     additionsImmediateAfterPaymentAndProrated: true,
     reductionsAtNextRenewalWithoutCredit: true,
   },
 } as const;
-
-export const paidSubscriptionAvailability = {
-  status: 'approved-not-connected' as const,
-  backendEnforcementAvailable: false,
-  checkoutAvailable: false,
-  seatAllowances: 'approved-but-backend-enforcement-unavailable' as const,
-  trialEnrollmentAvailable: false,
-  notice: 'Prices and included seats are approved. Checkout and subscription management remain unavailable until a payment provider and subscription backend are implemented.',
-};
 
 export function formatSubscriptionPrice(amount: number): string {
   return new Intl.NumberFormat('en-US', {

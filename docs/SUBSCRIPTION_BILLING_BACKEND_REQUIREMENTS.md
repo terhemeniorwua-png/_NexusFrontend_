@@ -1,12 +1,12 @@
 # Nexus Subscription and Billing Backend Requirements
 
-**Status: Approved product rules and provider-independent calculation helpers are implemented; no billing API or payment integration is operational.**
+**Status: Billing API, Paystack adapter, and transactional paid-seat capacity checks are implemented in the current backend worktree; merchant USD capability, migration application, and provider test verification remain unresolved.**
 
-This document separates implemented backend policy code from persistent billing and payment-provider work. Checkout and subscription management remain unavailable.
+This document records the implemented backend billing path and the provider and product gates that remain. Checkout stays disabled until the configured Paystack account confirms USD is enabled.
 
 ## Repository findings
 
-The frontend and backend are separate repositories. The backend at `../__NexusBackend__` uses Express, TypeScript, Prisma, and PostgreSQL. It contains workspace membership, invitation, and email-webhook modules, but no subscription models or migrations, subscription endpoints, payment SDK/configuration, payment webhook, invoice service, or lifecycle persistence. The signed email webhook is not a payment integration.
+The frontend and backend are separate repositories. The backend at `../__NexusBackend__` uses Express, TypeScript, Prisma, and PostgreSQL. The current backend worktree contains subscription models, a migration, owner-authorized billing routes, Paystack client, signed webhook route, checkout verification, and lifecycle persistence. These files are uncommitted existing work and require build/test/database validation before deployment.
 
 The `WorkspaceMembership` model has a unique `(workspaceId, userId)` constraint. This prevents duplicate membership rows but alone does not prevent provider-side duplicate charges.
 
@@ -14,10 +14,10 @@ The `WorkspaceMembership` model has a unique `(workspaceId, userId)` constraint.
 
 | Plan | Monthly base | Annual base | Included members | Extra active member |
 |---|---:|---:|---:|---:|
-| Pro | $10/month | $50/year | 15 | $0.50/member/month |
-| Business | $15/month | $70/year | 25 | $1/member/month |
+| Pro | $10/month | $50/year | 15 | $0.50/member per selected billing period |
+| Business | $15/month | $70/year | 25 | $1/member per selected billing period |
 
-The workspace owner counts once and consumes an included seat. These prices and allowances are centralized in the frontend `lib/subscription-plans.ts` and backend `src/modules/billing/pricing.ts` catalogs. Checkout remains disabled because the backend has no payment or subscription integration.
+The workspace owner counts once and consumes an included seat. These prices and allowances are centralized in the frontend `lib/subscription-plans.ts` and backend `src/modules/billing/pricing.ts` catalogs. Annual subscriptions use annual additional-seat charges. Checkout is disabled until USD account capability and credentials are configured.
 
 ## Approved membership billing policy
 
@@ -25,38 +25,44 @@ The workspace owner counts once and consumes an included seat. These prices and 
 - Pending invitations, suspended members, removed members, and deactivated accounts do not count.
 - The workspace owner counts once as an active member and consumes one included seat, if the owner account is active.
 - Additional-member charges apply only above the selected plan's included allowance.
-- Pro additional members cost $0.50/member/month; Business additional members cost $1/member/month.
-- Additional members remain monthly charges when the base subscription is annual.
-- A new additional seat takes effect immediately only after verified successful payment and is prorated for the remaining applicable monthly seat period.
+- Pro additional members cost $0.50 per selected billing period; Business additional members cost $1 per selected billing period.
+- Additional seats use the base subscription cadence: annual subscriptions bill additional seats annually.
+- A new additional seat takes effect immediately only after verified successful payment and is prorated for the remaining base subscription billing period.
 - A committed seat reduction takes effect at renewal; there is no automatic credit for an already-paid period.
 - Membership changes in one workspace do not affect another workspace. The server derives counts from the requested workspace's database state; frontend counts are not authoritative.
 - Billing calculations must not deactivate/remove members, charge pending invitations, or count an owner twice.
 
-The backend currently implements a server-owned integer-cent catalog, a Prisma-backed workspace-scoped active-member lookup/deduplicator, seat-quantity/monthly-charge calculation, and provider-independent lifecycle/proration policy helpers in `src/modules/billing/`. Unit tests cover these calculations. These helpers are not called by API routes and do not enforce membership mutations or persist subscription state.
+The backend implements a server-owned integer-cent catalog, a Prisma-backed workspace-scoped active-member lookup/deduplicator, monthly/annual seat-quantity calculation, lifecycle/proration helpers, persistent checkout/subscription/payment/webhook-event models, and billing routes in `src/modules/billing/`. Invitation acceptance, approved join requests, direct member creation, and suspended-member restoration check paid seat capacity inside their workspace transactions. Billing checkout accepts a requested target quantity but validates it against current active seats and calculates the amount server-side.
 
 ## Approved lifecycle policy
 
 - **Upgrade:** Pro to Business takes effect immediately after provider-confirmed successful payment. Calculate the prorated old/new plan difference for the remaining current billing period. Until confirmation, preserve the old plan and entitlements.
 - **Downgrade:** Schedule Business to Pro at renewal. Keep the old plan active through the paid period. Report target allowance conflicts; do not remove members, workspaces, projects, or files.
-- **Increase seats:** Apply immediately only after provider-confirmed successful payment, prorated for the remaining monthly seat period. Seat charges stay monthly with an annual base plan.
+- **Increase seats:** Apply immediately only after provider-confirmed successful payment, prorated for the remaining base billing period. Annual subscriptions use annual seat billing.
 - **Reduce seats:** Apply the lower committed quantity at renewal, recount active membership from the database, and issue no automatic credit. Never remove/deactivate users to fit a quantity.
 - **Cancellation:** Schedule cancellation at the end of the current paid period, retain benefits until that effective date, persist the request/date, and make repeat operations idempotent.
 - **Refunds:** No automatic refunds. A request is handled manually under the approved refund policy and applicable law. Cancellation and refund requests remain separate.
 - **Authorization:** Only the workspace owner may perform billing changes. Server authorization must not rely on client roles or IDs.
 
-The current policy module computes charge/timing intent only. It cannot activate a subscription, persist scheduled changes, verify a payment, or make an operation idempotent in durable storage. The catalog and calculation code must not be mistaken for a live billing system.
+The service verifies transactions server-side, persists billing state, processes signed webhooks, and the workspace membership activation flows check active paid-seat capacity transactionally. These paths remain unverified against a configured Paystack test account.
 
 ## Required backend API and persistent implementation
 
-After a payment provider is selected, establish and implement an API contract and subscription data model for:
+Implemented API paths (all workspace paths require authentication; billing mutations require workspace ownership):
 
-1. Reading the server-owned plan catalog and subscription status, period dates, included allowance, authoritative active-member count, committed additional-seat quantity, cancellation status, and next renewal.
-2. Creating checkout/payment operations from server-calculated prices and quantities; the browser cannot submit authoritative prices, seat counts, subscription status, or payment outcomes.
-3. Previewing and applying owner-authorized upgrades, downgrades, seat increases/reductions, and cancellation with provider timing/proration.
-4. Recording provider subscription/customer identifiers, plan/pricing version, billing cadence, state, current period, committed seat quantity, scheduled changes, and effective cancellation date.
-5. Receiving authenticated provider events with signature verification, replay protection, durable unique event IDs, idempotent processing, and transactional entitlement updates.
-6. Exposing billing history, payment methods, invoices, and receipts only where supported by the approved provider contract.
-7. Enforcing membership seat obligations transactionally against authoritative database state before membership activation can create a charge or exceed a paid quantity.
+- `GET /billing/plans`
+- `GET /billing/workspaces/:workspaceId`
+- `GET /billing/workspaces/:workspaceId/payments`
+- `POST /billing/workspaces/:workspaceId/checkout`
+- `POST /billing/workspaces/:workspaceId/verify`
+- `POST /billing/workspaces/:workspaceId/change`
+- `POST /billing/workspaces/:workspaceId/cancel`
+- `POST /webhooks/paystack`
+
+Remaining backend requirements:
+
+1. Integrate member removal/suspension with scheduled seat reduction and renewal quantity synchronization.
+2. Reconcile webhook events and subscription state against the Paystack account; validate retry-safe handling against a real Paystack test account.
 
 All billing mutations must be owner-authorized and audited. A client redirect or success message is never proof of payment. Do not store raw card data or expose provider credentials. Provider event processing and membership/subscription state changes require database transactions and duplicate-event protection.
 
@@ -64,14 +70,36 @@ All billing mutations must be owner-authorized and audited. A client redirect or
 
 The business has deferred failed-payment policy. Retry behavior/count, grace period, notifications, repeated-failure subscription status, continued paid access, and treatment of additional-seat charges remain undecided. Do not implement speculative retries, timelines, notices, or access restrictions. Existing failure handling must never grant paid access without verified payment or destroy customer data because payment failed.
 
+## Paystack design and provider limitations
+
+The backend uses hosted checkout via `POST /transaction/initialize`, server-side verification via `GET /transaction/verify/:reference`, recurring plan creation via `POST /plan`, recurring subscription creation via `POST /subscription`, and period-end provider cancellation via `POST /subscription/disable`. It verifies the `x-paystack-signature` HMAC-SHA512 using the Paystack secret key. Reusable authorization and subscription management tokens are stored encrypted with `PAYSTACK_ENCRYPTION_KEY`; raw card data is not stored.
+
+Paystack plans have a fixed amount and documented monthly/annual intervals, so Nexus creates/reuses a plan per plan, cadence, and billable-seat count. A variable prorated initial charge is initialized separately; on verified payment, the server creates a recurring subscription with the matching full-cycle plan, starting after the current paid period when applicable. Downgrades/seat reductions create a replacement plan subscription for the renewal date, then disable the prior provider subscription. These cross-provider/database actions require reconciliation if a provider call succeeds but the database write fails.
+
+Paystack docs state supported currencies are account/market dependent. USD is disabled by default and cannot be enabled from code; the merchant must confirm USD transactions with Paystack and verify the configured account. No currency conversion is implemented. The merchant's actual account configuration cannot be inspected by this repository.
+
+## Environment and Dashboard setup
+
+Configure these values in the backend's local `.env` (never in the frontend `.env.local`) and the backend deployment secret manager. `.env.example` contains empty placeholders only:
+
+- `PAYSTACK_SECRET_KEY`: test secret key from Paystack Dashboard **Settings → API keys & webhooks** for sandbox verification; replace with the live secret only after a separately approved production launch.
+- `PAYSTACK_USD_ENABLED`: leave `false` until Paystack confirms USD transactions are enabled for the actual merchant account; set `true` only after that confirmation.
+- `PAYSTACK_CALLBACK_URL`: absolute Nexus billing return URL, for example `https://<your-domain>/app/billing`. Production configuration requires HTTPS.
+- `PAYSTACK_ENCRYPTION_KEY`: generate a stable base64url-encoded 32-byte key for encrypting subscription management tokens at rest. Preserve it across deployments; losing it prevents provider subscription management.
+- `PAYSTACK_API_URL`: keep the documented default `https://api.paystack.co` unless Paystack supplies a different endpoint.
+- `PAYSTACK_REQUEST_TIMEOUT_MS`: optional request timeout; documented default is 15000 ms.
+
+The browser public key is not required because checkout uses Paystack's hosted transaction URL. There is no separate webhook signing secret variable: the official `x-paystack-signature` HMAC-SHA512 is verified with the Paystack secret key. In Paystack Dashboard, configure the webhook URL as `https://<backend-domain>/api/v1/webhooks/paystack` for the matching test/live environment. Local webhook testing requires a publicly reachable HTTPS tunnel. Do not paste credentials into chat or commit them.
+
 ## Provider-dependent blockers
 
-- Payment provider selection, supported currencies, tax handling, invoice requirements, production credentials and webhook configuration.
-- Provider API contract, secure payment confirmation, signatures/replay protection, durable idempotency, and provider-backed proration behavior.
-- Subscription schema/migration, routes, subscription lifecycle persistence, entitlement integration, billing authorization, and transactional membership enforcement.
+- Paystack USD support for this merchant, tax handling, invoice requirements, production credentials and webhook configuration.
+- Paystack test credentials and confirmation of USD-enabled merchant configuration.
+- Member removal/suspension-to-seat-reduction synchronization and provider/database reconciliation.
+- Migration application to a verified disposable database.
 - Live provider and backend verification, including duplicate webhook behavior and payment-success/failure paths.
 - Legal approval of the Terms and Privacy drafts and applicable refund/cancellation wording.
 
 ## Frontend behavior
 
-The pricing page shows the approved base prices, included-member allowances, owner inclusion, and additional-member monthly rates. It explains that only active members beyond the allowance are billable. Checkout, plan changes, cancellation, payment methods, invoices, and paid entitlement changes remain unavailable. Do not calculate authoritative totals in the browser.
+The pricing and authenticated billing pages display base/seat pricing, current backend subscription state, authoritative active-member count, renewal/cancellation dates, billing history, target seat quantity, checkout, plan changes, and period-end cancellation. The browser never grants paid access or supplies a price; requested seat quantity is checked against authoritative membership state by the backend. Merchant USD configuration and Paystack test-mode validation are still outstanding.

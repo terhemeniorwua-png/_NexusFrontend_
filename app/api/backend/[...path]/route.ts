@@ -15,7 +15,7 @@ async function forwardRequest(
   let upstreamUrl: URL;
   try {
     const { path } = await context.params;
-    if (path[0] !== 'auth' || path.some((segment) => !/^[a-zA-Z0-9-]+$/.test(segment))) {
+    if (!['auth', 'workspaces'].includes(path[0] ?? '') || path.some((segment) => !/^[a-zA-Z0-9-]+$/.test(segment))) {
       return Response.json({ success: false, error: { code: 'NOT_FOUND', message: 'The requested API route was not found.' } }, { status: 404 });
     }
     const base = new URL(configuredBase);

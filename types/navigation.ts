@@ -59,6 +59,12 @@ export interface NavItem {
   label: string;
   /** Destination path, supplied by the caller from the route constants. */
   href: string;
+  /**
+   * When true, the item is only active on an exact path match. Use it for
+   * overview destinations such as `/app` that would otherwise match every
+   * descendant route.
+   */
+  exact?: boolean;
   /** Optional leading icon. The shell renders it as decoration. */
   icon?: React.ReactNode;
   /**

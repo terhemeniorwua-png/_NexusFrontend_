@@ -21,10 +21,10 @@ import type {
  * `/projects` is active for `/projects/42`, but `/project` is not active for
  * `/projects`.
  */
-export function isPathActive(href: string, activePath: string): boolean {
+export function isPathActive(href: string, activePath: string, exact = false): boolean {
   if (!href) return false;
   if (href === activePath) return true;
-  if (href === '/') return false;
+  if (exact || href === '/') return false;
 
   const base = href.endsWith('/') ? href.slice(0, -1) : href;
   return activePath === base || activePath.startsWith(`${base}/`);

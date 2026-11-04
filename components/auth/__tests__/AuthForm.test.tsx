@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccessToken, setAccessToken } from '@/lib/api';
+import { readPendingOnboardingIntent, savePendingOnboardingIntent } from '@/lib/onboarding-intent';
 import { AuthForm } from '../AuthForm';
 
 const { router } = vi.hoisted(() => ({ router: { push: vi.fn() } }));
@@ -18,6 +19,7 @@ describe('AuthForm', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     setAccessToken(null);
+    window.localStorage.clear();
     router.push.mockReset();
   });
 
@@ -64,7 +66,49 @@ describe('AuthForm', () => {
       method: 'POST',
       body: JSON.stringify({ name: 'Ada Lovelace', email: 'ada@example.com', password: 'Nexus-password-42' }),
     }));
+  }, 15_000);
+
+  it('registers an institution owner through the existing identity contract', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: { user: { id: 'user-id', email: 'ada@school.example' }, verificationRequired: true },
+    }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(<AuthForm mode="sign-up" accountType="institution" />);
+    await user.type(screen.getByLabelText(/Administrator or account owner name/), 'Ada Lovelace');
+    await user.type(screen.getByLabelText(/Institution administrator email/), 'ada@school.example');
+    await user.type(screen.getByLabelText(/Password/), 'Nexus-password-42');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    expect(await screen.findByText(/verify your email, then sign in and create your institution workspace/i)).toBeInTheDocument();
+    expect(readPendingOnboardingIntent('ada@school.example')).toEqual({ accountType: 'institution', email: 'ada@school.example' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/backend/auth/register', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ name: 'Ada Lovelace', email: 'ada@school.example', password: 'Nexus-password-42' }),
+    }));
   });
+
+  it('registers a business owner through the same identity contract without organization fields', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: { user: { id: 'user-id', email: 'ada@acme.example' }, verificationRequired: true },
+    }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(<AuthForm mode="sign-up" accountType="business" />);
+    await user.type(screen.getByLabelText(/Administrator or account owner name/), 'Ada Lovelace');
+    await user.type(screen.getByLabelText(/Business email/), 'ada@acme.example');
+    await user.type(screen.getByLabelText(/Password/), 'Nexus-password-42');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    expect(await screen.findByText(/verify your email, then sign in and create your business workspace/i)).toBeInTheDocument();
+    expect(readPendingOnboardingIntent('ada@acme.example')).toEqual({ accountType: 'business', email: 'ada@acme.example' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/backend/auth/register', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ name: 'Ada Lovelace', email: 'ada@acme.example', password: 'Nexus-password-42' }),
+    }));
+    const [, init] = fetchMock.mock.calls[0];
+    expect(Object.keys(JSON.parse(String(init?.body))).sort()).toEqual(['email', 'name', 'password']);
+  }, 15_000);
 
   it('shows an authentication error when sign-in is rejected', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
@@ -100,6 +144,66 @@ describe('AuthForm', () => {
     expect(getAccessToken()).toBe('short-lived-access-token');
   });
 
+  it('resolves a selected business workspace using backend membership before continuing', async () => {
+    const company = { id: 'company-id', type: 'COMPANY', isPersonal: false };
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: {
+        user: { id: 'user-id', email: 'ada@example.com', name: 'Ada', status: 'ACTIVE', emailVerifiedAt: null, createdAt: '' },
+        accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 900, csrfToken: 'csrf', session: { id: 'session', expiresAt: '' },
+      } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: [
+        { id: 'personal-id', type: 'INDIVIDUAL', isPersonal: true }, company,
+      ] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: company }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(<AuthForm mode="sign-in" accountType="business" />);
+    await user.type(screen.getByLabelText(/Email address/), 'ada@example.com');
+    await user.type(screen.getByLabelText(/Password/), 'Nexus-password-42');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app'));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/backend/workspaces', expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/backend/workspaces/company-id/switch', expect.objectContaining({ method: 'POST' }));
+    expect(window.localStorage.getItem('nexus-active-workspace')).toBe('company-id');
+  });
+
+  it('carries an institution selection into protected workspace onboarding when no matching membership exists', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: {
+        user: { id: 'user-id', email: 'ada@example.com', name: 'Ada', status: 'ACTIVE', emailVerifiedAt: null, createdAt: '' },
+        accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 900, csrfToken: 'csrf', session: { id: 'session', expiresAt: '' },
+      } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: [
+        { id: 'personal-id', type: 'INDIVIDUAL', isPersonal: true },
+      ] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(<AuthForm mode="sign-in" accountType="institution" />);
+    await user.type(screen.getByLabelText(/Email address/), 'ada@example.com');
+    await user.type(screen.getByLabelText(/Password/), 'Nexus-password-42');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/workspaces?type=INSTITUTION'));
+  });
+
+  it('keeps Personal sign-in in the personal app route if the personal workspace is unexpectedly absent', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: {
+        user: { id: 'user-id', email: 'ada@example.com', name: 'Ada', status: 'ACTIVE', emailVerifiedAt: null, createdAt: '' },
+        accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 900, csrfToken: 'csrf', session: { id: 'session', expiresAt: '' },
+      } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: [
+        { id: 'company-id', type: 'COMPANY', isPersonal: false },
+      ] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(<AuthForm mode="sign-in" accountType="personal" />);
+    await user.type(screen.getByLabelText(/Email address/), 'ada@example.com');
+    await user.type(screen.getByLabelText(/Password/), 'Nexus-password-42');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app'));
+    expect(router.push).not.toHaveBeenCalledWith('/app/workspaces');
+  });
+
   it('submits an email verification token to the backend', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       success: true,
@@ -115,6 +219,52 @@ describe('AuthForm', () => {
       method: 'POST',
       body: JSON.stringify({ token: 'a-valid-verification-token-from-email' }),
     }));
+  });
+
+  it('resumes institution intent after verification and links to the selected sign-in flow', async () => {
+    savePendingOnboardingIntent({ accountType: 'institution', email: 'ada@school.example' });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: { user: { id: 'user-id', email: 'ada@school.example', name: 'Ada', status: 'ACTIVE', emailVerifiedAt: '2026-11-04T00:00:00.000Z', createdAt: '' } },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(<AuthForm mode="verify-email" initialToken="a-valid-verification-token-from-email" />);
+
+    await user.click(screen.getByRole('button', { name: 'Verify email' }));
+    expect(await screen.findByText(/create or resume your institution workspace/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue to sign in' }));
+    expect(router.push).toHaveBeenCalledWith('/sign-in?accountType=institution');
+  });
+
+  it.each([
+    ['personal', 'Your email is verified. You can now sign in to Nexus.', '/sign-in?accountType=personal'],
+    ['business', 'Your email is verified. Sign in to create or resume your business workspace.', '/sign-in?accountType=business'],
+  ])('continues a verified %s account to the matching sign-in route', async (accountType, notice, route) => {
+    savePendingOnboardingIntent({ accountType: accountType as 'personal' | 'business', email: 'ada@acme.example' });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: { user: { id: 'user-id', email: 'ada@acme.example', name: 'Ada', status: 'ACTIVE', emailVerifiedAt: '2026-11-04T00:00:00.000Z', createdAt: '' } },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(<AuthForm mode="verify-email" initialToken="a-valid-verification-token-from-email" />);
+
+    await user.click(screen.getByRole('button', { name: 'Verify email' }));
+    expect(await screen.findByText(notice)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue to sign in' }));
+    expect(router.push).toHaveBeenCalledWith(route);
+  });
+
+  it('offers verification resend when the verification token has expired', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: false, error: { code: 'TOKEN_EXPIRED', message: 'This link has expired. Please request a new one.' } }), { status: 400, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: { message: 'A new verification email has been sent.' } }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(<AuthForm mode="verify-email" initialToken="an-expired-verification-token" initialEmail="ada@example.com" />);
+
+    await user.click(screen.getByRole('button', { name: 'Verify email' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid or expired/i);
+    await user.click(screen.getByRole('button', { name: 'Resend verification email' }));
+    expect(await screen.findByText('A new verification email has been sent.')).toBeInTheDocument();
   });
 
   it('resends verification after successful registration', async () => {
@@ -154,5 +304,26 @@ describe('AuthForm', () => {
       method: 'POST',
       body: JSON.stringify({ token: 'a-valid-reset-token-from-email', password: 'Nexus-password-42' }),
     }));
+  });
+
+  it('returns to a validated redirect target after signing in', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: { accessToken: 'fresh-token' },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const user = userEvent.setup();
+    render(
+      <AuthForm
+        mode="sign-in"
+        redirectPath="/workspaces/invitations/accept?token=abc_-123"
+      />,
+    );
+    await user.type(screen.getByLabelText(/Email address/), 'ada@example.com');
+    await user.type(screen.getByLabelText(/Password/), 'Nexus-password-42');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/workspaces/invitations/accept?token=abc_-123'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/backend/auth/login', expect.objectContaining({ method: 'POST' }));
   });
 });

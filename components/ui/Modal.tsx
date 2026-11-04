@@ -74,13 +74,22 @@ export function Modal({
     [onClose],
   );
 
-  // Move focus into dialog on open; restore on close
+  // Close on Escape and keep Tab inside the dialog. The listener is rebound
+  // when the handler identity changes, which is harmless.
+  useEffect(() => {
+    if (!open) return;
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, handleKeyDown]);
+
+  // Move focus into the dialog once, when it opens, and restore it on close.
+  // This effect must not depend on the render-time handler, otherwise every
+  // keystroke in a field inside the dialog would re-run it and pull focus
+  // back to the first control.
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement as HTMLElement | null;
-    document.addEventListener('keydown', handleKeyDown);
 
-    // Focus first focusable element
     const raf = requestAnimationFrame(() => {
       if (dialogRef.current) {
         const first = dialogRef.current.querySelector<HTMLElement>(FOCUSABLE);
@@ -90,10 +99,9 @@ export function Modal({
 
     return () => {
       cancelAnimationFrame(raf);
-      document.removeEventListener('keydown', handleKeyDown);
       previousFocus?.focus();
     };
-  }, [open, handleKeyDown]);
+  }, [open]);
 
   // Lock body scroll while open
   useEffect(() => {

@@ -13,7 +13,7 @@ export default function PricingPage() {
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-semibold text-[var(--color-primary)]">Workspace plans</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">Simple, clear pricing</h1>
-          <p className="mt-4 text-base leading-7 text-[var(--color-text-secondary)]">Compare Pro and Business pricing. Checkout and subscription management are not yet connected.</p>
+          <p className="mt-4 text-base leading-7 text-[var(--color-text-secondary)]">Compare Free, Pro, and Business. Signed-in workspace owners can manage paid subscriptions when the payment provider is configured for USD.</p>
         </div>
         <PricingOptions />
         <footer className="mt-12 border-t border-[var(--color-border)] pt-6"><PolicyLinks /></footer>

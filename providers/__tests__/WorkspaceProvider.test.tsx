@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceProvider, useWorkspaceContext } from '../WorkspaceProvider';
 import { createWorkspace, listWorkspaces, switchWorkspace, updateWorkspace } from '@/services/workspaces';
+import { ApiRequestError } from '@/lib/api';
 
 const mocks = vi.hoisted(() => ({
   router: { replace: vi.fn() },
@@ -78,6 +79,15 @@ describe('WorkspaceProvider', () => {
 
     await waitFor(() => expect(screen.getByText('Ada in Company')).toBeInTheDocument());
     expect(window.localStorage.getItem('nexus-active-workspace')).toBe(company.id);
+  });
+
+  it('returns to sign-in when a workspace switch cannot refresh an expired session', async () => {
+    render(<WorkspaceProvider><Probe /></WorkspaceProvider>);
+    expect(await screen.findByText('Ada in Personal')).toBeInTheDocument();
+    vi.mocked(switchWorkspace).mockRejectedValueOnce(new ApiRequestError('Your session has expired.', 401));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to company' }));
+
+    await waitFor(() => expect(mocks.router.replace).toHaveBeenCalledWith('/sign-in'));
   });
 
   it('creates the workspace through the backend and activates its returned id', async () => {

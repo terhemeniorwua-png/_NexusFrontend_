@@ -53,7 +53,7 @@ export const subscriptionPricing = {
     countOwnerOnce: true,
     preventDuplicateWorkspaceMembers: true,
     authoritativeCountSource: 'backend',
-    backendEnforcementImplemented: false,
+    backendEnforcementImplemented: true,
     additionalSeatsUseBaseSubscriptionDuration: true,
     additionsImmediateAfterPaymentAndProrated: true,
     reductionsAtNextRenewalWithoutCredit: true,

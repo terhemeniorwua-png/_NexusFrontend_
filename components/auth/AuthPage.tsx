@@ -7,9 +7,9 @@ import { AuthForm } from './AuthForm';
 
 type AuthMode = 'sign-in' | 'sign-up' | 'forgot-password' | 'reset-password' | 'verify-email';
 
-export function AuthPage({ mode, token, email }: { mode: AuthMode; token?: string; email?: string }) {
+export function AuthPage({ mode, token, email, initialAccountType }: { mode: AuthMode; token?: string; email?: string; initialAccountType?: AuthAccountType }) {
   const router = useRouter();
-  const [accountType, setAccountType] = useState<AuthAccountType | null>(null);
+  const [accountType, setAccountType] = useState<AuthAccountType | null>(initialAccountType ?? null);
   const [entryMode, setEntryMode] = useState<'sign-in' | 'sign-up'>(mode === 'sign-in' ? 'sign-in' : 'sign-up');
   const requiresAccountSelection = mode === 'sign-in' || mode === 'sign-up';
   const activeMode = requiresAccountSelection ? (accountType ? entryMode : mode) : mode;

@@ -24,7 +24,7 @@ interface WorkspaceContextValue {
   switchingWorkspaceId: string | null;
   error: string | null;
   retry: () => void;
-  switchToWorkspace: (workspaceId: string) => Promise<void>;
+  switchToWorkspace: (workspaceId: string) => Promise<boolean>;
   createAndActivateWorkspace: (input: CreateWorkspaceInput) => Promise<Workspace>;
   saveWorkspace: (workspaceId: string, input: UpdateWorkspaceInput) => Promise<Workspace>;
 }
@@ -95,7 +95,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, [loadAttempt, router]);
 
   const switchToWorkspace = useCallback(async (workspaceId: string) => {
-    if (workspaceId === activeWorkspace?.id) return;
+    if (workspaceId === activeWorkspace?.id) return true;
     setSwitchingWorkspaceId(workspaceId);
     setError(null);
     try {
@@ -103,12 +103,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setWorkspaces((current) => current.map((workspace) => workspace.id === selected.id ? selected : workspace));
       setActiveWorkspace(selected);
       window.localStorage.setItem(ACTIVE_WORKSPACE_KEY, selected.id);
+      return true;
     } catch (cause) {
+      if (cause instanceof ApiRequestError && cause.status === 401) router.replace('/sign-in');
       setError(messageFor(cause, 'That workspace is unavailable. Choose another workspace or refresh the list.'));
+      return false;
     } finally {
       setSwitchingWorkspaceId(null);
     }
-  }, [activeWorkspace?.id]);
+  }, [activeWorkspace?.id, router]);
 
   const createAndActivateWorkspace = useCallback(async (input: CreateWorkspaceInput) => {
     const created = await createWorkspaceRequest(input);

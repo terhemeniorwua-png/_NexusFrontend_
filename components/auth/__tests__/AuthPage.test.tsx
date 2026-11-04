@@ -43,6 +43,13 @@ describe('account selection authentication flow', () => {
     expect(screen.getByText(/Institution account ·/)).toBeInTheDocument();
   });
 
+  it('restores the selected account type from the verification return route', () => {
+    render(<AuthPage mode="sign-in" initialAccountType="business" />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
+    expect(screen.getByText(/Business account · Sign in/)).toBeInTheDocument();
+  });
+
   it('returns to account selection without changing the current intent', async () => {
     const user = userEvent.setup();
     render(<AuthPage mode="sign-up" />);

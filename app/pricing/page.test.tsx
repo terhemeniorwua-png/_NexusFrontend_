@@ -44,7 +44,7 @@ describe('subscription pricing configuration', () => {
       countOwnerOnce: true,
       preventDuplicateWorkspaceMembers: true,
       authoritativeCountSource: 'backend',
-      backendEnforcementImplemented: false,
+      backendEnforcementImplemented: true,
       additionalSeatsUseBaseSubscriptionDuration: true,
       additionsImmediateAfterPaymentAndProrated: true,
       reductionsAtNextRenewalWithoutCredit: true,

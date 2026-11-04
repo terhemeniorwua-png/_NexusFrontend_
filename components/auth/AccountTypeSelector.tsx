@@ -1,8 +1,8 @@
 'use client';
 
 import { Modal } from '@/components/ui/Modal';
-
-export type AuthAccountType = 'personal' | 'institution' | 'business';
+import type { AuthAccountType } from '@/types/auth';
+export type { AuthAccountType } from '@/types/auth';
 
 const accountTypes: { id: AuthAccountType; title: string; description: string }[] = [
   { id: 'personal', title: 'Personal account', description: 'Manage your own work, tasks, projects, and personal workspace.' },

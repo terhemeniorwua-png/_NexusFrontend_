@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import { getProject, type ProjectSummary, type ProjectVisibility } from '@/services/projects';
 
 function visibilityLabel(v: ProjectVisibility): string {
@@ -30,6 +31,7 @@ function dateLabel(value: string | null): string {
 
 export default function ProjectOverviewPage({ params }: { params: { projectId: string } }) {
   const { activeWorkspace } = useWorkspaceContext();
+  useWorkspaceRedirect();
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);
@@ -37,7 +39,7 @@ export default function ProjectOverviewPage({ params }: { params: { projectId: s
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
-    setLoading(true); setError(null); setAccessStatus(null);
+    setLoading(true); setError(null); setAccessStatus(null); setProject(null);
     try {
       const data = await getProject(activeWorkspace.id, params.projectId);
       setProject(data);
@@ -125,6 +127,31 @@ export default function ProjectOverviewPage({ params }: { params: { projectId: s
           <p className="mt-1 font-medium">{dateLabel(project.dueDate)}</p>
         </Card>
       </div>
+
+      {/* Organizational access display */}
+      {project.visibility === 'DEPARTMENT_TEAM' && (project.teamId || project.departmentId) && (
+        <Card className="p-4">
+          <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-2">Organizational access</h2>
+          <div className="flex flex-wrap gap-4">
+            {project.teamId && (
+              <div>
+                <p className="text-xs text-[var(--color-text-muted)]">Team</p>
+                <p className="mt-1 text-sm font-medium">{project.teamId}</p>
+              </div>
+            )}
+            {project.departmentId && (
+              <div>
+                <p className="text-xs text-[var(--color-text-muted)]">Department</p>
+                <p className="mt-1 text-sm font-medium">{project.departmentId}</p>
+              </div>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+            Members of the associated team or department can access this project.
+            Manage associations in <Link href={`/app/projects/${encodeURIComponent(project.id)}/settings`} className="text-[var(--color-primary)] underline">settings</Link>.
+          </p>
+        </Card>
+      )}
 
       {project.labels.length > 0 && (
         <Card className="p-4">

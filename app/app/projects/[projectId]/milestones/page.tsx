@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import {
   createProjectMilestone,
   deleteProjectMilestone,
@@ -40,6 +41,7 @@ function requestError(cause: unknown, fallback: string): string {
 
 export default function ProjectMilestonesPage({ params }: { params: { projectId: string } }) {
   const { activeWorkspace } = useWorkspaceContext();
+  useWorkspaceRedirect();
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);

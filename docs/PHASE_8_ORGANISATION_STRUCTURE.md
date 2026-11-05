@@ -1,0 +1,105 @@
+# Phase 8 — Organisation Structure Frontend
+
+**Status: In Progress**  
+**Last checked:** 2026-11-05
+
+## Implemented
+
+- `services/organization-structure.ts` consumes the backend's workspace-scoped department, team, and institution-group routes through the existing API client.
+- `/app/teams` provides team creation and editing, team lead assignment, team member assignment/removal, team archival, institution department association, department create/rename, and department member assignment.
+- `/app/groups` provides institution group create/edit/delete and member/lead management.
+- Sidebar navigation exposes Teams and structure to company/institution workspaces and Institution groups to institution workspaces.
+- API client contract tests check HTTP paths, methods, bodies, and authenticated proxy use.
+
+## Authorization and data scope
+
+The backend is authoritative for access checks. The UI displays API errors (including permission failures) and does not infer management permission from an unverified client role. Workspace members are loaded from the active workspace endpoint. Group membership visibility is supplied by the backend. Team membership summaries are included only where the individual team member endpoint permits access; inaccessible team rosters are omitted. The backend remains responsible for preventing cross-workspace reads and writes.
+
+The current list/detail response contracts do not include per-resource capability flags. As a result, management controls cannot yet be precisely hidden for every combination of workspace role and team membership; attempted operations are still rejected by backend authorization and surfaced as errors. A capability contract (or an equivalent frontend/backend-approved permission mapping) is required to fully satisfy permission-aware control visibility without guessing.
+
+## Backend contracts verified
+
+The backend checkout at `/home/philip-iorwua/Desktop/__NexusBackend__` contains registered, implemented contracts:
+
+- Departments: `GET/POST /workspaces/{workspaceId}/departments`, `PATCH /.../departments/{departmentId}`, `POST /.../{departmentId}/members`, and `DELETE /.../{departmentId}/members/{targetUserId}`.
+- Teams: list/create/get/update/archive/delete, member list/add/update/remove, and team lead assignment under `/workspaces/{workspaceId}/teams`.
+- Institution groups: list/create/update/delete and member list/add/update/remove under `/workspaces/{workspaceId}/institution-groups`.
+
+## Remaining dependencies and limitations
+
+- The backend has no department-members list endpoint. Current frontend can assign a member and show aggregate counts but cannot verify/display department rosters or offer safe per-member removal. Backend dependency: expose authorized department membership records before that UI is added.
+- No team activity API is registered. Team activity view depends on an approved backend route/contract and cannot be implemented against the current API.
+- A dedicated `/app/teams/{teamId}` page now displays team details and its authorized member roster; activity remains unavailable.
+- Membership overview is permission-filtered by backend-readable rosters. A count does not reveal membership identities, and inaccessible rosters are not inferred.
+- End-to-end integration against a configured backend session and representative Company/Institution workspaces remains necessary; mocked service tests alone do not prove live integration.
+
+## Validation
+
+Results from 2026-11-05:
+
+- `npx vitest run services/__tests__/organization-structure.test.ts` — passed, 3 tests.
+- `npx tsc --noEmit` — passed.
+- `npm run lint` — passed.
+- `npm test` — 36 files passed; 2 files failed, with 261 tests passed and 3 failed (264 total). Existing failures are in invitation acceptance tests (two failures: test mock returns `undefined` for `refreshSession`, then `.then` is called) and the Terms policy page test (assertion expects obsolete exact 30-day sentence). No Phase 8 test failed.
+- `npm run build` — failed before application compilation in `app/globals.css`: Tailwind Turbopack worker timed out/crashed. It also reports the existing parent-directory `pnpm-lock.yaml` warning. No successful production build is claimed.
+- Live authenticated backend integration and responsive browser/E2E validation were not run; no configured user session/workspace was exercised. Service tests validate request contracts only.
+
+No tests or checks were run against production data or a real storage system.
+
+## Phase 8 remediation and verification — 2026-11-05
+
+The previous validation record above is historical. The following results supersede it for this remediation run.
+
+### Corrections completed
+
+- Fixed a mismatched JSX wrapper and added the missing `ConfirmDialog` import in `/app/teams`; the page had not been parsed by the earlier test run because the page test was not collected successfully.
+- Filtered workspace-kind navigation entries in `buildAppNavigation`, so Company, Institution, and Individual navigation results match the active workspace type. Permission filtering remains in the authenticated sidebar and the backend remains authoritative.
+- Added latest-request guards to team and group list loading. A delayed response from an earlier workspace can no longer replace data from the currently selected workspace. The Teams page also clears prior workspace data on a failed current load.
+- Added a Teams page regression test for out-of-order workspace responses.
+- The current invitation and Terms focused tests pass without production changes. Inspection confirms the invitation session refresh service returns a promise; no current failure reproduces from the earlier report, and the Terms assertion matches the current approved product wording. Those tests were not weakened.
+
+### Backend dependencies and requested contracts
+
+These contracts were checked against the adjacent backend source and route registrations. They are proposals for the backend team; no backend files were changed.
+
+1. **Department roster listing**
+   - Need: list department-member identities and roles so the UI can show an authorized roster and offer removal only for known assignments.
+   - Missing behavior: current routes support listing departments, assignment, and removal by target user ID, but not listing membership records.
+   - Proposed route: `GET /workspaces/:workspaceId/departments/:departmentId/members`, with required `workspaceId` and `departmentId` path parameters and optional cursor/limit pagination if roster size requires it.
+   - Proposed success data: `{ items: [{ userId, name, email, role: 'HEAD' | 'MEMBER', joinedAt }], nextCursor }` (or a documented unpaginated array for bounded rosters). Keep any aggregate count explicitly separate from the returned page.
+   - Authorization: require an active authenticated member and enforce workspace scope; return only identities the caller is allowed to see. Mutations must continue revalidating assignment/removal permissions server-side.
+   - Blocks roster display and safe per-member removal; department create/rename/assignment remain available.
+
+2. **Team activity**
+   - Need: show the team activity view without fabricated entries.
+   - Missing behavior: no team activity route/contract is registered.
+   - Proposed route: `GET /workspaces/:workspaceId/teams/:teamId/activity?cursor=&limit=`.
+   - Proposed success data: `{ items: [{ id, actor: { id, name }, action, resourceType, resourceId, summary, createdAt }], nextCursor }`; omit private resource details the caller cannot access.
+   - Authorization: require active workspace membership plus team/activity visibility; enforce resource visibility for linked resources.
+   - Blocks live activity rendering only; team details and membership remain usable.
+
+3. **Resource capability flags**
+   - Need: hide or explain controls according to authoritative resource-specific permissions rather than workspace type or visibility alone.
+   - Missing behavior: current list/detail responses do not include capabilities for the current actor.
+   - Proposed response addition on team, department, and group list/detail records: `capabilities` with booleans only for implemented operations (for example `canUpdate`, `canArchive`/`canDelete`, `canAssignLead`, `canAddMember`, and `canRemoveMember`). Backend should define the exact operation set and apply the same checks when each mutation is submitted.
+   - Request parameters: none beyond the existing workspace/resource path parameters; capabilities must be computed for the authenticated actor, not accepted from the client.
+   - Authorization: each mutation still performs an independent server-side check and returns the established 401/403 response. The frontend must handle 403 even when a capability previously indicated an action was available.
+   - Improves precise control visibility; current operations are usable with backend rejection/error feedback, but controls cannot be accurately pre-filtered.
+
+### Verification results
+
+- `npx vitest run` — passed, 40 test files and 269 tests.
+- Focused Phase 8 page, navigation, and API-contract run — passed, 3 files and 8 tests. Invitation and legal regression focus run — passed, 5 files and 18 tests before the final additions; the full suite above includes the final code.
+- `npx tsc --noEmit` — passed.
+- `npm run lint` — passed with 0 errors and 3 existing unused-function warnings in Discover, Invitations, and Join Requests.
+- `git diff --check` — passed.
+- Standard `npm run build` still fails before app compilation in the Tailwind Turbopack CSS loader worker with a subprocess message timeout. `next.config.ts` selects Next.js 16.4.2 Turbopack and maps `*.css` through the installed `@tailwindcss/turbopack` loader; Tailwind is v4; `app/globals.css` has one `@import "tailwindcss"`, and the root layout is its only application CSS import. No CSS import cycle or Phase 8 CSS change was found. The machine showed 3.9 GiB of 4 GiB swap used during investigation, which is consistent with resource pressure but does not by itself prove the cause.
+- `npx next build --webpack` completed successfully on the final implementation, including compilation, TypeScript, static generation of 23 routes, and trace collection. A production build therefore succeeds with the project's supported webpack builder; the configured Turbopack build worker timeout remains unresolved.
+- No authenticated live backend session, Company/Institution browser workflow, or responsive browser/E2E run was available. No production files or real object storage were used.
+
+### Remaining limitations and disposition
+
+- Department roster listing, team activity, and actor-specific resource capability flags remain backend dependencies with proposed contracts above.
+- Live authenticated backend integration and browser responsive testing remain manual verification requirements.
+- The separate AWS S3 SDK integration request is backend-owned. The current task explicitly prohibits backend-repository modifications; the frontend repository has no storage adapter or backend storage setup guide, so no S3 implementation/configuration was changed here. The backend adapter was inspected read-only and currently uses a custom S3-compatible SigV4 fetch implementation that requires a non-empty endpoint; it does not yet meet the requested AWS SDK v3/default-endpoint requirement. This remains unimplemented and must be handled in an authorized backend task.
+- Phase 8 remains **In Progress**. Phase 7 status is unchanged; Phase 9 has not started.

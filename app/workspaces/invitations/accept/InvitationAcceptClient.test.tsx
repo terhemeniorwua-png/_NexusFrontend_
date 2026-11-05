@@ -87,6 +87,7 @@ describe('invitation acceptance', () => {
     await user.click(await screen.findByRole('button', { name: 'Accept invitation' }));
 
     await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledWith('token_-123'));
+    expect(mocks.refreshSession).not.toHaveBeenCalled();
     expect(await screen.findByText('You are now a member of Nexus Studio.')).toBeInTheDocument();
     expect(window.localStorage.getItem('nexus-active-workspace')).toBe('workspace-1');
 
@@ -106,6 +107,7 @@ describe('invitation acceptance', () => {
     await user.click(screen.getByRole('button', { name: 'Decline invitation' }));
 
     await waitFor(() => expect(mocks.declineInvitation).toHaveBeenCalledWith('token_-123'));
+    expect(mocks.refreshSession).not.toHaveBeenCalled();
     expect(await screen.findByText('You declined the invitation to Nexus Studio.')).toBeInTheDocument();
   });
 

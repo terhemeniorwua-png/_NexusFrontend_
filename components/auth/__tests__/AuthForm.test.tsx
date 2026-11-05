@@ -124,16 +124,11 @@ describe('AuthForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('That email and password combination was not recognised.');
   });
 
-  it('offers password-verified account reactivation and requires a fresh sign-in', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        success: false,
-        error: { code: 'ACCOUNT_PENDING_DELETION', message: 'This account is pending deletion. Recover it before signing in.' },
-      }), { status: 403, headers: { 'Content-Type': 'application/json' } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        success: true,
-        data: { user: { id: 'user-id', email: 'ada@example.com', name: 'Ada', status: 'ACTIVE', emailVerifiedAt: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' } },
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  it('offers recovery while an account is in the scheduled deletion period', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      success: false,
+      error: { code: 'ACCOUNT_PENDING_DELETION', message: 'This account is being deleted and can no longer sign in.' },
+    }), { status: 403, headers: { 'Content-Type': 'application/json' } }));
     const user = userEvent.setup();
     render(<AuthForm mode="sign-in" />);
 
@@ -141,14 +136,8 @@ describe('AuthForm', () => {
     await user.type(screen.getByLabelText(/Password/), 'Nexus-password-42');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByRole('button', { name: 'Reactivate account' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Reactivate account' }));
-
-    expect(await screen.findByText('Your account is restored. Sign in again to start a new secure session.')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/backend/auth/reactivate', expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ email: 'ada@example.com', password: 'Nexus-password-42' }),
-    }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Restore it within 30 days');
+    expect(screen.getByRole('button', { name: 'Reactivate account' })).toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();
   });
 

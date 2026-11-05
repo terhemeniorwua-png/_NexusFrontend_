@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setAccessToken } from '@/lib/api';
 import {
   addWorkspaceMember,
+  acceptWorkspaceBillingResponsibility,
+  acceptWorkspaceOwnershipTransfer,
   createWorkspace,
   listWorkspaceMembers,
   listWorkspaces,
+  initiateWorkspaceOwnershipTransfer,
   removeWorkspaceMember,
   restoreWorkspaceMember,
   suspendWorkspaceMember,
@@ -114,5 +117,20 @@ describe('workspace API service', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/backend/workspaces/workspace-1/members/user-2/suspend', expect.objectContaining({ method: 'POST' }));
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/backend/workspaces/workspace-1/members/user-2/restore', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('initiates ownership transfer and requires separate transfer and billing acceptance calls', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(response({ transferId: 'transfer-1', status: 'PENDING' }))
+      .mockResolvedValueOnce(response({ workspaceId: 'workspace-1', billingAcceptanceRequired: true }))
+      .mockResolvedValueOnce(response({ workspaceId: 'workspace-1' }));
+
+    await initiateWorkspaceOwnershipTransfer('workspace-1', 'member-2');
+    await acceptWorkspaceOwnershipTransfer('workspace-1', 'transfer-1');
+    await acceptWorkspaceBillingResponsibility('workspace-1', 'transfer-1');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/backend/workspaces/workspace-1/owner/member-2', expect.objectContaining({ method: 'PATCH', body: '{}' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/backend/workspaces/workspace-1/owner-transfers/transfer-1/accept', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/backend/workspaces/workspace-1/owner-transfers/transfer-1/billing-acceptance', expect.objectContaining({ method: 'POST' }));
   });
 });

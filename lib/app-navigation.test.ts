@@ -29,4 +29,10 @@ describe('workspace-aware organization navigation', () => {
     expect(hrefs('INDIVIDUAL')).not.toContain('/app/teams');
     expect(hrefs('INDIVIDUAL')).not.toContain('/app/groups');
   });
+
+  it('shows the projects entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/projects');
+    expect(hrefs('INSTITUTION')).toContain('/app/projects');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/projects');
+  });
 });

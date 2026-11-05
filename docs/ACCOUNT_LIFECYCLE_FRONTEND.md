@@ -19,7 +19,9 @@
 - No invoice list/detail/pay API exists. The UI distinguishes persisted payment history from invoices and explains the approved payment/cancellation policy.
 - The backend currently has no Message, Conversation, or Channel message model/API. Privacy redaction therefore applies to supported task comments only; message retention/redaction and message attachments cannot yet be integrated.
 
-## Retained collaboration content
+## Phase 9 organizational-access integration — 2026-11-05
+
+Phase 9 now integrates `PATCH /workspaces/{workspaceId}/projects/{projectId}/organizational-access`. The project create form shows department and team pickers when DEPARTMENT_TEAM visibility is selected; the settings page exposes the same controls post-creation. The overview page displays the associated team and department when visibility is DEPARTMENT_TEAM. Ownership transfer (`POST .../transfer-ownership`) is also integrated in the settings page with ConfirmDialog. All changes are on `feature/phase-9-projects`.
 
 The UI explains that shared collaboration content remains, author attribution becomes “Deleted user,” and this does not mean personal details in the content have been erased. It does not delete or redact content client-side. Any approved redactions must arrive from a future authorized backend contract.
 

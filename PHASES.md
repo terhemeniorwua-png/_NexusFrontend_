@@ -1261,12 +1261,49 @@ Branch: `feature/phase-9-projects` (from `feature/frontend-authentication`).
 | `npm run build` | Passed (all project routes generated: /app/projects, /app/projects/[projectId], /app/projects/[projectId]/members, /app/projects/[projectId]/milestones, /app/projects/[projectId]/activity, /app/projects/[projectId]/settings) |
 | `git diff --check` | Passed |
 
+#### Phase 9 follow-up — 2026-11-05
+
+Additional implementation on `feature/phase-9-projects` after initial commit (`1abc85d`).
+
+**1. Organizational access integrated.** Project create form now shows team and department pickers when visibility is DEPARTMENT_TEAM, passing `teamId` and `departmentId` to `POST .../projects`. Settings page shows an "Organizational access" section (team/department pickers + save button) when visibility is DEPARTMENT_TEAM, calling `PATCH .../organizational-access`. Overview page displays associated team and department for DEPARTMENT_TEAM projects. Backend constraint: department-bound teams must use the same department (enforced server-side as a 409). Tests: organizational access section shown/hidden, save calls correct route.
+
+**2. Workspace switching on project detail pages.** Added `hooks/useWorkspaceRedirect.ts` — a hook that redirects to `/app/projects` when the active workspace changes while viewing a detail page. Used in overview, members, milestones, activity, and settings pages. Regression tests: all 5 detail pages redirect on workspace change (5 passing tests in `workspace-switch.test.tsx`).
+
+**3. A2 audit completed.** All workspace-scoped pages audited:
+- `billing` → `key={activeWorkspace.id}` ✅
+- `members`, `invitations`, `join-requests` panels → `key={activeWorkspace.id}` ✅
+- `teams`, `groups` → `latestLoad` refs ✅
+- `workspaces` → `WorkspaceSettings key={activeWorkspace.id}` + added `key={activeWorkspace.id}` to `OwnershipLifecyclePanel` ✅
+- `discover`, `invitations`, `privacy-requests` → user-scoped, no workspace state ✅
+- `projects` list → `latestLoad` + `loadedWorkspaceId` ✅
+- project detail pages → `useWorkspaceRedirect` ✅
+- Browser storage: `nexus-active-workspace` (workspace ID only), `nexus-theme` (preference), `PENDING_ONBOARDING_KEY` (account type intent) — no workspace-private data.
+
+**4. Sorting: backend gap recorded.** `GET /workspaces/{ws}/projects` supports `cursor`, `limit`, `status`, `visibility`, `teamId`, `departmentId`, `search`, `includeArchived`. No `sort` or `orderBy` parameter is registered. No sort control was added; a backend API gap is recorded here.
+
+**5. Ownership transfer integrated.** `POST .../transfer-ownership` with `{ newOwnerId, previousOwnerRole? }` added to `services/projects.ts`. Settings page has a member picker + "Transfer ownership" button with ConfirmDialog stating the consequence. Service contract test added. Tests: section visible, dialog opens, confirmation calls the route.
+
+**6. Docs updated.** `docs/ACCOUNT_LIFECYCLE_FRONTEND.md` notes Phase 9 organizational-access and ownership-transfer integration. `docs/PHASE_8_ORGANISATION_STRUCTURE.md` validation record updated to reflect current test/build results (supersedes stale historical counts).
+
+**7. Private-project handling verified.** The backend applies visibility in the database query (`listWorkspaceProjects` description: "PRIVATE requires project ownership or explicit project membership"). The frontend renders whatever the backend returns without additional client-side filtering. Confirmed: no client-side visibility filtering exists in the project list page.
+
+**Follow-up validation:**
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed |
+| `npm run lint` | Passed (0 errors, 0 warnings) |
+| `npm test -- --maxWorkers=1` | Passed (49 files, 323 tests) |
+| `npm run build` | Passed |
+| `git diff --check` | Passed |
+
+Live-backend and manual responsive checks remain unverified.
+
 #### Remaining gaps
 
 - Live backend verification not performed; all tests use mocked API responses.
 - Manual responsive review not performed.
-- Project ownership transfer (`POST .../transfer-ownership`) endpoint exists but is not yet integrated in the UI.
-- Organizational access (`PATCH .../organizational-access`) endpoint exists but is not yet integrated in the UI (department/team association for DEPARTMENT_TEAM visibility projects).
+- Sorting: no `sort` parameter in the backend project-list API. Record as a backend gap.
 - Project discussions, files, and timeline entry points are labeled as unavailable; no backend contract exists for these.
 - Task management is not part of Phase 9; no task API is registered in the backend.
 - No mock data in production code. No tokens or private data in browser storage.

@@ -10,7 +10,7 @@
 
 export type WorkspaceType = 'INDIVIDUAL' | 'COMPANY' | 'INSTITUTION';
 export type WorkspaceVisibility = 'PRIVATE' | 'PUBLIC';
-export type WorkspaceStatus = 'ACTIVE' | 'ARCHIVED';
+export type WorkspaceStatus = 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
 
 export type WorkspaceRole = 'OWNER' | 'PROJECT_MANAGER' | 'MEMBER' | 'COLLABORATOR' | 'VIEWER';
 

@@ -15,6 +15,7 @@ import { clearPendingOnboardingIntent, readPendingOnboardingIntent, savePendingO
 import {
   register,
   requestPasswordReset,
+  reactivateAccount,
   resendVerification,
   resetPassword,
   signIn,
@@ -39,6 +40,8 @@ const modeContent: Record<AuthMode, { title: string; subtitle: string }> = {
 function friendlyError(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return 'Something went wrong. Please try again.';
   if (error.status === 401) return 'That email and password combination was not recognised.';
+  if (error.code === 'ACCOUNT_DEACTIVATED') return 'This account is deactivated. You can reactivate it with your current password.';
+  if (error.code === 'ACCOUNT_PENDING_DELETION') return 'This account is scheduled for deletion. Reactivate it before its recovery period ends.';
   if (error.status === 403) return error.message;
   if (error.status === 400 && (error.code === 'TOKEN_INVALID' || error.code === 'TOKEN_EXPIRED')) return 'This verification link is invalid or expired. Request a new verification email to continue.';
   if (error.status === 409) return 'An account with this email already exists. Try signing in instead.';
@@ -58,6 +61,7 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [complete, setComplete] = useState(false);
+  const [reactivationAvailable, setReactivationAvailable] = useState(false);
   const [verifiedAccountType, setVerifiedAccountType] = useState<AuthAccountType | null>(null);
   const pendingEmail = useSyncExternalStore(
     subscribePendingOnboardingIntent,
@@ -78,6 +82,7 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
     event.preventDefault();
     setError(null);
     setNotice(null);
+    setReactivationAvailable(false);
 
     if (mode === 'sign-in' || mode === 'sign-up' || mode === 'forgot-password') {
       const validEmail = emailSchema.safeParse(email);
@@ -159,6 +164,40 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
       }
     } catch (requestError) {
       setError(friendlyError(requestError));
+      if (
+        mode === 'sign-in' &&
+        requestError instanceof ApiRequestError &&
+        (requestError.code === 'ACCOUNT_DEACTIVATED' || requestError.code === 'ACCOUNT_PENDING_DELETION')
+      ) {
+        setReactivationAvailable(true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleReactivate() {
+    const validEmail = emailSchema.safeParse(email);
+    if (!validEmail.success) {
+      setError(validEmail.error.issues[0]?.message ?? 'Enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Enter your current password to reactivate this account.');
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await reactivateAccount({ email: validEmail.data, password });
+      setReactivationAvailable(false);
+      setNotice(result.user.status === 'PENDING_VERIFICATION'
+        ? 'Your account is restored. Check your email to verify it, then sign in.'
+        : 'Your account is restored. Sign in again to start a new secure session.');
+    } catch (requestError) {
+      setError(friendlyError(requestError));
     } finally {
       setBusy(false);
     }
@@ -200,6 +239,7 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
 
       {error && <Alert variant="error" className="mb-5">{error}</Alert>}
       {notice && <Alert variant={complete ? 'success' : 'info'} className="mb-5">{notice}</Alert>}
+      {reactivationAvailable && mode === 'sign-in' && <div className="mb-5 space-y-2"><p className="text-sm text-[var(--color-text-secondary)]">Use the email and password above to restore access. You will need to sign in again afterward.</p><Button type="button" className="w-full" variant="secondary" loading={busy} onClick={() => { void handleReactivate(); }}>Reactivate account</Button></div>}
 
       {mode === 'sign-up' && complete ? (
         <div className="space-y-4">

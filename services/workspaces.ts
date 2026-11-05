@@ -64,6 +64,47 @@ export interface UpdateWorkspaceInput {
   visibility: WorkspaceVisibility;
 }
 
+export interface OwnershipTransferCreated {
+  transferId: string;
+  status: 'PENDING';
+}
+
+export interface OwnershipTransferAccepted {
+  workspaceId: string;
+  billingAcceptanceRequired: boolean;
+}
+
+export function initiateWorkspaceOwnershipTransfer(
+  workspaceId: string,
+  userId: string,
+  newOwnerRole?: Exclude<WorkspaceRole, 'OWNER'>,
+): Promise<OwnershipTransferCreated> {
+  return authorizedRequest<OwnershipTransferCreated>(
+    workspacePath(workspaceId, `/owner/${encodeURIComponent(userId)}`),
+    { method: 'PATCH', body: JSON.stringify(newOwnerRole ? { newOwnerRole } : {}) },
+  );
+}
+
+export function acceptWorkspaceOwnershipTransfer(
+  workspaceId: string,
+  transferId: string,
+): Promise<OwnershipTransferAccepted> {
+  return authorizedRequest<OwnershipTransferAccepted>(
+    workspacePath(workspaceId, `/owner-transfers/${encodeURIComponent(transferId)}/accept`),
+    { method: 'POST' },
+  );
+}
+
+export function acceptWorkspaceBillingResponsibility(
+  workspaceId: string,
+  transferId: string,
+): Promise<{ workspaceId: string }> {
+  return authorizedRequest<{ workspaceId: string }>(
+    workspacePath(workspaceId, `/owner-transfers/${encodeURIComponent(transferId)}/billing-acceptance`),
+    { method: 'POST' },
+  );
+}
+
 export interface AddWorkspaceMemberInput {
   email: string;
   organizationRole?: OrganizationRole;

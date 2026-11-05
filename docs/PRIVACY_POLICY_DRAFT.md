@@ -73,21 +73,23 @@ Hosting provider, data locations, and transfer safeguards: **[DEPLOYMENT DETAILS
 
 ## 16. Data retention
 
-Service records are retained as needed to provide the service, protect security, resolve disputes, and meet legal obligations. No retention period for ordinary workspace data, logs, or backups is set by this draft. The 30-day account-deletion recovery period is described below.
+Service records are retained as needed to provide the service, protect security, resolve disputes, and meet legal obligations. Applicable legal retention periods for financial records, audit records, backups, and other data require legal/accounting review; this draft does not invent those periods.
 
-## 17. Account deletion and 30-day recovery
+## 17. Account deletion — product decision approved; legal review pending
 
-Account deletion requires authentication and confirmation and begins a 30-day recovery period. During that period, the user may recover the account through a secure process. Afterward, permanent deletion removes the personal workspace and exclusively owned data, subject to legal obligations and technically necessary cleanup.
+After identity verification, an account deletion request changes the account to `PENDING_DELETION`, records the request time, and schedules final deletion exactly 30 days later. Sessions and refresh credentials are revoked immediately. The user may verify identity and recover the account before the deadline. Recovery and finalization are mutually exclusive; normal recovery is unavailable after finalization starts. The request, recovery, and completion are audited.
 
-Shared organization workspaces and other members’ content must be preserved. If the deleting user is the only eligible organization owner, ownership must be transferred or separately resolved. Shared assets must remain while referenced by valid shared resources. Organization deletion is separate and requires authorization.
+Owned workspaces are retained. Workspaces without an accepted owner transfer are suspended; shared projects, teams, messages, comments, files, and workspace history remain under existing access controls. An accepted transfer requires the recipient to be an active member and to separately accept billing responsibility. No outstanding financial liability is silently transferred. At final deletion, personal author attribution is replaced with “Deleted user,” profile picture and profile references are removed, and collaboration content is retained. Personal information within retained collaboration content is not automatically purged; users may submit access, correction, erasure, or redaction requests for review, subject to protecting other people and legitimate collaboration records. Purely personal attachments are deleted only at final deletion after the 30-day recovery period; recovery preserves them. Shared workspace and collaboration-linked attachments are retained. An authorized platform administrator may resolve ownership after the recovery deadline; this does not grant unrestricted access to private content.
 
-## 18. Personal workspace deletion
+Subscription cancellation is scheduled at the 30-day deadline to prevent future renewals. During the recovery period the subscription remains in its current state. Recovery cancels scheduled cancellation and provider state is checked before billing is restored. Outstanding invoices remain payable. Applicable retention periods for invoices, payment references, receipts, refunds, subscription history, and audit records require legal/accounting review. These are approved product decisions, not legal approval or a claim of regulatory compliance.
 
-Permanent account deletion includes the personal workspace and exclusively owned data under the approved product policy. Shared content must not be deleted while other members or valid shared resources rely on it. Any separate workspace deletion action must be authorized, confirmed, and explain its effect.
+## 18. Personal workspace and shared content
+
+No workspace or shared content is automatically deleted as a result of account deletion. Messages, comments, files, projects, and collaboration history are retained and remain governed by existing access controls. The approved personal-attachment exception is limited to purely personal attachments, which are deleted after the recovery period; shared or collaboration-linked files are retained. Personal information inside retained content follows the review process described above; applicable rights, response timelines, and legal obligations remain subject to professional legal review.
 
 ## 19. Shared organization data
 
-Account deletion does not delete an organization workspace or content belonging to other members. Access follows workspace and resource permissions. Organization deletion is a separate authorized process, and ownership must be resolved before deleting the only eligible owner.
+Account deletion does not delete an organization workspace or content belonging to other members. Ownership transfer, suspension, and administrator resolution follow Section 17. Administrator ownership assignment is audited and does not grant unrestricted access to private workspace content.
 
 ## 20. User rights and privacy requests
 

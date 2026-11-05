@@ -1,4 +1,4 @@
-import { apiRequest, setAccessToken } from '@/lib/api';
+import { apiRequest, ApiRequestError, setAccessToken } from '@/lib/api';
 
 export interface AuthUser {
   id: string;
@@ -27,6 +27,8 @@ export interface AuthMessage {
   message: string;
 }
 
+let refreshInFlight: Promise<AuthResponse> | null = null;
+
 export async function register(input: {
   name: string;
   email: string;
@@ -45,6 +47,16 @@ export async function signIn(input: {
   });
   setAccessToken(result.accessToken);
   return result;
+}
+
+export async function reactivateAccount(input: {
+  email: string;
+  password: string;
+}): Promise<{ user: AuthUser }> {
+  return apiRequest('/auth/reactivate', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function verifyEmail(token: string): Promise<{ user: AuthUser }> {
@@ -78,10 +90,28 @@ export async function resetPassword(input: {
   });
 }
 
-export async function refreshSession(): Promise<AuthResponse> {
-  const result = await apiRequest<AuthResponse>('/auth/refresh', { method: 'POST' });
-  setAccessToken(result.accessToken);
-  return result;
+export function refreshSession(): Promise<AuthResponse> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const refresh = apiRequest<AuthResponse>('/auth/refresh', { method: 'POST' })
+    .then((result) => {
+      if (!result || typeof result.accessToken !== 'string' || !result.accessToken) {
+        throw new ApiRequestError('Your session could not be restored. Sign in again.', 401, 'INVALID_REFRESH_RESPONSE');
+      }
+      setAccessToken(result.accessToken);
+      return result;
+    })
+    .catch((error: unknown) => {
+      setAccessToken(null);
+      throw error;
+    });
+
+  refreshInFlight = refresh;
+  void refresh.then(
+    () => { if (refreshInFlight === refresh) refreshInFlight = null; },
+    () => { if (refreshInFlight === refresh) refreshInFlight = null; },
+  );
+  return refresh;
 }
 
 export async function signOut(): Promise<void> {

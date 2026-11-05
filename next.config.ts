@@ -5,12 +5,9 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
+    // A pnpm lockfile exists in the parent home directory. Pin Turbopack to
+    // this checkout so it does not scan the broader home tree for sources.
+    root: process.cwd(),
   },
 };
 

@@ -7,23 +7,24 @@ This document defines the phased implementation roadmap for the Nexus frontend.
 Nexus is a Real-Time Workspace & Project Management Platform that combines project management, team collaboration, communication, document management, meetings, scheduling, automation, and AI-powered productivity.
 
 The frontend must provide a consistent, responsive, accessible, and intuitive experience across three workspace types:
-| Check | Result |
-|---|---|
-| Framework | Next.js 16.4.2, App Router |
-| React | 19.3.0 |
-| Tailwind CSS | 4.x (`@tailwindcss/turbopack`) |
-| TypeScript | 5.x |
-| Socket.IO client | **Not installed** |
-| Form validation library | **Not installed** |
-| Test framework | **Not installed** (no `test` script in `package.json`) |
-| State management library | **Not installed** |
-| Available scripts | `dev`, `build`, `start`, `lint` |
-| App directory contents | `layout.tsx`, `page.tsx`, `globals.css`, `favicon.ico` only |
-| Feature folders | None exist (`components/`, `features/`, `hooks/`, `services/`, `types/`, `lib/`, `providers/` are all absent) |
-| Design tokens | `globals.css` uses Next.js defaults, not Nexus palette |
-| Path alias | `@/*` → repo root (defined in `tsconfig.json`) |
-| Environment file | No `.env` present |
-| Nexus features implemented | **Zero** |
+
+| Check                      | Result                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Framework                  | Next.js 16.4.2, App Router                                                                                    |
+| React                      | 19.3.0                                                                                                        |
+| Tailwind CSS               | 4.x (`@tailwindcss/turbopack`)                                                                                |
+| TypeScript                 | 5.x                                                                                                           |
+| Socket.IO client           | **Not installed**                                                                                             |
+| Form validation library    | **Not installed**                                                                                             |
+| Test framework             | **Not installed** (no `test` script in `package.json`)                                                        |
+| State management library   | **Not installed**                                                                                             |
+| Available scripts          | `dev`, `build`, `start`, `lint`                                                                               |
+| App directory contents     | `layout.tsx`, `page.tsx`, `globals.css`, `favicon.ico` only                                                   |
+| Feature folders            | None exist (`components/`, `features/`, `hooks/`, `services/`, `types/`, `lib/`, `providers/` are all absent) |
+| Design tokens              | `globals.css` uses Next.js defaults, not Nexus palette                                                        |
+| Path alias                 | `@/*` → repo root (defined in `tsconfig.json`)                                                                |
+| Environment file           | No `.env` present                                                                                             |
+| Nexus features implemented | **Zero**                                                                                                      |
 
 All phases began at `NOT_STARTED`. Phase 0 is now `COMPLETE`: all foundation tasks have been finished and committed. One item remains open (backend repository location — must be resolved before Phase 3). Phase 1 is next.
 
@@ -38,9 +39,11 @@ The frontend must integrate with the existing Nexus backend rather than independ
 ## Phase 0 — Repository Audit and Project Foundation
 
 ### Objective
+
 Establish a verified understanding of the repository's actual state, resolve environment and tooling gaps, and create the conventions that every subsequent phase will follow. This phase produces no user-visible features but ensures that every later phase builds on a reliable foundation.
 
 ### Prerequisites
+
 - Access to the repository.
 - `AGENTS.md` and `nexus-frontend/SKILL.md` available for reading.
 - Node.js and npm installed and working.
@@ -68,20 +71,24 @@ Establish a verified understanding of the repository's actual state, resolve env
 - [ ] Confirm backend repository location and documentation access.
 
 ### Frontend Deliverables
+
 - `.env.example` with placeholder values for `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL`.
 - Documented folder structure convention (in this file or in a `CONVENTIONS.md`).
 - Baseline lint and build report.
 - Backend dependency checklist.
 
 ### Backend Dependencies
+
 - None required for this phase. Backend documentation must be located and linked before Phase 3.
 
 ### Validation and Tests
+
 - `npm run lint` completes without new errors.
 - `npm run build` produces a working production bundle without errors.
 - `.env.example` is committed with placeholders only (no real values).
 
 ### Acceptance Criteria
+
 - Repository state fully documented.
 - `.env.example` committed with all required variable names.
 - Folder structure convention agreed and recorded.
@@ -89,24 +96,27 @@ Establish a verified understanding of the repository's actual state, resolve env
 - No secrets committed to the repository.
 
 ### Completion Status
+
 `COMPLETE`
 
 ### Completion Record (Phase 0)
 
-| Deliverable | Status | Commit |
-|---|---|---|
-| `.env.example` with `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` | ✅ Done | `5438cf2` |
-| `.gitignore` updated to allow `!.env.example` | ✅ Done | `5438cf2` |
-| Baseline `npm run lint` — zero errors | ✅ Done | recorded |
-| Baseline `npm run build` — zero errors (1 pre-existing pnpm warning) | ✅ Done | recorded |
-| `CONVENTIONS.md` — folder structure, API client, token storage, libraries | ✅ Done | `1072238` |
-| Backend API contracts checklist — Appendix B populated | ✅ Done | this commit |
-| Appendix C conventions reference updated | ✅ Done | this commit |
+| Deliverable                                                               | Status  | Commit      |
+| ------------------------------------------------------------------------- | ------- | ----------- |
+| `.env.example` with `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL`    | ✅ Done | `5438cf2`   |
+| `.gitignore` updated to allow `!.env.example`                             | ✅ Done | `5438cf2`   |
+| Baseline `npm run lint` — zero errors                                     | ✅ Done | recorded    |
+| Baseline `npm run build` — zero errors (1 pre-existing pnpm warning)      | ✅ Done | recorded    |
+| `CONVENTIONS.md` — folder structure, API client, token storage, libraries | ✅ Done | `1072238`   |
+| Backend API contracts checklist — Appendix B populated                    | ✅ Done | this commit |
+| Appendix C conventions reference updated                                  | ✅ Done | this commit |
 
 **Remaining open item:**
+
 - Backend repository location and documentation are still unknown. This must be resolved before Phase 3 begins.
 
 ### Notes and Blockers
+
 - The root instruction file is `AGENTS.md`, not `agent.md`. All future agents must read `AGENTS.md`.
 - `SKILL.md` is located at `nexus-frontend/SKILL.md`, not the repo root.
 - `SKILL.md` §3 refers to a `src/app` structure. This repository uses `app/` at the repo root; follow the actual structure (documented in `CONVENTIONS.md` §1).
@@ -236,42 +246,42 @@ At the end of each phase:
 
 Last verified: 2026-11-03, on branch `feature/frontend-authentication`.
 
-| Phase | Title | Status |
-|---|---|---|
-| 0 | Frontend Repository Audit and Project Foundation | Completed |
-| 1 | Design System, Branding, and UI Foundation | Completed |
-| 2 | Application Layout and Navigation Architecture | Completed |
-| 3 | Public Website and Authentication Interfaces | In Progress |
-| 4 | User Onboarding and Profile Management | Blocked |
-| 5 | Workspace Creation and Workspace Switching | Not Started |
-| 6 | Organisation Membership, Join Requests, and Invitations | Not Started |
-| 7 | Roles, Permissions, and Access-Controlled UI | Not Started |
-| 8 | Departments, Teams, and Groups | Not Started |
-| 9 | Projects and Project Visibility | Not Started |
-| 10 | Tasks and Work Management | Not Started |
-| 11 | Real-Time Messaging and Conversations | Not Started |
-| 12 | Notification Centre and Activity Feed | Not Started |
-| 13 | File Management and Nexus Drive | Not Started |
-| 14 | Document Collaboration | Not Started |
-| 15 | Calendar and Scheduling | Not Started |
-| 16 | Meetings and Calling | Not Started |
-| 17 | Forms and Surveys | Not Started |
-| 18 | Subscription, Billing, and Plan Management | Not Started |
-| 19 | Global Search and Full Document Search | Not Started |
-| 20 | Integrations Management | Not Started |
-| 21 | Automation and Workflow Builder | Not Started |
-| 22 | Nexus AI Assistant | Not Started |
-| 23 | Nexus Write | Not Started |
-| 24 | AI Action Approval and Execution Interfaces | Not Started |
-| 25 | Real-Time State, Presence, and Cross-Application Synchronisation | Not Started |
-| 26 | User Settings and Preferences | Not Started |
-| 27 | Reporting, Insights, and Analytics | Not Started |
-| 28 | Global UX, Accessibility, and Responsive Refinement | Not Started |
-| 29 | Frontend Security and Privacy Review | Not Started |
-| 30 | Frontend Testing and Quality Assurance | Not Started |
-| 31 | Performance and Production Optimisation | Not Started |
-| 32 | Deployment and Production Configuration | Not Started |
-| 33 | Final Frontend Review and Release Readiness | Not Started |
+| Phase | Title                                                            | Status      |
+| ----- | ---------------------------------------------------------------- | ----------- |
+| 0     | Frontend Repository Audit and Project Foundation                 | Completed   |
+| 1     | Design System, Branding, and UI Foundation                       | Completed   |
+| 2     | Application Layout and Navigation Architecture                   | Completed   |
+| 3     | Public Website and Authentication Interfaces                     | In Progress |
+| 4     | User Onboarding and Profile Management                           | Blocked     |
+| 5     | Workspace Creation and Workspace Switching                       | Not Started |
+| 6     | Organisation Membership, Join Requests, and Invitations          | Not Started |
+| 7     | Roles, Permissions, and Access-Controlled UI                     | Not Started |
+| 8     | Departments, Teams, and Groups                                   | In Progress |
+| 9     | Projects and Project Visibility                                  | Not Started |
+| 10    | Tasks and Work Management                                        | Not Started |
+| 11    | Real-Time Messaging and Conversations                            | Not Started |
+| 12    | Notification Centre and Activity Feed                            | Not Started |
+| 13    | File Management and Nexus Drive                                  | Not Started |
+| 14    | Document Collaboration                                           | Not Started |
+| 15    | Calendar and Scheduling                                          | Not Started |
+| 16    | Meetings and Calling                                             | Not Started |
+| 17    | Forms and Surveys                                                | Not Started |
+| 18    | Subscription, Billing, and Plan Management                       | Not Started |
+| 19    | Global Search and Full Document Search                           | Not Started |
+| 20    | Integrations Management                                          | Not Started |
+| 21    | Automation and Workflow Builder                                  | Not Started |
+| 22    | Nexus AI Assistant                                               | Not Started |
+| 23    | Nexus Write                                                      | Not Started |
+| 24    | AI Action Approval and Execution Interfaces                      | Not Started |
+| 25    | Real-Time State, Presence, and Cross-Application Synchronisation | Not Started |
+| 26    | User Settings and Preferences                                    | Not Started |
+| 27    | Reporting, Insights, and Analytics                               | Not Started |
+| 28    | Global UX, Accessibility, and Responsive Refinement              | Not Started |
+| 29    | Frontend Security and Privacy Review                             | Not Started |
+| 30    | Frontend Testing and Quality Assurance                           | Not Started |
+| 31    | Performance and Production Optimisation                          | Not Started |
+| 32    | Deployment and Production Configuration                          | Not Started |
+| 33    | Final Frontend Review and Release Readiness                      | Not Started |
 
 Status meanings: **Not Started**, **In Progress**, **Blocked**, **Completed**. A phase is only marked **Completed** when its functional requirements, integrations, and validation requirements have been verified.
 
@@ -316,17 +326,17 @@ Verified on 2026-11-03 on branch `feature/phase-1-design-system`.
 
 #### Verified technology and configuration
 
-| Area | Verified state |
-|---|---|
-| Framework | Next.js `16.4.2`, App Router, Turbopack build |
-| Language | TypeScript `5.x`, `strict: true` |
-| UI runtime | React and React DOM `19.3.0` |
-| Styling | Tailwind CSS `4.x` via `@tailwindcss/turbopack`, CSS-first `@theme` tokens in `app/globals.css` |
-| Validation | Zod `^4.6.7` installed, not yet used in application code |
-| Tests | Vitest `4.1.12`, Testing Library, jsdom `29.1.1` |
-| Linting | ESLint `9.x` with `eslint-config-next` core-web-vitals and TypeScript rules |
-| Package manager | npm (`package-lock.json` is the active lockfile) |
-| Path alias | `@/*` resolves to the repository root, not `src/` |
+| Area            | Verified state                                                                                  |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| Framework       | Next.js `16.4.2`, App Router, Turbopack build                                                   |
+| Language        | TypeScript `5.x`, `strict: true`                                                                |
+| UI runtime      | React and React DOM `19.3.0`                                                                    |
+| Styling         | Tailwind CSS `4.x` via `@tailwindcss/turbopack`, CSS-first `@theme` tokens in `app/globals.css` |
+| Validation      | Zod `^4.6.7` installed, not yet used in application code                                        |
+| Tests           | Vitest `4.1.12`, Testing Library, jsdom `29.1.1`                                                |
+| Linting         | ESLint `9.x` with `eslint-config-next` core-web-vitals and TypeScript rules                     |
+| Package manager | npm (`package-lock.json` is the active lockfile)                                                |
+| Path alias      | `@/*` resolves to the repository root, not `src/`                                               |
 
 #### Verified application state
 
@@ -347,31 +357,31 @@ Verified on 2026-11-03 on branch `feature/phase-1-design-system`.
 
 #### Validation evidence
 
-| Check | Result |
-|---|---|
-| `npm run lint` | Passed |
-| `npx tsc --noEmit` | Passed |
-| `npm test` | Passed — 5 files, 46 tests |
-| `npm run build` | Passed — static `/` and `/_not-found` routes generated |
+| Check              | Result                                                 |
+| ------------------ | ------------------------------------------------------ |
+| `npm run lint`     | Passed                                                 |
+| `npx tsc --noEmit` | Passed                                                 |
+| `npm test`         | Passed — 5 files, 46 tests                             |
+| `npm run build`    | Passed — static `/` and `/_not-found` routes generated |
 
 #### Backend dependency checklist
 
 The following contracts must be verified against the backend before dependent phases begin. Phase 0 only inspected the frontend repository; Phase 3 has now verified the auth contracts against the adjacent backend repository.
 
-| Dependency | Needed by | Status |
-|---|---|---|
-| API base URL and versioning convention | Phase 3 | Confirmed: backend OpenAPI server is `/api/v1`; local upstream is `http://localhost:4000` |
-| Authentication/session contract (cookie vs token, refresh, logout) | Phase 3 | Confirmed: short-lived bearer access token in response; rotating refresh token in HttpOnly cookie; CSRF cookie plus header; session logout endpoints |
-| User and session response shapes | Phase 3 | Confirmed in OpenAPI and auth controller; workspace permission shapes remain unconfirmed for later phases |
-| Workspace list, switching, and scoping contract | Phase 5 | Unconfirmed |
-| Membership, join request, and invitation contracts | Phase 6 | Unconfirmed |
-| Role and permission payloads for Company and Institution | Phase 7 | Unconfirmed |
-| Project, task, and visibility contracts | Phase 9–10 | Unconfirmed |
-| Pagination, filtering, and sorting | Phase 3 onward | Unconfirmed |
-| Error envelope | Phase 3 | Confirmed: `{ success: false, error: { code, message, details?, requestId } }` |
-| Socket.IO URL, auth method, event names, and payloads | Phase 11, 25 | Unconfirmed |
-| File upload/download and signed URL contract | Phase 13 | Unconfirmed |
-| AI request, streaming, and action-approval contract | Phase 22–24 | Unconfirmed |
+| Dependency                                                         | Needed by      | Status                                                                                                                                               |
+| ------------------------------------------------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API base URL and versioning convention                             | Phase 3        | Confirmed: backend OpenAPI server is `/api/v1`; local upstream is `http://localhost:4000`                                                            |
+| Authentication/session contract (cookie vs token, refresh, logout) | Phase 3        | Confirmed: short-lived bearer access token in response; rotating refresh token in HttpOnly cookie; CSRF cookie plus header; session logout endpoints |
+| User and session response shapes                                   | Phase 3        | Confirmed in OpenAPI and auth controller; workspace permission shapes remain unconfirmed for later phases                                            |
+| Workspace list, switching, and scoping contract                    | Phase 5        | Unconfirmed                                                                                                                                          |
+| Membership, join request, and invitation contracts                 | Phase 6        | Unconfirmed                                                                                                                                          |
+| Role and permission payloads for Company and Institution           | Phase 7        | Unconfirmed                                                                                                                                          |
+| Project, task, and visibility contracts                            | Phase 9–10     | Unconfirmed                                                                                                                                          |
+| Pagination, filtering, and sorting                                 | Phase 3 onward | Unconfirmed                                                                                                                                          |
+| Error envelope                                                     | Phase 3        | Confirmed: `{ success: false, error: { code, message, details?, requestId } }`                                                                       |
+| Socket.IO URL, auth method, event names, and payloads              | Phase 11, 25   | Unconfirmed                                                                                                                                          |
+| File upload/download and signed URL contract                       | Phase 13       | Backend API inspected 2026-11-05: general file/presigned upload contracts absent; only authenticated raw-byte organization-logo proxy routes exist. See `docs/FRONTEND_STORAGE_INTEGRATION.md`. |
+| AI request, streaming, and action-approval contract                | Phase 22–24    | Unconfirmed                                                                                                                                          |
 
 #### Known limitations recorded during the audit
 
@@ -446,12 +456,12 @@ Implemented and verified on 2026-11-03.
 
 #### Validation evidence
 
-| Check | Result |
-|---|---|
-| `npm run lint` | Passed |
-| `npx tsc --noEmit` | Passed |
-| `npm test` | Passed — 8 files, 65 tests |
-| `npm run build` | Passed — static `/` and `/_not-found` routes generated |
+| Check              | Result                                                 |
+| ------------------ | ------------------------------------------------------ |
+| `npm run lint`     | Passed                                                 |
+| `npx tsc --noEmit` | Passed                                                 |
+| `npm test`         | Passed — 8 files, 65 tests                             |
+| `npm run build`    | Passed — static `/` and `/_not-found` routes generated |
 
 Tests added for `Dropdown` (9), theme provider and toggle (5), and page header/container (5), alongside the existing 46 primitive tests.
 
@@ -460,7 +470,6 @@ Tests added for `Dropdown` (9), theme provider and toggle (5), and page header/c
 - No page currently uses the design-system components; Phase 2 will build the application shell that consumes them.
 - Select's chevron is a static data-URI colour and does not adapt to the dark theme. It remains legible because a muted grey is used, but a token-driven icon should replace it when an icon system is approved.
 - No icon library is installed; inline SVG remains the convention.
-
 
 ## Phase 2 — Application Layout and Navigation Architecture
 
@@ -540,12 +549,12 @@ Verified on 2026-11-03 on branch `feature/phase-2-app-shell`. The reusable shell
 
 #### Validation evidence
 
-| Check | Result |
-|---|---|
-| `npm run lint` | Passed |
-| `npx tsc --noEmit` | Passed |
-| `npm test` | Passed — 14 files, 118 tests |
-| `npm run build` | Passed — static `/` and `/_not-found` routes generated |
+| Check              | Result                                                 |
+| ------------------ | ------------------------------------------------------ |
+| `npm run lint`     | Passed                                                 |
+| `npx tsc --noEmit` | Passed                                                 |
+| `npm test`         | Passed — 14 files, 118 tests                           |
+| `npm run build`    | Passed — static `/` and `/_not-found` routes generated |
 
 New tests cover navigation filtering and active paths, the sidebar (active state, permission scoping, collapse, drawer controls, badges, slots), the workspace switcher, the user menu, the topbar (search, separate counts, breadcrumbs, optional entry points), and the shell (skip link, drawer open/close, Escape focus restoration, navigation close, collapse, workspace switching, separate counts).
 
@@ -596,20 +605,20 @@ Verified on 2026-11-03 against the frontend implementation and `../__NexusBacken
 
 #### Phase 3 task status
 
-| Requirement | Status | Verification or dependency |
-|---|---|---|
-| Public landing page, product overview, and feature sections | Implemented; responsive implementation reviewed per user confirmation | No agent manual visual review claimed in this task |
-| Pricing page and plan pricing | Implemented and automated UI test verified | Pro is $10/month or $50/year with 15 included seats; Business is $15/month or $70/year with 25 included seats. The owner counts once and uses an included seat. Additional-seat rates are $0.50 Pro and $1 Business per selected billing period. |
-| Registration and sign-in forms | Implemented and automated request, validation, success, and error tests pass | Live backend authentication remains unverified |
-| Email verification and verification resend | Implemented and automated request tests pass | Live backend workflow remains unverified |
-| Password recovery and password reset | Implemented and automated success/error/request tests pass | Live backend workflow remains unverified |
-| Authentication validation and API error feedback | Implemented; covered cases are automated-test verified | Not every backend validation response has been exercised against a live server |
-| Session restoration, expired-session refresh, unauthenticated redirect, and logout | Implemented and automated session-boundary tests pass | Live cookie/session behavior remains unverified |
-| Network/server failure and retry feedback | Implemented and automated session error-state test passes | Live backend outage behavior remains unverified |
-| Terms and Privacy routes, draft content, and links | Drafts rendered and automated page/link tests pass | Legal review and approval; bracketed entity, contact, jurisdiction, age, provider, and deployment details remain unresolved |
-| Paid-plan display and workspace billing | Implemented in progress; pricing, workspace plan/status, authoritative active-seat count, target quantity, checkout, changes, cancellation, and billing history are connected to backend API contracts | USD account capability and credentials must be configured; migration/provider validation remains |
-| Subscription API and persistence | Implemented in progress in adjacent backend worktree; Prisma models/migration, routes, Paystack API client, transaction verification, HMAC webhook verification, encrypted provider management tokens, event/payment persistence, owner authorization, and transactionally enforced seat capacity are present | Migration not applied; worktree checks/provider tests and live Paystack test verification pending; removal-to-seat-reduction synchronization and provider reconciliation remain |
-| OAuth sign-in | Not implemented; no frontend OAuth controls were added | Approved providers and provider configuration, backend routes, callback/account-link contract, and session/security requirements |
+| Requirement                                                                        | Status                                                                                                                                                                                                                                                                                                        | Verification or dependency                                                                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Public landing page, product overview, and feature sections                        | Implemented; responsive implementation reviewed per user confirmation                                                                                                                                                                                                                                         | No agent manual visual review claimed in this task                                                                                                                                                                                               |
+| Pricing page and plan pricing                                                      | Implemented and automated UI test verified                                                                                                                                                                                                                                                                    | Pro is $10/month or $50/year with 15 included seats; Business is $15/month or $70/year with 25 included seats. The owner counts once and uses an included seat. Additional-seat rates are $0.50 Pro and $1 Business per selected billing period. |
+| Registration and sign-in forms                                                     | Implemented and automated request, validation, success, and error tests pass                                                                                                                                                                                                                                  | Live backend authentication remains unverified                                                                                                                                                                                                   |
+| Email verification and verification resend                                         | Implemented and automated request tests pass                                                                                                                                                                                                                                                                  | Live backend workflow remains unverified                                                                                                                                                                                                         |
+| Password recovery and password reset                                               | Implemented and automated success/error/request tests pass                                                                                                                                                                                                                                                    | Live backend workflow remains unverified                                                                                                                                                                                                         |
+| Authentication validation and API error feedback                                   | Implemented; covered cases are automated-test verified                                                                                                                                                                                                                                                        | Not every backend validation response has been exercised against a live server                                                                                                                                                                   |
+| Session restoration, expired-session refresh, unauthenticated redirect, and logout | Implemented and automated session-boundary tests pass                                                                                                                                                                                                                                                         | Live cookie/session behavior remains unverified                                                                                                                                                                                                  |
+| Network/server failure and retry feedback                                          | Implemented and automated session error-state test passes                                                                                                                                                                                                                                                     | Live backend outage behavior remains unverified                                                                                                                                                                                                  |
+| Terms and Privacy routes, draft content, and links                                 | Drafts rendered and automated page/link tests pass                                                                                                                                                                                                                                                            | Legal review and approval; bracketed entity, contact, jurisdiction, age, provider, and deployment details remain unresolved                                                                                                                      |
+| Paid-plan display and workspace billing                                            | Implemented in progress; pricing, workspace plan/status, authoritative active-seat count, target quantity, checkout, changes, cancellation, and billing history are connected to backend API contracts                                                                                                        | USD account capability and credentials must be configured; migration/provider validation remains                                                                                                                                                 |
+| Subscription API and persistence                                                   | Implemented in progress in adjacent backend worktree; Prisma models/migration, routes, Paystack API client, transaction verification, HMAC webhook verification, encrypted provider management tokens, event/payment persistence, owner authorization, and transactionally enforced seat capacity are present | Migration not applied; worktree checks/provider tests and live Paystack test verification pending; removal-to-seat-reduction synchronization and provider reconciliation remain                                                                  |
+| OAuth sign-in                                                                      | Not implemented; no frontend OAuth controls were added                                                                                                                                                                                                                                                        | Approved providers and provider configuration, backend routes, callback/account-link contract, and session/security requirements                                                                                                                 |
 
 #### Implemented
 
@@ -768,6 +777,33 @@ Phase 3 stays **In Progress** until frontend/backend validations are complete, t
 
 OAuth is conditional in the Phase 3 roadmap (“if supported by the backend”). While the backend has no approved provider contract or OAuth routes, keep OAuth deferred and add no frontend controls. If product approval brings OAuth into this phase, the backend contract, provider setup, callback/account-link behavior, session handoff, security implementation, and frontend tests must all be completed before closure. If OAuth remains unsupported, record the explicit deferral as accepted scope before declaring Phase 3 complete.
 
+#### Phase 3 remediation continuation — 2026-11-05
+
+This continuation records the current Phase 3 implementation and validation across the frontend and adjacent backend repositories. Existing Phase 4 audit notes and all unrelated dirty files were preserved. No Phase 4 or later implementation was started.
+
+| Requirement                                                                                                | Current status                                                           | Evidence / remaining dependency                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Registration, sign-in, email verification, recovery/reset, session restoration and logout                  | IMPLEMENTED; MOCK/CONTRACT TESTED; LIVE WRITE WORKFLOW BLOCKED           | Existing frontend and backend contracts remain aligned: short-lived bearer access token in memory, rotating HttpOnly refresh cookie, CSRF checks on refresh/logout, and session revocation. Live health and invalid-token behavior were checked. Registration, email delivery, refresh rotation/reuse, logout and restoration were not exercised because the configured database is remote and no disposable `TEST_DATABASE_URL` is configured.                                                                                                                                                                                                                                                                                                     |
+| Account reactivation                                                                                       | IMPLEMENTED; DATABASE INTEGRATION BLOCKED                                | Deactivated accounts may reactivate after password verification and must sign in again. Pending deletion is irreversible; the frontend no longer offers reactivation for that backend status. Database-backed workflow tests were skipped.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Account deletion request and immediate access revocation                                                   | BACKEND IMPLEMENTED; FRONTEND FLOW/POLICY BLOCKED                        | `POST /auth/delete` requires current password and exact email confirmation, revokes sessions and tokens, schedules cleanup at the request time, and disallows recovery. Cleanup is asynchronous and retains an anonymized user tombstone for shared records and billing/financial rows. Personal file metadata currently blocks cleanup because no object-storage deletion adapter exists. The backend worktree currently transfers an owned workspace to an eligible active member or archives it without a successor; product-owner approval of that ownership behavior is pending. No frontend delete action is exposed until this behavior is approved.                                                                                         |
+| Paystack plans, checkout, verification, webhooks, subscription lifecycle, payments and owner authorization | IMPLEMENTED IN WORKTREE; UNIT TESTED; PROVIDER/DB VERIFICATION BLOCKED   | Hosted checkout, backend amount/currency/reference verification, idempotent webhook processing, encrypted provider management tokens, renewal/cancellation/status reconciliation, payment history and owner-only mutations are present. Webhook verification supports Paystack's current timestamped `Paystack-Signature` and the legacy `x-paystack-signature` fallback. Current provider API behavior was checked against [Paystack transaction documentation](https://paystack.com/docs/api/transaction/), [subscription documentation](https://paystack.com/docs/payments/subscriptions/), and [webhook documentation](https://paystack.com/docs/payments/webhooks/). No sandbox credentials or verified USD merchant capability are available. |
+| Active-seat counts, transactional capacity enforcement and seat reductions                                 | IMPLEMENTED IN WORKTREE; UNIT TESTED; DB/PAYSTACK RECONCILIATION BLOCKED | Owner counts once; only active memberships and active accounts count. Invitation acceptance, approved join requests, member creation and suspension restoration check paid capacity transactionally. Removal/suspension now enqueue durable seat-sync work for renewal; the worker creates/reconciles the provider replacement plan. Backend catalog and frontend catalog use approved prices and same-cadence seat rates.                                                                                                                                                                                                                                                                                                                          |
+| Database migration and schema verification                                                                 | BLOCKED; NO REMOTE MIGRATION APPLIED                                     | `prisma migrate status` found 15 migrations and reports `20261105030000_phase3_account_deletion_cancellation` plus two Phase 7 migrations pending. Runtime startup also reported `public.BillingSeatSync` missing even though migration history did not list the Phase 3 Paystack migration as pending, indicating remote schema/history drift. The configured `DATABASE_URL` targets remote Aiven `defaultdb`; no disposable local test database credentials are available. No migration was applied.                                                                                                                                                                                                                                              |
+| Terms, Privacy, subscription/billing, cancellation/refund and deletion/retention drafts                    | DRAFTED; APP PAGES PARTIALLY IMPLEMENTED; APPROVAL BLOCKED               | Drafts exist in `docs/TERMS_OF_SERVICE_DRAFT.md`, `docs/PRIVACY_POLICY_DRAFT.md`, `docs/SUBSCRIPTION_BILLING_POLICY_DRAFT.md`, and `docs/CANCELLATION_REFUND_POLICY_DRAFT.md`. Terms and Privacy are rendered with draft warnings; billing and deletion topics are disclosed in those drafts. The Paystack configuration document now lists webhook signing-secret variables. Entity/contact, jurisdiction, data-retention, tax/invoice, refund, deletion/ownership, provider and deployment facts remain for business/legal review. No legal approval is claimed.                                                                                                                                                                                  |
+| OAuth                                                                                                      | DEFERRED                                                                 | No approved provider or backend OAuth contract exists; no OAuth UI or parallel authentication path was added.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+
+#### Validation — 2026-11-05
+
+- Frontend `npx tsc --noEmit` passed. `npm run lint` passed with three existing unused-function warnings in discover/invitation components.
+- Frontend full `npm test -- --maxWorkers=1`: **failed**, 35/36 files passed and 255/257 tests passed. The two failing Phase 6 invitation-acceptance tests mock `refreshSession()` as `undefined`, while `InvitationAcceptClient` calls `.then()`. That later-phase code and tests were left untouched. The Phase 3 auth, billing, legal and pricing tests were not among the failing cases.
+- Frontend configured `npm run build` failed in the Tailwind Turbopack CSS loader subprocess with a timeout. `npx next build --webpack` passed, including compilation, TypeScript, static generation (19 pages), and trace collection. The parent-directory `pnpm-lock.yaml` warning is unrelated to this repository's `package-lock.json`.
+- Backend `npm test` passed: 234 tests, 0 failures, 2 optional database suites skipped. The annual Pro seat-sync expectation was corrected to $52.00 for 17 active seats (15 included plus two annual seats at $1 each).
+- Backend `npm run typecheck` and `npm run lint` passed after removing two unused symbols in the Phase 3 worktree. Focused Prettier checks pass for changed Phase 3 auth/billing files. Repository-wide `npm run format:check` still reports pre-existing/out-of-scope formatting in Phase 4 email provider and Phase 6/7 files; those files were not reformatted.
+- Backend `npm run build` passed after the latest formatting changes. Frontend `npx next build --webpack` passed after the configured Turbopack build timed out.
+- Live backend startup succeeded with a process-local `TRUST_PROXY=false` override because the existing backend `.env` has a duplicate invalid `TRUST_PROXY=1` entry. The file was not changed. `GET /api/v1/health/live` returned 200; `/api/v1/auth/me` with an invalid bearer token returned 401 `ACCESS_TOKEN_INVALID`. Startup connected to the remote database and its billing worker reported the missing `BillingSeatSync` table. No registration, billing mutation, email delivery, migration, or deletion was attempted.
+
+Phase 3 remains **In Progress**. Outstanding requirements include safe disposable-database integration tests and migration/drift resolution, Paystack sandbox and merchant USD verification, the account-deletion ownership/data-retention decision and frontend flow, storage cleanup for personal files, legal/product approval and missing facts, full live authentication lifecycle verification, and resolution of the two existing later-phase test failures before claiming the repository-wide frontend suite passes.
+
 No other independent Phase 3 frontend implementation task is currently identified after the session-boundary redirect and its regression coverage.
 
 ## Phase 4 — User Onboarding and Profile Management
@@ -778,17 +814,17 @@ Started on 2026-11-03 on `feature/frontend-authentication` at the user's directi
 
 #### Phase 4 progress
 
-| Requirement | Status | Verification or dependency |
-|---|---|---|
-| Profile setup and editing | Implemented in progress at `/app/profile`; validation and API integration covered by frontend tests | Uses the verified `/users/me` GET/PATCH contract. Manual live-backend verification and responsive viewport review remain outstanding. |
-| Profile picture | URL field supported by the profile contract; file upload is not implemented | No upload/storage API contract was found for this phase task. |
-| Time zone and locale preferences | Editable through the profile contract | UI/backend integration tests pass; confirm values against a live backend before completion. |
-| First-time onboarding progress and return behavior | Not implemented | No onboarding-completion API or persistence contract was found. |
-| Account security and session/device management | Implemented against confirmed auth contracts | Password change, verified email-change request, active-session listing, and confirmed sign-out-all use `/auth/password/change`, `/auth/email/change`, `/auth/sessions`, and `/auth/logout-all`. Individual session revocation and 2FA are not supported by the inspected backend contract. |
-| Account deletion interface | Blocked | The backend has a 30-day deletion request, but cleanup behavior does not fully match the approved retention policy. Do not expose until aligned. |
-| Mobile, tablet, and desktop review | User-confirmed reviewed and responsive | This agent did not perform a manual viewport review in the current task. |
+| Requirement                                        | Status                                                                                              | Verification or dependency                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Profile setup and editing                          | Implemented in progress at `/app/profile`; validation and API integration covered by frontend tests | Uses the verified `/users/me` GET/PATCH contract. Manual live-backend verification and responsive viewport review remain outstanding.                                                                                                                                                                                                                                                                                                                                                                            |
+| Profile picture                                    | URL field implemented; required upload/replace/remove workflow blocked                              | The provisional product policy specifies private AWS S3 storage, formats JPEG/JPG, PNG, WebP, GIF, and AVIF, and a strict size below 1,000,000 bytes. The backend exposes only a profile `avatarUrl` field; no authorized upload, replacement, removal, signature validation, or object-deletion contract exists. Do not send files directly to S3 from the browser or treat a user-entered URL as satisfying avatar management.                                                                                 |
+| Time zone and locale preferences                   | Editable through the profile contract                                                               | UI/backend integration tests pass; confirm values against a live backend before completion.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| First-time onboarding progress and return behavior | Partially implemented; cross-device persistence blocked                                             | The frontend stores account-type intent in browser local storage and can resume or reuse a matching workspace on that browser. The new provisional product policy requires backend persistence across browsers/devices. No onboarding status endpoint or registration/verification persistence contract exists.                                                                                                                                                                                                  |
+| Account security and session/device management     | Implemented against confirmed auth contracts                                                        | Password change, verified email-change request, active-session listing, and confirmed sign-out-all use `/auth/password/change`, `/auth/email/change`, `/auth/sessions`, and `/auth/logout-all`. Individual session revocation and 2FA are not supported by the inspected backend contract.                                                                                                                                                                                                                       |
+| Account deletion interface                         | Blocked; current contract conflicts with latest provisional product policy                          | The latest policy proposes immediate access revocation with no recovery period, ownership transfer or workspace restriction, asynchronous deletion/anonymization, and billing cancellation. The backend still schedules deletion with a 30-day recovery period and its worker can block on ownership, shared personal-workspace membership, or file metadata. No deletion UI is exposed. Backend lifecycle, ownership, billing, storage, anonymization, and retention must align before frontend implementation. |
+| Mobile, tablet, and desktop review                 | User-confirmed reviewed and responsive                                                              | This agent did not perform a manual viewport review in the current task.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
-Profile setup/editing, timezone and locale preferences, password/email security, and session review are implemented. Focused tests passed (8 tests); full frontend validation is recorded below. Phase 4 is **Blocked** because first-time onboarding completion/return behavior has no persistence contract, avatar upload has no backend contract, and the approved account-deletion retention policy is not fully aligned with backend cleanup. Phase 5 work is tracked below.
+Profile setup/editing, timezone and locale preferences, password/email security, and session review are implemented. Focused tests passed (8 tests); full frontend validation is recorded below. Phase 4 is **Blocked** because cross-device onboarding persistence and avatar upload/removal have no backend contracts, and the latest provisional immediate-deletion policy conflicts with the backend's 30-day recovery contract and cleanup behavior. Phase 5 work is tracked below.
 
 #### Phase 4 validation — 2026-11-03
 
@@ -800,13 +836,27 @@ Profile setup/editing, timezone and locale preferences, password/email security,
 - Live backend workflows and agent-performed viewport review were not run. Responsive behavior remains user-confirmed only.
 - Files changed for this progress: `components/profile/AccountSecurity.tsx`, `components/profile/__tests__/AccountSecurity.test.tsx`, `services/account-security.ts`, and the existing in-progress `/app/profile` page and test.
 
-#### Approved account-deletion policy for future implementation
+#### Phase 4 next-phase audit — 2026-11-05
 
-- Account deletion requires authentication and explicit confirmation, followed by a 30-day secure recovery period.
-- After the recovery period, permanent deletion removes the personal workspace and exclusively owned data while preserving shared organization content and assets referenced by valid shared resources.
-- If the user is the only eligible organization owner, ownership must be transferred or separately resolved. Organization deletion remains a distinct authorized action.
-- This is a product-policy decision only; no account-deletion interface work is included in the current Phase 4 implementation scope.
-- Backend alignment must be reviewed before the flow is exposed. The current cleanup worker can hold deletion for manual resolution when a personal workspace has collaborators or file metadata and blocks deletion while workspace ownership remains; its storage cleanup behavior is not equivalent to the complete approved policy.
+- After committing the Phase 3 authentication follow-up, Phase 4 was re-inspected as the next roadmap phase. Existing `/app/profile`, `AccountSecurity`, profile API, and same-browser onboarding intent functionality are present; no duplicate implementation was added.
+- `npm test -- --run components/profile/__tests__/AccountSecurity.test.tsx app/app/profile/page.test.tsx` passed (2 files, 8 tests).
+- No new Phase 4 feature could be safely implemented against the inspected contracts: cross-device onboarding requires backend-persisted intent; avatar upload, replacement, signature validation, and removal require authorized backend storage contracts; deletion remains blocked by the provisional immediate-deletion policy conflicting with the backend's 30-day recovery flow. Live profile/session verification is also blocked by the backend environment configuration documented under Phase 3.
+- Phase 4 remains **Blocked**. Resume implementation when these backend and product-policy dependencies are resolved; do not treat the existing profile editor's avatar URL field as the required secure upload workflow.
+
+#### Account-deletion policy update — 2026-11-04
+
+- The user's latest provisional product policy supersedes the previous 30-day product-policy assumption: access should be revoked immediately after explicit confirmation, without a user-facing recovery period; eligible personal information is removed asynchronously; shared organizational content is preserved/anonymized as applicable; workspace ownership is transferred or access is restricted; recurring billing is stopped.
+- The supplied policy pack remains a fictional working draft pending product-owner confirmation and legal review. Nigeria is an assumption, not an approved governing jurisdiction. The supplied terms, privacy, subscription, and refund policies must not be represented as legally approved.
+- The current backend still schedules account deletion after 30 days and does not provide the complete ownership-transfer, billing, avatar-object deletion, and data-retention lifecycle specified by the new policy. Do not expose a frontend deletion workflow until the backend contract and implementation match an explicitly approved product decision.
+- Avatar policy now proposes AWS S3, JPEG/JPG, PNG, WebP, GIF, AVIF, and a strict maximum below 1,000,000 bytes. This does not supply a backend upload/signature-validation/removal endpoint; frontend upload remains blocked.
+- Onboarding policy requires backend persistence across devices. The current browser-local account-type intent is only a same-browser fallback and does not satisfy this requirement; no matching backend contract was found.
+
+#### Legal and lifecycle policy handoff — 2026-11-04
+
+- Added `docs/LEGAL_IMPLEMENTATION_GUIDE.md` to record draft lifecycle states, public-page requirements, registration-consent dependencies, checkout disclosures, and the verified onboarding, avatar, and account-deletion backend gaps.
+- Updated `docs/TERMS_OF_SERVICE_DRAFT.md`, `docs/PRIVACY_POLICY_DRAFT.md`, `docs/CANCELLATION_REFUND_POLICY_DRAFT.md`, and the public draft copy in `lib/legal-policies.ts` to replace the superseded 30-day policy claim with the latest provisional immediate-revocation proposal and an explicit statement that the backend still has a 30-day recovery period.
+- The provided pack remains a fictional working draft; Nigeria is only a jurisdiction assumption. No legal or product approval state is inferred, and Phase 3 remains open pending required approvals and live integration checks.
+- `npm test -- --run components/legal/__tests__/PolicyPage.test.tsx` — passed (1 file, 3 tests); `npx tsc --noEmit` — passed; `npm run lint` — passed with the same three unrelated unused-function warnings recorded above. Full suite was not rerun for this documentation/copy update.
 
 ### Objectives
 
@@ -864,22 +914,31 @@ Support Individual, Company, and Institution workspaces.
 
 **Status: In Progress — partially implemented.** This phase was started at the user's explicit direction to skip earlier phases; the Phase 3 and Phase 4 findings above were not reopened or changed.
 
-| Requirement | Status | Evidence / limitation |
-|---|---|---|
-| Workspace-aware session and membership context | Implemented | `providers/WorkspaceProvider.tsx` restores the authenticated user, loads memberships, validates the selected workspace through the backend switch endpoint, and exposes loading/error/retry state. |
-| Workspace switcher and workspace information | Implemented | `/app` uses the existing `WorkspaceSwitcher`, displays workspace type and counts, and switches through the provider. |
-| Company and Institution creation | Implemented | `/app/workspaces` submits the documented create payload and activates the returned workspace. Personal workspace creation remains account-provisioned by the backend. |
-| Workspace settings | Partially implemented | Name, description, and visibility use the documented update endpoint; permission denials surface from the backend. |
-| Workspace profile and branding settings | Blocked in part | Workspace profile fields are present. The current backend schema has no logo, colour, or other branding fields/upload contract, so those controls cannot be safely implemented. |
-| Workspace member overview | Implemented | `/app/workspaces` loads members from the workspace-scoped member endpoint and clears stale results during switches. |
-| Responsive success, loading, empty, and error states | Implemented in UI | Creation and switching feedback, empty workspace/member states, and request errors are included. Manual device/browser review remains outstanding. |
-| Live end-to-end backend workflow | Not verified | The frontend service/provider tests cover the confirmed API paths; no live authenticated backend session was used in this run. |
+| Requirement                                          | Status                | Evidence / limitation                                                                                                                                                                              |
+| ---------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace-aware session and membership context       | Implemented           | `providers/WorkspaceProvider.tsx` restores the authenticated user, loads memberships, validates the selected workspace through the backend switch endpoint, and exposes loading/error/retry state. |
+| Workspace switcher and workspace information         | Implemented           | `/app` uses the existing `WorkspaceSwitcher`, displays workspace type and counts, and switches through the provider.                                                                               |
+| Company and Institution creation                     | Implemented           | `/app/workspaces` submits the documented create payload and activates the returned workspace. Personal workspace creation remains account-provisioned by the backend.                              |
+| Workspace settings                                   | Partially implemented | Name, description, and visibility use the documented update endpoint; permission denials surface from the backend.                                                                                 |
+| Workspace profile and branding settings              | Blocked in part       | Workspace profile fields are present. The current backend schema has no logo, colour, or other branding fields/upload contract, so those controls cannot be safely implemented.                    |
+| Workspace member overview                            | Implemented           | `/app/workspaces` loads members from the workspace-scoped member endpoint and clears stale results during switches.                                                                                |
+| Responsive success, loading, empty, and error states | Implemented in UI     | Creation and switching feedback, empty workspace/member states, and request errors are included. Manual device/browser review remains outstanding.                                                 |
+| Live end-to-end backend workflow                     | Not verified          | The frontend service/provider tests cover the confirmed API paths; no live authenticated backend session was used in this run.                                                                     |
 
 **Files added or changed:** `services/workspaces.ts`, `providers/WorkspaceProvider.tsx`, `app/app/workspaces/page.tsx`, `app/app/workspaces/page.test.tsx`, `app/app/layout.tsx`, `app/app/page.tsx`, `app/app/page.test.tsx`, `app/app/profile/page.tsx`, `app/app/profile/page.test.tsx`, `services/__tests__/workspaces.test.ts`, and `providers/__tests__/WorkspaceProvider.test.tsx`.
 
 **Validation:** `npx tsc --noEmit` passed; `npm run lint` passed; `npm run build` passed and emitted `/app/workspaces`; focused Phase 5 tests passed (16/16). The full Vitest suite reported 155 passing and 3 tests outside the touched feature areas timing out at the configured 5-second limit (auth form, sidebar, and legal policy); the cause was not established. `git diff --check` passed.
 
 **Remaining before completion:** backend-defined workspace branding support or an approved reduction of that requirement, live authenticated workflow verification, and responsive/manual review. No backend source or schema was modified.
+
+#### Verification follow-up — 2026-11-04
+
+- `npx tsc --noEmit` — passed.
+- `npm run lint` — passed with three existing unused-function warnings in Phase 6 files (`app/app/discover/page.tsx`, `components/members/InvitationsPanel.tsx`, and `components/members/JoinRequestsPanel.tsx`).
+- `npm run build` — passed; `/app/workspaces` was generated. Next.js reported the existing parent-directory `pnpm-lock.yaml` warning.
+- `npm test` — 35 of 36 test files passed (252 of 254 tests). Two invitation acceptance tests failed because `refreshSession()` returned `undefined` in the test setup and the component called `.then()` on it. This failure is in Phase 6 code and was not changed as part of the Phase 5 audit.
+- Backend workspace API docs and `workspace.schemas.ts` were inspected in the adjacent `__NexusBackend__` repository. They confirm name, description, and visibility updates, but expose no logo, colour, or other workspace-branding fields. Branding remains blocked on a backend contract or approved scope reduction.
+- No live authenticated workflow or manual responsive viewport review was performed; those requirements remain open.
 
 ## Phase 6 — Organisation Membership, Join Requests, and Invitations
 
@@ -996,6 +1055,20 @@ Provide organisational structure management.
 - Department management.
 - Team management.
 - Institution group management.
+
+### Current implementation status — In Progress (2026-11-05)
+
+- Added workspace-scoped department, team, and institution-group API services using the registered backend contracts.
+- Added `/app/teams` for team creation/editing, team leads, member assignment/removal, archival, institution department assignment, department creation/rename, and department member assignment.
+- Added `/app/groups` for institution group creation/editing/deletion and group member/lead management.
+- Added workspace-kind-aware navigation for company/institution teams and institution groups. Every mutation remains subject to backend authorization.
+- The team view presents member assignment counts, users with no team assignment, and multiple team memberships only from team membership records the current user is authorized to read.
+- API contract tests cover department, team, and group request paths and payloads.
+- Remediation (2026-11-05): fixed the Teams route JSX/import errors and filtered organization navigation by workspace kind; guarded team/group loads against out-of-order responses after workspace switches. Added an out-of-order Teams workspace regression test.
+- Current verification and the proposed department-roster, team-activity, and resource-capability backend contracts are recorded in `docs/PHASE_8_ORGANISATION_STRUCTURE.md`. Phase 8 remains In Progress pending backend dependencies and authenticated browser verification. Standard Turbopack build remains timed out; the production build succeeds with `npx next build --webpack`.
+- Backend currently has no team activity endpoint. Department membership APIs permit assignment/removal but do not return department member identities; the UI therefore does not claim to show the roster or offer removal controls without a confirmed member list.
+- TypeScript, lint, test, and production build results are recorded in `docs/PHASE_8_ORGANISATION_STRUCTURE.md` after this implementation's validation.
+- Phase 8 remains In Progress. Phase 7 status is unchanged and Phase 9 has not started.
 
 ## Phase 9 — Projects and Project Visibility
 
@@ -1914,102 +1987,102 @@ Confirm that the frontend is ready for release.
 
 All backend contracts marked "Requires confirmation" in the phases above are listed here. Update the Status and Confirmed Date columns as contracts are verified with the backend team.
 
-| Phase | Contract | Status | Confirmed Date |
-|---|---|---|---|
-| Phase 3 | `POST /auth/login` — request/response shape, cookie vs. token strategy | Pending | — |
-| Phase 3 | `POST /auth/register` — validation rules, email verification flow | Pending | — |
-| Phase 3 | `POST /auth/logout` — cookie clearing or token revocation | Pending | — |
-| Phase 3 | `POST /auth/forgot-password` | Pending | — |
-| Phase 3 | `POST /auth/reset-password` — token param, expiry behavior | Pending | — |
-| Phase 3 | `GET /auth/verify-email` — query param name and flow | Pending | — |
-| Phase 3 | `GET /users/me` — response shape including roles/workspace memberships | Pending | — |
-| Phase 3 | `PATCH /users/me` — updatable fields, validation rules | Pending | — |
-| Phase 3 | 401 response format and refresh token behavior | Pending | — |
-| Phase 4 | `GET /workspaces` — list user's workspaces | Pending | — |
-| Phase 4 | `POST /workspaces` — create workspace, validation rules | Pending | — |
-| Phase 4 | `GET /workspaces/:id` | Pending | — |
-| Phase 4 | `PATCH /workspaces/:id` | Pending | — |
-| Phase 4 | `DELETE /workspaces/:id` | Pending | — |
-| Phase 4 | `GET /workspaces/:id/members` — includes role field | Pending | — |
-| Phase 4 | `POST /workspaces/:id/invite` — email, role | Pending | — |
-| Phase 4 | `PATCH /workspaces/:id/members/:userId` — role update | Pending | — |
-| Phase 4 | `DELETE /workspaces/:id/members/:userId` | Pending | — |
-| Phase 4 | `GET /teams` or `GET /workspaces/:id/teams` | Pending | — |
-| Phase 4 | `POST /teams`, `PATCH /teams/:id`, `DELETE /teams/:id` | Pending | — |
-| Phase 4 | `POST /invitations/:token/accept` — for email-link acceptance | Pending | — |
-| Phase 4 | Role enum values: `OWNER`, `PM`, `MEMBER`, `VIEWER`, `COLLABORATOR` — confirm exact strings | Pending | — |
-| Phase 5 | `GET /workspaces/:id/projects` — pagination, filter, sort params | Pending | — |
-| Phase 5 | `POST /projects` | Pending | — |
-| Phase 5 | `GET /projects/:id` — includes progress calculation field | Pending | — |
-| Phase 5 | `PATCH /projects/:id` | Pending | — |
-| Phase 5 | `POST /projects/:id/archive` or `PATCH` with status field | Pending | — |
-| Phase 5 | `DELETE /projects/:id` | Pending | — |
-| Phase 5 | `GET /projects/:id/members` | Pending | — |
-| Phase 5 | `POST /projects/:id/members` | Pending | — |
-| Phase 5 | `DELETE /projects/:id/members/:userId` | Pending | — |
-| Phase 5 | Progress field — confirm whether backend returns a numeric percentage or raw counts | Pending | — |
-| Phase 6 | `GET /projects/:id/tasks` — filter params, sort, pagination | Pending | — |
-| Phase 6 | `POST /tasks` — required fields, validation rules | Pending | — |
-| Phase 6 | `GET /tasks/:id` — full detail including comments, activity | Pending | — |
-| Phase 6 | `PATCH /tasks/:id` | Pending | — |
-| Phase 6 | `DELETE /tasks/:id` | Pending | — |
-| Phase 6 | `PATCH /tasks/:id/status` — accepted transitions per role | **Pending (required before Kanban)** | — |
-| Phase 6 | `GET /tasks/:id/comments`, `POST /tasks/:id/comments` | Pending | — |
-| Phase 6 | `PATCH /comments/:id`, `DELETE /comments/:id` | Pending | — |
-| Phase 6 | `POST /tasks/:id/attachments`, `DELETE /attachments/:id` — file size/type limits | Pending | — |
-| Phase 6 | `GET /tasks/:id/activity` | Pending | — |
-| Phase 6 | Progress aggregation — confirm whether endpoint returns `progress` field or raw counts | Pending | — |
-| Phase 7 | `GET /projects/:id/documents` | Pending | — |
-| Phase 7 | `POST /documents` | Pending | — |
-| Phase 7 | `GET /documents/:id` | Pending | — |
-| Phase 7 | `PATCH /documents/:id` — content format (JSON blocks, Markdown, or HTML) | **Pending (required before editor install)** | — |
-| Phase 7 | `DELETE /documents/:id` | Pending | — |
-| Phase 7 | Real-time collaboration service (Yjs/OT/CRDT), if any | Pending | — |
-| Phase 7 | Document access permissions per role | Pending | — |
-| Phase 8 | `GET /conversations` — filter by type (direct/team/project) | Pending | — |
-| Phase 8 | `POST /conversations` | Pending | — |
-| Phase 8 | `GET /conversations/:id/messages` — pagination | Pending | — |
-| Phase 8 | `POST /conversations/:id/messages` — text, file attachment | Pending | — |
-| Phase 8 | `PATCH /messages/:id` | Pending | — |
-| Phase 8 | `DELETE /messages/:id` | Pending | — |
-| Phase 8 | `POST /messages/:id/reactions` | Pending | — |
-| Phase 8 | `POST /messages/:id/pin` | Pending | — |
-| Phase 8 | Message search endpoint | Pending | — |
-| Phase 8 | `POST /messages/:id/convert-to-task` | Pending | — |
-| Phase 8 | Message mention format (`@userId` or `@username`) | Pending | — |
-| Phase 8 | File attachment endpoint and size limits | Pending | — |
-| Phase 8 | Thread/reply support | Pending | — |
-| Phase 8 | Read receipt endpoint | Pending | — |
-| Phase 9 | Socket.IO gateway URL and authentication method | **Pending (required before Phase 9)** | — |
-| Phase 9 | `task:created`, `task:updated`, `task:deleted` — payload shapes | **Pending** | — |
-| Phase 9 | `message:created`, `message:edited`, `message:deleted`, `message:reaction` — payload shapes | **Pending** | — |
-| Phase 9 | `typing:start`, `typing:stop` — room/channel convention | **Pending** | — |
-| Phase 9 | `user:online`, `user:offline` — presence events and payload | Pending | — |
-| Phase 9 | `notification:created` — payload shape | **Pending** | — |
-| Phase 9 | Room naming convention (workspace/project/conversation ID based) | **Pending** | — |
-| Phase 9 | `GET /notifications` — pagination, filter params | Pending | — |
-| Phase 9 | `POST /notifications/:id/read` or `PATCH` | Pending | — |
-| Phase 9 | `POST /notifications/read-all` | Pending | — |
-| Phase 10 | Calling SDK provider and credentials model | **Pending (required before Phase 10)** | — |
-| Phase 10 | `POST /meetings` — creation params | Pending | — |
-| Phase 10 | `GET /meetings/:id` — join token/URL from backend | Pending | — |
-| Phase 10 | `POST /meetings/:id/end` | Pending | — |
-| Phase 10 | `GET /meetings` — history, filter by project/team | Pending | — |
-| Phase 10 | `POST /ai/ask` or streaming AI endpoint | Pending | — |
-| Phase 10 | `POST /ai/task-plan` | Pending | — |
-| Phase 10 | `POST /ai/summarize-project/:id` | Pending | — |
-| Phase 10 | `POST /ai/summarize-conversation/:id` | Pending | — |
-| Phase 10 | AI response streaming protocol (SSE vs. chunked JSON) | Pending | — |
-| Phase 10 | AI usage limits and rate-limit response format | Pending | — |
-| Phase 10 | Meeting recording and summary endpoints | Pending | — |
-| Phase 11 | `GET /search?q=&type=` — response shape, supported entity types | Pending | — |
-| Phase 11 | Pagination for search results | Pending | — |
-| Phase 11 | `GET /workspaces/:id/activity` | Pending | — |
-| Phase 11 | `GET /projects/:id/activity` | Pending | — |
-| Phase 11 | Activity event schema: actor, verb, resource type, resource ID | Pending | — |
-| Phase 11 | `GET /workspaces/:id/analytics` — metric list and response shape | Pending | — |
-| Phase 11 | `GET /projects/:id/analytics` | Pending | — |
-| Phase 11 | Dashboard metrics: completion, overdue, workload, deadlines, activity trend | Pending | — |
+| Phase    | Contract                                                                                    | Status                                       | Confirmed Date |
+| -------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- | -------------- |
+| Phase 3  | `POST /auth/login` — request/response shape, cookie vs. token strategy                      | Pending                                      | —              |
+| Phase 3  | `POST /auth/register` — validation rules, email verification flow                           | Pending                                      | —              |
+| Phase 3  | `POST /auth/logout` — cookie clearing or token revocation                                   | Pending                                      | —              |
+| Phase 3  | `POST /auth/forgot-password`                                                                | Pending                                      | —              |
+| Phase 3  | `POST /auth/reset-password` — token param, expiry behavior                                  | Pending                                      | —              |
+| Phase 3  | `GET /auth/verify-email` — query param name and flow                                        | Pending                                      | —              |
+| Phase 3  | `GET /users/me` — response shape including roles/workspace memberships                      | Pending                                      | —              |
+| Phase 3  | `PATCH /users/me` — updatable fields, validation rules                                      | Pending                                      | —              |
+| Phase 3  | 401 response format and refresh token behavior                                              | Pending                                      | —              |
+| Phase 4  | `GET /workspaces` — list user's workspaces                                                  | Pending                                      | —              |
+| Phase 4  | `POST /workspaces` — create workspace, validation rules                                     | Pending                                      | —              |
+| Phase 4  | `GET /workspaces/:id`                                                                       | Pending                                      | —              |
+| Phase 4  | `PATCH /workspaces/:id`                                                                     | Pending                                      | —              |
+| Phase 4  | `DELETE /workspaces/:id`                                                                    | Pending                                      | —              |
+| Phase 4  | `GET /workspaces/:id/members` — includes role field                                         | Pending                                      | —              |
+| Phase 4  | `POST /workspaces/:id/invite` — email, role                                                 | Pending                                      | —              |
+| Phase 4  | `PATCH /workspaces/:id/members/:userId` — role update                                       | Pending                                      | —              |
+| Phase 4  | `DELETE /workspaces/:id/members/:userId`                                                    | Pending                                      | —              |
+| Phase 4  | `GET /teams` or `GET /workspaces/:id/teams`                                                 | Pending                                      | —              |
+| Phase 4  | `POST /teams`, `PATCH /teams/:id`, `DELETE /teams/:id`                                      | Pending                                      | —              |
+| Phase 4  | `POST /invitations/:token/accept` — for email-link acceptance                               | Pending                                      | —              |
+| Phase 4  | Role enum values: `OWNER`, `PM`, `MEMBER`, `VIEWER`, `COLLABORATOR` — confirm exact strings | Pending                                      | —              |
+| Phase 5  | `GET /workspaces/:id/projects` — pagination, filter, sort params                            | Pending                                      | —              |
+| Phase 5  | `POST /projects`                                                                            | Pending                                      | —              |
+| Phase 5  | `GET /projects/:id` — includes progress calculation field                                   | Pending                                      | —              |
+| Phase 5  | `PATCH /projects/:id`                                                                       | Pending                                      | —              |
+| Phase 5  | `POST /projects/:id/archive` or `PATCH` with status field                                   | Pending                                      | —              |
+| Phase 5  | `DELETE /projects/:id`                                                                      | Pending                                      | —              |
+| Phase 5  | `GET /projects/:id/members`                                                                 | Pending                                      | —              |
+| Phase 5  | `POST /projects/:id/members`                                                                | Pending                                      | —              |
+| Phase 5  | `DELETE /projects/:id/members/:userId`                                                      | Pending                                      | —              |
+| Phase 5  | Progress field — confirm whether backend returns a numeric percentage or raw counts         | Pending                                      | —              |
+| Phase 6  | `GET /projects/:id/tasks` — filter params, sort, pagination                                 | Pending                                      | —              |
+| Phase 6  | `POST /tasks` — required fields, validation rules                                           | Pending                                      | —              |
+| Phase 6  | `GET /tasks/:id` — full detail including comments, activity                                 | Pending                                      | —              |
+| Phase 6  | `PATCH /tasks/:id`                                                                          | Pending                                      | —              |
+| Phase 6  | `DELETE /tasks/:id`                                                                         | Pending                                      | —              |
+| Phase 6  | `PATCH /tasks/:id/status` — accepted transitions per role                                   | **Pending (required before Kanban)**         | —              |
+| Phase 6  | `GET /tasks/:id/comments`, `POST /tasks/:id/comments`                                       | Pending                                      | —              |
+| Phase 6  | `PATCH /comments/:id`, `DELETE /comments/:id`                                               | Pending                                      | —              |
+| Phase 6  | `POST /tasks/:id/attachments`, `DELETE /attachments/:id` — file size/type limits            | Pending                                      | —              |
+| Phase 6  | `GET /tasks/:id/activity`                                                                   | Pending                                      | —              |
+| Phase 6  | Progress aggregation — confirm whether endpoint returns `progress` field or raw counts      | Pending                                      | —              |
+| Phase 7  | `GET /projects/:id/documents`                                                               | Pending                                      | —              |
+| Phase 7  | `POST /documents`                                                                           | Pending                                      | —              |
+| Phase 7  | `GET /documents/:id`                                                                        | Pending                                      | —              |
+| Phase 7  | `PATCH /documents/:id` — content format (JSON blocks, Markdown, or HTML)                    | **Pending (required before editor install)** | —              |
+| Phase 7  | `DELETE /documents/:id`                                                                     | Pending                                      | —              |
+| Phase 7  | Real-time collaboration service (Yjs/OT/CRDT), if any                                       | Pending                                      | —              |
+| Phase 7  | Document access permissions per role                                                        | Pending                                      | —              |
+| Phase 8  | `GET /conversations` — filter by type (direct/team/project)                                 | Pending                                      | —              |
+| Phase 8  | `POST /conversations`                                                                       | Pending                                      | —              |
+| Phase 8  | `GET /conversations/:id/messages` — pagination                                              | Pending                                      | —              |
+| Phase 8  | `POST /conversations/:id/messages` — text, file attachment                                  | Pending                                      | —              |
+| Phase 8  | `PATCH /messages/:id`                                                                       | Pending                                      | —              |
+| Phase 8  | `DELETE /messages/:id`                                                                      | Pending                                      | —              |
+| Phase 8  | `POST /messages/:id/reactions`                                                              | Pending                                      | —              |
+| Phase 8  | `POST /messages/:id/pin`                                                                    | Pending                                      | —              |
+| Phase 8  | Message search endpoint                                                                     | Pending                                      | —              |
+| Phase 8  | `POST /messages/:id/convert-to-task`                                                        | Pending                                      | —              |
+| Phase 8  | Message mention format (`@userId` or `@username`)                                           | Pending                                      | —              |
+| Phase 8  | File attachment endpoint and size limits                                                    | Pending                                      | —              |
+| Phase 8  | Thread/reply support                                                                        | Pending                                      | —              |
+| Phase 8  | Read receipt endpoint                                                                       | Pending                                      | —              |
+| Phase 9  | Socket.IO gateway URL and authentication method                                             | **Pending (required before Phase 9)**        | —              |
+| Phase 9  | `task:created`, `task:updated`, `task:deleted` — payload shapes                             | **Pending**                                  | —              |
+| Phase 9  | `message:created`, `message:edited`, `message:deleted`, `message:reaction` — payload shapes | **Pending**                                  | —              |
+| Phase 9  | `typing:start`, `typing:stop` — room/channel convention                                     | **Pending**                                  | —              |
+| Phase 9  | `user:online`, `user:offline` — presence events and payload                                 | Pending                                      | —              |
+| Phase 9  | `notification:created` — payload shape                                                      | **Pending**                                  | —              |
+| Phase 9  | Room naming convention (workspace/project/conversation ID based)                            | **Pending**                                  | —              |
+| Phase 9  | `GET /notifications` — pagination, filter params                                            | Pending                                      | —              |
+| Phase 9  | `POST /notifications/:id/read` or `PATCH`                                                   | Pending                                      | —              |
+| Phase 9  | `POST /notifications/read-all`                                                              | Pending                                      | —              |
+| Phase 10 | Calling SDK provider and credentials model                                                  | **Pending (required before Phase 10)**       | —              |
+| Phase 10 | `POST /meetings` — creation params                                                          | Pending                                      | —              |
+| Phase 10 | `GET /meetings/:id` — join token/URL from backend                                           | Pending                                      | —              |
+| Phase 10 | `POST /meetings/:id/end`                                                                    | Pending                                      | —              |
+| Phase 10 | `GET /meetings` — history, filter by project/team                                           | Pending                                      | —              |
+| Phase 10 | `POST /ai/ask` or streaming AI endpoint                                                     | Pending                                      | —              |
+| Phase 10 | `POST /ai/task-plan`                                                                        | Pending                                      | —              |
+| Phase 10 | `POST /ai/summarize-project/:id`                                                            | Pending                                      | —              |
+| Phase 10 | `POST /ai/summarize-conversation/:id`                                                       | Pending                                      | —              |
+| Phase 10 | AI response streaming protocol (SSE vs. chunked JSON)                                       | Pending                                      | —              |
+| Phase 10 | AI usage limits and rate-limit response format                                              | Pending                                      | —              |
+| Phase 10 | Meeting recording and summary endpoints                                                     | Pending                                      | —              |
+| Phase 11 | `GET /search?q=&type=` — response shape, supported entity types                             | Pending                                      | —              |
+| Phase 11 | Pagination for search results                                                               | Pending                                      | —              |
+| Phase 11 | `GET /workspaces/:id/activity`                                                              | Pending                                      | —              |
+| Phase 11 | `GET /projects/:id/activity`                                                                | Pending                                      | —              |
+| Phase 11 | Activity event schema: actor, verb, resource type, resource ID                              | Pending                                      | —              |
+| Phase 11 | `GET /workspaces/:id/analytics` — metric list and response shape                            | Pending                                      | —              |
+| Phase 11 | `GET /projects/:id/analytics`                                                               | Pending                                      | —              |
+| Phase 11 | Dashboard metrics: completion, overdue, workload, deadlines, activity trend                 | Pending                                      | —              |
 
 ---
 
@@ -2069,18 +2142,18 @@ Do not implement backend functionality inside the frontend. Do not invent API en
 
 > Decisions made in Phase 0. Full details in `CONVENTIONS.md`.
 
-| Decision | Choice | Notes |
-|---|---|---|
-| Folder structure | `app/` at repo root (no `src/`), `@/*` alias → repo root | See `CONVENTIONS.md` §1 |
-| API client approach | Typed fetch wrapper in `lib/api.ts` | See `CONVENTIONS.md` §2 |
-| Token storage | HttpOnly cookies via `credentials: 'include'` | Confirm exact cookie config with backend in Phase 3. See `CONVENTIONS.md` §3 |
-| Form validation library | **Zod** — install in Phase 1 | See `CONVENTIONS.md` §4 |
-| Test framework | **Vitest + Testing Library** — install in Phase 1 | See `CONVENTIONS.md` §5 |
-| Drag-and-drop library | **@dnd-kit/core** — install in Phase 6, team confirm required | See `CONVENTIONS.md` §6 |
-| Document editor library | **Deferred** — pending backend content format confirmation (Phase 7) | See `CONVENTIONS.md` §7 |
-| Calling SDK | **Deferred** — pending team selection (Phase 10) | See `CONVENTIONS.md` §8 |
-| State management | React built-ins only (`useState`, `useContext`, `useReducer`) | See `CONVENTIONS.md` §9 |
-| Commit convention | `type(scope): description` — e.g., `feat(phase-3): ...` | See `CONVENTIONS.md` §10 |
+| Decision                | Choice                                                               | Notes                                                                        |
+| ----------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Folder structure        | `app/` at repo root (no `src/`), `@/*` alias → repo root             | See `CONVENTIONS.md` §1                                                      |
+| API client approach     | Typed fetch wrapper in `lib/api.ts`                                  | See `CONVENTIONS.md` §2                                                      |
+| Token storage           | HttpOnly cookies via `credentials: 'include'`                        | Confirm exact cookie config with backend in Phase 3. See `CONVENTIONS.md` §3 |
+| Form validation library | **Zod** — install in Phase 1                                         | See `CONVENTIONS.md` §4                                                      |
+| Test framework          | **Vitest + Testing Library** — install in Phase 1                    | See `CONVENTIONS.md` §5                                                      |
+| Drag-and-drop library   | **@dnd-kit/core** — install in Phase 6, team confirm required        | See `CONVENTIONS.md` §6                                                      |
+| Document editor library | **Deferred** — pending backend content format confirmation (Phase 7) | See `CONVENTIONS.md` §7                                                      |
+| Calling SDK             | **Deferred** — pending team selection (Phase 10)                     | See `CONVENTIONS.md` §8                                                      |
+| State management        | React built-ins only (`useState`, `useContext`, `useReducer`)        | See `CONVENTIONS.md` §9                                                      |
+| Commit convention       | `type(scope): description` — e.g., `feat(phase-3): ...`              | See `CONVENTIONS.md` §10                                                     |
 
 #### Phase 3 account selection and Free plan follow-up — 2026-11-04
 
@@ -2101,3 +2174,77 @@ Do not implement backend functionality inside the frontend. Do not invent API en
 - Paid seat-capacity enforcement status in `lib/subscription-plans.ts` now matches the backend’s transactionally enforced membership activation checks. The Free plan has no backend subscription catalog entry or defined feature/seat/storage/project limits. The public card therefore states only the verified personal-workspace inclusion and routes to account creation; Free usage-limit enforcement remains a backend/product-policy gap.
 - Cross-browser/device onboarding intent is not stored by the backend: registration accepts only `{ name, email, password }`, and the verification URL contains only its token. The browser-local intent survives reloads and browser closure on that browser. On another browser/device, the user can still choose the account type at sign-in to resume the correct path, but automatic type recovery requires a backend-persisted registration intent or an approved verification-link contract change.
 - Frontend automated tests cover identity payloads, local intent restore, verification resend/recovery, matching and missing workspace paths, typed creation, existing-workspace reuse, uncertain-create retry, session expiry, and Free plan display. All 27 test files passed (184 tests total) on 2026-11-04. Live email delivery and live backend registration/verification/workspace creation were not exercised in this review. Phase 3 remains In Progress.
+
+#### Sequential phase audit follow-up — 2026-11-04
+
+- Re-read the canonical `AGENTS.md`, `README.md`, `PHASES.md`, `branding.md`, `nexus-frontend/SKILL.md`, and `CONVENTIONS.md`; the lowercase filenames referenced by some instructions are not present. `README.md` duplicates `AGENTS.md`. The adjacent backend references are in `../__NexusBackend__/docs/API.md`, `docs/openapi.yaml`, and the relevant source schemas/controllers.
+- Phase 0 — **VERIFIED COMPLETE** for repository/configuration deliverables: package/lockfile, environment template, TypeScript/Next configuration, conventions, and backend dependency record are present. The Phase 0 historical note that the backend repository is unknown is obsolete; the adjacent repository and API docs are available. This does not establish completion of later backend-dependent functionality.
+- Phases 1–2 — **VERIFIED COMPLETE** for their design-system and application-shell scope: the tokenized themes, UI primitives, shell/navigation components, and their focused tests are present. The current grouped foundation/shell/Phase 3 workflow run passed 25 files and 192 tests.
+- Phase 3 — remains **PARTIALLY COMPLETE / IN PROGRESS**. The draft legal pack is not legal approval, live auth/email workflow verification remains outstanding, and billing still requires merchant USD enablement, migration/provider verification, and remaining backend lifecycle/reconciliation work. No additional independent frontend workflow can be completed safely against the current approved contracts.
+- This audit is intentionally sequential. It does not advance Phase 4 or later phases while Phase 3 remains open.
+- Full-suite state from the 2026-11-04 audit is recorded above: 252/254 tests passed, with two invitation-acceptance failures in Phase 6 test setup. That later-phase defect is documented for its phase and was not changed out of sequence.
+
+#### Phase 3 authentication completion follow-up — 2026-11-05
+
+Scope was limited to Phase 3 authentication. No Phase 4 or later implementation was started.
+
+| Requirement                                                               | Verified status                                     | Evidence / remaining dependency                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Registration, sign-in, email verification/resend, password recovery/reset | PARTIALLY VERIFIED                                  | Existing flows and request/UI behavior have automated coverage. Live email delivery and live backend workflow remain unverified because the backend was not safely started against its configured remote database.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Authentication persistence and session restoration                        | PARTIALLY VERIFIED                                  | Refresh restores the in-memory access token through the HttpOnly refresh-cookie flow; failed refresh now clears stale in-memory access state. `signOut` clears memory even when the request fails. Automated tests cover these client behaviors. Live cookie, rotation, CSRF, expiry and cross-device behavior remain unverified.                                                                                                                                                                                                                                                                                       |
+| Access-token expiration, refresh rotation, replay/session invalidation    | BACKEND CONTRACT VERIFIED; LIVE INTEGRATION BLOCKED | Backend source documents short-lived access tokens, digest-only refresh-token storage, rotation, replay family/session revocation, and refresh/logout CSRF checks. Database-backed Phase 3 tests require an explicit loopback test database and were skipped; remote migration status timed out.                                                                                                                                                                                                                                                                                                                        |
+| Account reactivation                                                      | IMPLEMENTED; FRONTEND CONTRACT TESTED               | Sign-in now offers password-verified reactivation after `ACCOUNT_DEACTIVATED` or `ACCOUNT_PENDING_DELETION`. It calls the existing `POST /auth/reactivate` contract and requires a fresh sign-in afterward, matching backend behavior (reactivation does not restore/create a session).                                                                                                                                                                                                                                                                                                                                 |
+| Logout and session invalidation                                           | FRONTEND CONTRACT TESTED; LIVE INTEGRATION BLOCKED  | Existing logout calls the backend and clears the in-memory token on success or failure. Actual cookie/session revocation was not exercised against a running server.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Protected routes and authorization                                        | FRONTEND CONTRACT TESTED; LIVE INTEGRATION BLOCKED  | Existing `/app` boundary restores and checks the current user and redirects unauthenticated users. Backend remains authoritative for resource authorization. Live session behavior was not exercised.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Account deletion / `deleteAccount`                                        | IMPLEMENTED; PARTIALLY VERIFIED                    | The product owner approved immediate irreversible deletion and transfer/archive handling for owned workspaces. Frontend requires password, matching email, and explicit confirmation, calls `POST /auth/delete`, clears in-memory credentials through the API service, and redirects to sign-in. Backend immediately revokes sessions, transfers an owned workspace to an eligible active member or archives it, marks subscriptions not to renew, and queues cleanup. Targeted HTTP tests on a disposable local PostgreSQL database cover deletion, ownership succession, session revocation, and cleanup; one stale ownership assertion was updated and passed separately. Full database integration remains to be rerun cleanly. Personal file objects can still hold cleanup. |
+| Authentication validation, loading, and error states                      | PARTIALLY VERIFIED                                  | Automated frontend tests cover sign-in errors and the new reactivation path. Live server/network behavior remains unverified.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+
+#### Phase 3 authentication implementation and validation — 2026-11-05
+
+- Changed `services/auth.ts` to expose the confirmed reactivation service and clear stale access-token memory if refresh fails.
+- Changed `components/auth/AuthForm.tsx` to present reactivation only for backend-confirmed deactivated or pending-deletion sign-in errors, submit the already-entered credentials to the documented route, and explain that a new sign-in is required. No access token is created by the reactivation response.
+- Added focused tests in `services/__tests__/auth.test.ts` and `components/auth/__tests__/AuthForm.test.tsx` for the API contract, no-session behavior, failed-refresh cleanup, and user-facing reactivation flow.
+- Frontend `npx tsc --noEmit` passed. `npm run lint` passed with three pre-existing unused-function warnings in discover/invitation components. Focused auth/session run `npm test -- --run services/__tests__/auth.test.ts components/auth/__tests__/AuthForm.test.tsx app/app/page.test.tsx` passed (3 files, 25 tests).
+- Frontend full suite: **failed**, 35/36 files passed and 255/257 tests passed. The same two Phase 6 invitation-acceptance tests fail because `refreshSession()` is mocked as `undefined` and `.then()` is called in `InvitationAcceptClient.tsx:76`. This Phase 3 change does not touch that component or its tests; the failing tests were preserved.
+- Frontend `npm run build`: **failed** twice at `app/globals.css` while the Tailwind Turbopack loader subprocess timed out. `npx next build --webpack` passed afterward, including compilation, TypeScript, static generation (19 pages), and trace collection. Thus a production build passed with the supported webpack builder; the configured Turbopack build path remains unresolved.
+- Backend `npm test`: passed, 226 tests, 0 failures, 2 skipped (including the guarded database-backed Phase 3 lifecycle suite). Backend `npm run typecheck` passed. Backend `npm run lint` failed on an unused `data` argument in `tests/billing-service.test.ts`; this is outside the Phase 3 frontend change and was left untouched.
+- Backend focused auth unit command `node --import tsx --test tests/auth-unit.test.ts` passed (14/14 tests). `git diff --check` passed in the frontend repository.
+- Guarded Phase 3 database integration command `RUN_PHASE3_DB_TESTS=true node --import tsx --test tests/auth-phase3.test.ts` skipped because no explicit loopback `TEST_DATABASE_URL` was supplied.
+- Backend `npm run dev` was attempted as documented, but startup stopped during environment validation: `TRUST_PROXY` is not one of the accepted boolean strings (`true` or `false`). The watcher was stopped after this failure, before database connections or workers started. The environment file was not changed. `curl http://localhost:4000/health` confirmed no listener (connection refused). `npx prisma migrate status` previously timed out while attempting to reach the configured remote database. No live auth endpoint or successful health response was verified; after correcting the configuration, startup should only be retried against an explicitly approved development/test database because startup launches account-deletion and billing/email workers.
+- Existing backend dirty changes were preserved. No commit or push was created.
+
+#### Current Phase 3 disposition
+
+Phase 3 remains **In Progress / PARTIALLY COMPLETE**. The reactivation and refresh-failure handling gaps addressed here have focused coverage, but Phase 3 cannot be completed until configured live backend authentication/session workflows are verified, legal approval and placeholders are resolved, and the already documented USD merchant, migration, Paystack lifecycle/reconciliation and seat-sync blockers are cleared. OAuth remains deferred pending an approved provider and backend contract. No Phase 4+ work was performed.
+
+#### Phase 3 deletion-policy approval and integration follow-up — 2026-11-05
+
+- The product owner approved immediate, irreversible account deletion and automatic ownership transfer to an eligible active workspace member, with archival if none exists. This supersedes earlier provisional recovery-period and mandatory-transfer notes above; those historical notes are retained for traceability.
+- Added a destructive account deletion form to Account Security. It requires the current password, matching account email, and explicit acknowledgement; it describes immediate access loss, workspace transfer/archive, subscription non-renewal, retained shared/billing records, and possible delay for personal file cleanup. On success it clears in-memory access credentials and redirects to sign-in.
+- Backend deletion transaction now applies transfer/archive, administrator succession, subscription non-renewal/cancellation queueing, session/token revocation, and immediate cleanup eligibility. Cleanup refuses to delete personal file metadata while corresponding private storage objects cannot be safely removed. API docs and confirmation email were aligned with this behavior.
+- Focused frontend deletion/auth/pricing tests passed (35/35), focused legal-page/account-deletion tests passed (11/11), frontend TypeScript passed, and targeted backend billing/account-deletion unit tests passed (37/37). Backend TypeScript passed. Disposable PostgreSQL HTTP coverage passed for ownership transfer/archive, administrator succession, immediate cleanup, personal-file hold, and session revocation; the full Phase 3 database suite still needs a clean rerun. Paystack sandbox verification remains blocked because secret/webhook credentials are absent and USD billing is disabled.
+- Phase 3 remains **In Progress**. Legal documents are drafts only and require owner review plus external legal review. No Phase 4+ implementation was performed.
+
+## Phase 3 account deletion policy correction — 2026-11-05
+
+The product owner's finalized policy supersedes the earlier immediate-deletion addenda: account deletion is scheduled exactly 30 days after a verified request, with immediate session revocation and identity-verified recovery during the period. Owned workspaces and shared content are retained; untransferred owned workspaces are suspended. Recipient ownership acceptance and separate billing responsibility acceptance are required. Subscription cancellation is scheduled for the deadline and reversed on recovery subject to provider-state verification. Legal drafts and the profile confirmation UI now describe this approved product behavior while clearly leaving legal review outstanding.
+
+Phase 3 remains **IN PROGRESS** pending backend/frontend contract verification, successful backend and frontend validation, lifecycle integration and race tests, Paystack sandbox verification when credentials are available, and legal/accounting review of financial and privacy retention obligations. This correction did not alter Phase 4 audit findings or implement Phase 4 features.
+
+## Frontend storage contract audit and build/auth remediation — 2026-11-05
+
+- Backend API documentation confirms authenticated raw-byte upload, private raw-byte retrieval, and deletion only for Company/Institution logos. No general attachment or presigned-upload contract is registered; profile avatars remain `avatarUrl` values with no upload, replacement, or deletion API. No file-upload UI exists in the frontend to connect.
+- No storage controls or AWS credentials were added to the browser. Phase 13 remains **Not Started** until the backend provides the authorized upload, completion, retrieval, and deletion contracts. Details and expected contract fields are in `docs/FRONTEND_STORAGE_INTEGRATION.md`.
+- `refreshSession()` now returns a shared in-flight Promise, rejects an empty refresh response, and clears stale in-memory access state on failure. Invitation refresh and Terms tests pass without invitation-business-rule or legal-content changes.
+- Replaced the custom Tailwind Turbopack CSS loader with Tailwind CSS v4's `@tailwindcss/postcss` integration. Default Turbopack and webpack production builds pass. Full frontend tests pass with bounded worker count (40 files, 272 tests); TypeScript passes and ESLint has three existing warnings.
+- Phase 3 remains **In Progress**; Phase 4 status is unchanged; Phase 8 remains **In Progress**; Phase 13 remains **Not Started**. No phase was marked complete.
+
+## Account lifecycle frontend implementation — 2026-11-05
+
+- Added explicit confirmation before scheduling deletion, clear 30-day/recovery and no-refund messaging, and a sign-in notice that displays the backend scheduled deletion timestamp. Existing sign-in recovery uses the backend `/auth/reactivate` contract.
+- Added workspace owner transfer initiation and recipient ownership/billing acceptance UI using documented backend routes. Suspended workspace status is represented by the frontend type. Transfer references are shared out of band because the backend has no incoming-transfer listing endpoint.
+- Billing continues to show backend subscription cancellation dates and payment status; UI clarifies that this is payment history, invoices are not currently exposed, outstanding invoices remain payable, and cancellation does not automatically refund.
+- Added a Privacy Requests route that transparently reports that submission/status/decision APIs are unavailable; it does not fake a request workflow. Retained collaboration content is described as retained and reviewed, not automatically erased.
+- API details and missing dependencies: `docs/ACCOUNT_LIFECYCLE_FRONTEND.md`.
+- Verification: targeted Vitest run passed 20/20; ESLint completed with 0 errors and 3 warnings outside changed files. Build and TypeScript check results are recorded in the completion report.
+- Remaining: backend incoming-transfer listing and rejection endpoints; invoice list/payment support; backend privacy request and authorized review/redaction workflow; backend integration testing for the connected flows. Phase 7 remains **IN PROGRESS**.

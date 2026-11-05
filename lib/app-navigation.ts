@@ -39,6 +39,8 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
           href: '/app/members',
           permissions: ['member:view'],
         },
+        { id: 'teams', label: 'Teams and structure', href: '/app/teams', workspaceKinds: ['company', 'institution'] },
+        { id: 'groups', label: 'Institution groups', href: '/app/groups', workspaceKinds: ['institution'] },
       ],
     },
     {
@@ -48,6 +50,7 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
         { id: 'invitations', label: 'Invitations', href: '/app/invitations' },
         { id: 'billing', label: 'Billing', href: '/app/billing' },
         { id: 'profile', label: 'Profile', href: '/app/profile' },
+        { id: 'privacy-requests', label: 'Privacy requests', href: '/app/privacy-requests' },
       ],
     },
   ];
@@ -63,5 +66,13 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
       .filter((section) => section.items.length > 0);
   }
 
-  return sections;
+  const workspaceKind = workspaceKindFor(workspace);
+  return sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) => !item.workspaceKinds || item.workspaceKinds.includes(workspaceKind),
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
 }

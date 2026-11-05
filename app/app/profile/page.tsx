@@ -195,7 +195,7 @@ export default function ProfilePage() {
             </form>
           </Card>
         ) : null}
-        {!profileLoading && fields && profile && <AccountSecurity />}
+        {!profileLoading && fields && profile && <AccountSecurity email={profile.user.email} />}
       </section>
       <footer className="text-xs text-[var(--color-text-muted)]">Nexus · Profile setup and management</footer>
     </div>

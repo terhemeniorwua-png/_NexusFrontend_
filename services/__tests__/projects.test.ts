@@ -130,4 +130,14 @@ describe('projects service', () => {
     expect(mocks.refreshSession).toHaveBeenCalledOnce();
     expect(mocks.apiRequest).toHaveBeenCalledTimes(2);
   });
+
+  it('transferProjectOwnership sends POST to the transfer-ownership sub-path', async () => {
+    mocks.apiRequest.mockResolvedValue({ projectId: PID, previousOwnerId: 'user-1', ownerId: 'user-2', ownerRole: 'PROJECT_MANAGER', previousOwnerRole: 'MANAGER', previousOwnerResultingRole: 'PROJECT_MANAGER', forcedAdminTransfer: false, updatedAt: '' });
+    const { transferProjectOwnership } = await import('../projects');
+    await transferProjectOwnership(WS, PID, { newOwnerId: 'user-2' });
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/transfer-ownership`,
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
 });

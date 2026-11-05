@@ -10,7 +10,7 @@
 
 ## Plans and prices
 
-Published prices are in USD. Pro is $10 monthly or $50 annually and includes 15 seats. Business is $15 monthly or $70 annually and includes 25 seats. The workspace owner consumes one included seat. Pro additional seats are $0.50 per selected billing period; Business additional seats are $1 per selected billing period. Annual subscriptions therefore use annual additional-seat billing.
+Published prices are in USD. Pro is $10 monthly or $50 annually and includes 15 seats. Business is $15 monthly or $70 annually and includes 25 seats. The workspace owner consumes one included seat. Additional seats cost $0.50 monthly or $1 annually for both Pro and Business. Annual subscriptions therefore use annual additional-seat billing.
 
 The merchant is based initially in Nigeria and intends to serve customers internationally. USD transactions may be offered only after the merchant account is enabled for USD by Paystack. Nexus does not silently convert USD prices to NGN or another currency. If USD is unavailable, checkout is unavailable until the merchant resolves that account requirement.
 

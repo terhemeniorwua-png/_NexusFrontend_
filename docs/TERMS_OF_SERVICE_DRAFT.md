@@ -68,7 +68,7 @@ An additional seat is a distinct active workspace member beyond the selected pla
 - Monthly subscriptions bill these charges monthly; annual subscriptions bill them annually.
 - Only active member accounts with active workspace membership count. Pending invitations, suspended, removed, and deactivated members are not billable.
 - The workspace owner counts once and consumes one included seat.
-- Each additional seat costs **$0.50 for Pro** or **$1.00 for Business** per selected subscription billing period. Monthly plans renew this charge monthly; annual plans renew it annually.
+- Each additional seat costs **$0.50 monthly** or **$1.00 annually** for both Pro and Business. The charge follows the base subscription billing duration.
 - An additional seat takes effect immediately only after successful payment is confirmed by the provider; its charge is prorated for the remaining applicable billing period.
 - A reduction in committed additional-seat quantity takes effect at renewal. No automatic credit is issued for an already-paid period. The backend recounts active members and does not remove or deactivate users to meet a quantity.
 - The backend calculates prices and validates requested seat quantities against authoritative membership state; the client does not set prices or payment outcomes.
@@ -97,21 +97,21 @@ Failed-payment policy is deferred. Retry behavior, grace periods, notices, subsc
 
 Access may need to be restricted for security, legal requirements, non-payment, or material violations. Notice, review, appeal, and restoration procedures are **[PENDING LEGAL AND BUSINESS APPROVAL]**, subject to non-waivable legal rights.
 
-## 21. Account deletion — provisional policy; implementation mismatch
+## 21. Account deletion — product decision approved; legal review pending
 
-The current provisional product policy proposes immediate account-access revocation after an authenticated, explicitly confirmed deletion request, with no user-facing cancellation or recovery period. Eligible personal information is then scheduled for deletion. This policy is not legally approved.
+An authenticated deletion request verifies the current password and account email, immediately revokes active sessions, and schedules permanent deletion exactly 30 days after the request. The account enters `PENDING_DELETION`; the user may recover it before the deadline by verifying identity. Once final deletion starts, normal recovery is unavailable. The request, recovery, and finalization are audited.
 
-The backend currently schedules deletion with a 30-day recovery period. The frontend does not expose account deletion. Do not publish this proposed behavior as an available service until the product policy, legal text, and backend lifecycle contract are aligned and the ownership, billing, retention, anonymization, and object-storage requirements are implemented and verified.
+Owned workspaces and their shared projects, teams, messages, comments, files, and history are retained. Purely personal attachments are deleted after the 30-day recovery period; attachments shared with a workspace or linked to collaboration records are retained. A transfer requires the current owner's initiation, an eligible active member's explicit acceptance, and separate explicit acceptance of billing responsibility. Financial liability is not transferred automatically. If there is no accepted transfer by the deadline, the workspace remains suspended and a platform administrator may assign an owner without gaining unrestricted access to private content.
 
-The proposed policy preserves eligible organizational content, transfers ownership to an eligible active member where possible, and archives/restricts a workspace if no eligible successor exists. Personal avatars and other eligible personal data are deleted; legally required financial records may be retained. Organization deletion remains a separate authorized action. The exact legal exceptions and retention periods require review.
+Subscription cancellation is scheduled for the recovery deadline to prevent future renewals; subscription state remains unchanged during the recovery period. Recovery cancels scheduled cancellation and verifies provider state before restoring billing. Outstanding invoices remain payable. Payment, invoice, receipt, refund, subscription, and audit records are retained as required; applicable retention periods require legal/accounting review. Shared content is preserved and personal attribution is replaced with “Deleted user” during finalization. This describes approved product behavior, not legal approval or regulatory compliance.
 
 ## 22. Personal workspace and shared content
 
-Under the provisional policy, deletion removes eligible personal information and the personal workspace while preserving valid shared organizational content and records needed for workspace continuity. Do not promise exact deletion timing or retention until the backend lifecycle and applicable legal requirements are aligned.
+Account deletion does not delete workspaces or shared content. Access to suspended workspaces is restricted. Messages, comments, files, projects, and collaboration history are retained under existing access controls. Author attribution changes to “Deleted user” and profile references are removed, but this does not mean all personal information in content is erased. Users may submit personal-information access, correction, erasure, or redaction requests for review; handling must protect other users' information and legitimate collaboration records. Applicable rights and legal obligations require professional legal review.
 
 ## 23. Shared organization content
 
-Deleting an account does not delete an organization workspace or content belonging to other members. Organization deletion must be initiated separately by an authorized party. Ownership conflicts must be resolved before deleting the only eligible owner.
+Deleting an account does not delete an organization workspace or content belonging to other members. Workspace ownership transfer and suspension follow Section 21. An administrator's ownership resolution must be audited and does not grant unrestricted access to private workspace content.
 
 ## 24. Third-party services and integrations
 

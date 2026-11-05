@@ -42,11 +42,11 @@ Before a payment request, the interface must show the server-provided plan, bill
 
 The supplied pricing values are labeled provisional in the legal pack. Existing product decisions and the live backend catalog must be reconciled before changing the pricing UI. Do not activate recurring billing or promise a trial conversion rule without an approved product policy and a matching provider/backend contract.
 
-## 5. Account deletion policy and backend mismatch
+## 5. Account deletion policy and implementation status
 
-The newly supplied provisional product policy proposes immediate revocation of sign-in access after explicit confirmation, no user-facing recovery period, asynchronous deletion of eligible personal information, preservation/anonymization of eligible shared organization records, ownership transfer or workspace restriction, cancellation of recurring billing, and retention of legally required financial records.
+The product owner approved a 30-day scheduled deletion period, immediate session revocation, identity-verified recovery before finalization, retention and suspension of owned workspaces without accepted transfer, separate billing-responsibility acceptance, preservation of shared content with anonymized attribution, and subscription cancellation scheduled for the deadline. Legal approval remains outstanding.
 
-The inspected backend instead schedules deletion after a 30-day recovery period. Its worker can also defer cleanup for organization ownership, last-admin, shared personal-workspace, and file-metadata conditions; there is no object-storage adapter for avatar/file cleanup. The frontend has no account deletion UI. Keep deletion UI blocked until product policy, legal text, backend contract, ownership and billing lifecycle, storage cleanup, anonymization, and retention behavior are aligned and integration-tested.
+The backend has a request/recovery/finalization flow and scheduled billing-cancellation records. Finalization must retain all workspace, project, membership, collaboration, and file records; replace personal attribution with a tombstone; and retain financial records. Ownership transfer acceptance, separate billing acceptance, platform-administrator resolution, race-safe processing, API contract documentation, and end-to-end verification remain implementation requirements until explicitly verified. No legal approval or regulatory compliance is claimed.
 
 ## 6. Avatar policy and backend dependency
 

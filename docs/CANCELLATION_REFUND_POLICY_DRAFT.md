@@ -22,9 +22,9 @@ Refund contact and submission process: **[REQUIRED BUSINESS DETAIL]**. Statutory
 
 ## Data retention and account deletion
 
-Cancelling a subscription does not delete customer data. Account deletion is a separate authenticated request. The provisional product policy now proposes immediate access revocation without a recovery period, but the current backend still schedules deletion after 30 days. This mismatch must be resolved before customer-facing deletion terms or a deletion interface are published. The proposal preserves eligible shared organization content and requires ownership transfer or workspace restriction when no eligible successor exists. Organization deletion is separate and authorized. These are provisional product rules, not legal approval.
+Account deletion is separate from subscription cancellation. An authenticated deletion request revokes sessions immediately and schedules final deletion after a 30-day recovery period. The user may recover the account during that period; subscription cancellation is scheduled for its end to prevent future renewals. Existing subscription state remains unchanged during recovery. Recovery cancels scheduled cancellation, subject to provider-state verification. Outstanding invoices remain payable and financial records are retained subject to applicable legal/accounting retention requirements. Owned workspaces without an accepted ownership transfer remain suspended and are not deleted. These are approved product decisions; this draft still requires legal review.
 
-Retention periods for billing records, invoices, audit records, backups, and payment-provider data: **[LEGAL / ACCOUNTING / DEPLOYMENT REVIEW REQUIRED]**. No additional period is invented here.
+Retention periods for invoices, payment references, receipts, refunds, audit records, backups, and payment-provider data: **[LEGAL / ACCOUNTING / DEPLOYMENT REVIEW REQUIRED]**. No additional period is invented here.
 
 ## Review required before publication
 

@@ -11,13 +11,13 @@
 - `POST /api/v1/workspaces/{workspaceId}/owner-transfers/{transferId}/billing-acceptance`, invoked separately after explicit user action.
 - Existing `GET /api/v1/billing/workspaces/{workspaceId}` and `/payments` display subscription cancellation state, effective dates and payment statuses. This is payment history, not an invoice feed.
 
-## Backend dependencies not available
+## Backend contracts available and remaining dependencies
 
-- No endpoint lists incoming/pending ownership transfers, so a recipient must receive the transfer reference out of band to use the current acceptance form. No transfer-rejection endpoint exists. Do not imply these capabilities are supported until backend contracts are added.
-- Backend OpenAPI currently documents the ownership-initiation response as a workspace response, while the route service returns a transfer reference and pending status. Reconcile this documentation/schema mismatch before generating a frontend client.
-- No invoice list/detail/pay endpoint exists; the UI explicitly distinguishes payment history from invoices and displays the approved payable-invoice/no-automatic-refund policy.
-- No privacy request submission, status, decision, access, correction, erasure or redaction endpoint exists. The UI presents a non-submitting dependency notice and does not fake persistence.
-- The backend schema currently has no message/channel entities, so message retention or message attachment screens cannot be connected.
+- The backend exposes `GET /api/v1/workspaces/owner-transfers/incoming` and `POST /api/v1/workspaces/{workspaceId}/owner-transfers/{transferId}/reject`, alongside accept and separate billing-acceptance routes. `components/workspaces/OwnershipLifecyclePanel.tsx` consumes the incoming list, accept, reject, and billing-acceptance contracts; starting a transfer still uses the documented recipient-id form.
+- The current `docs/openapi.yaml` documents the ownership-initiation result as `OwnershipTransferInitiationResponse`, matching the `{ transferId, status }` contract. The previously recorded response-schema mismatch is resolved.
+- Privacy request submission and own-request list/detail routes are available under `/api/v1/privacy-requests`. `services/privacy-requests.ts` and `app/app/privacy-requests/page.tsx` submit requests and show the caller's list/details. Reviewer, decision, completion, and task-comment redaction management remain outside this self-service view.
+- No invoice list/detail/pay API exists. The UI distinguishes persisted payment history from invoices and explains the approved payment/cancellation policy.
+- The backend currently has no Message, Conversation, or Channel message model/API. Privacy redaction therefore applies to supported task comments only; message retention/redaction and message attachments cannot yet be integrated.
 
 ## Retained collaboration content
 

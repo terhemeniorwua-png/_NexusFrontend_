@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { listWorkspaceMembers, type WorkspaceMember } from '@/services/workspaces';
+import { AccessState } from '@/components/shared/AccessState';
 import {
   addTeamMember, archiveTeam, assignDepartmentMember, createDepartment, createTeam,
   listDepartments, listTeamMembers, listTeams, removeTeamMember, renameDepartment,
@@ -44,6 +45,7 @@ export default function TeamsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [memberId, setMemberId] = useState('');
@@ -74,7 +76,7 @@ export default function TeamsPage() {
   const load = useCallback(async () => {
     if (activeWorkspace && activeWorkspace.id !== activeWorkspaceIdRef.current) return;
     const loadId = ++latestLoad.current;
-    setTeams([]); setMembers([]); setDepartments([]); setVisibleTeamMembersState(null); setLoadedWorkspaceId('');
+    setTeams([]); setMembers([]); setDepartments([]); setVisibleTeamMembersState(null); setLoadedWorkspaceId(''); setAccessStatus(null);
     if (!activeWorkspace || !['COMPANY', 'INSTITUTION'].includes(activeWorkspace.type)) {
       return;
     }
@@ -100,7 +102,11 @@ export default function TeamsPage() {
       if (loadId !== latestLoad.current) return;
       setTeams([]); setMembers([]); setDepartments([]); setVisibleTeamMembersState({ workspaceId: activeWorkspace.id, members: [] });
       setLoadedWorkspaceId(activeWorkspace.id);
-      setError(requestMessage(cause, 'The workspace structure could not be loaded.'));
+      if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
+        setAccessStatus(cause.status);
+      } else {
+        setError(requestMessage(cause, 'The workspace structure could not be loaded.'));
+      }
     } finally {
       if (loadId === latestLoad.current) setLoading(false);
     }
@@ -195,6 +201,7 @@ export default function TeamsPage() {
       <PageHeader title="Teams and structure" description={`Manage teams${isInstitution ? ' and departments' : ''} in ${activeWorkspace.name}. The backend enforces permissions for every change.`} />
       {error && <Alert variant="error" title="Could not complete request">{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}
+      {accessStatus && <AccessState status={accessStatus} onRetry={() => void load()} />}
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Organisation structure">
         <Button variant={section === 'teams' ? 'primary' : 'secondary'} onClick={() => setSection('teams')} role="tab" aria-selected={section === 'teams'}>Teams</Button>
         {isInstitution && <Button variant={section === 'departments' ? 'primary' : 'secondary'} onClick={() => setSection('departments')} role="tab" aria-selected={section === 'departments'}>Departments</Button>}

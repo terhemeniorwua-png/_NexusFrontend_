@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { listWorkspaceMembers, type WorkspaceMember } from '@/services/workspaces';
+import { AccessState } from '@/components/shared/AccessState';
 import {
   addInstitutionGroupMember, createInstitutionGroup, deleteInstitutionGroup,
   listInstitutionGroupMembers, listInstitutionGroups, removeInstitutionGroupMember,
@@ -32,6 +33,7 @@ export default function GroupsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [memberId, setMemberId] = useState('');
@@ -53,7 +55,7 @@ export default function GroupsPage() {
   const load = useCallback(async () => {
     if (activeWorkspace && activeWorkspace.id !== activeWorkspaceIdRef.current) return;
     const loadId = ++latestLoad.current;
-    setGroups([]); setWorkspaceMembers([]); setGroupMembersState(null); setSelectedId(''); setLoadedWorkspaceId('');
+    setGroups([]); setWorkspaceMembers([]); setGroupMembersState(null); setSelectedId(''); setLoadedWorkspaceId(''); setAccessStatus(null);
     if (!activeWorkspace || activeWorkspace.type !== 'INSTITUTION') { setLoading(false); return; }
     setLoading(true); setError(null);
     try {
@@ -68,7 +70,11 @@ export default function GroupsPage() {
     } catch (cause) {
       if (loadId !== latestLoad.current) return;
       setGroups([]); setWorkspaceMembers([]); setLoadedWorkspaceId(activeWorkspace.id);
-      setError(cause instanceof ApiRequestError ? cause.message : 'Institution groups could not be loaded.');
+      if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
+        setAccessStatus(cause.status);
+      } else {
+        setError(cause instanceof ApiRequestError ? cause.message : 'Institution groups could not be loaded.');
+      }
     } finally { if (loadId === latestLoad.current) setLoading(false); }
   }, [activeWorkspace]);
 
@@ -129,6 +135,7 @@ export default function GroupsPage() {
     <PageHeader title="Institution groups" description={`Manage groups in ${activeWorkspace.name}. Group membership is independent from department, team, and project access.`} />
     {error && <Alert variant="error" title="Could not complete request">{error}</Alert>}
     {notice && <Alert variant="success">{notice}</Alert>}
+    {accessStatus && <AccessState status={accessStatus} onRetry={() => void load()} />}
     {loading || loadedWorkspaceId !== activeWorkspace.id ? <p role="status" className="text-sm text-[var(--color-text-secondary)]">Loading institution groups…</p> : <div className="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
       <div className="space-y-5">
         <Card className="space-y-4"><h2 className="text-lg font-semibold">Create a group</h2><form className="space-y-4" onSubmit={(event) => { void create(event); }}>

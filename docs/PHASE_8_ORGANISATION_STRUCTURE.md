@@ -15,7 +15,7 @@
 
 The backend is authoritative for access checks. The UI displays API errors (including permission failures) and does not infer management permission from an unverified client role. Workspace members are loaded from the active workspace endpoint. Group membership visibility is supplied by the backend. Team membership summaries are included only where the individual team member endpoint permits access; inaccessible team rosters are omitted. The backend remains responsible for preventing cross-workspace reads and writes.
 
-The current list/detail response contracts do not include per-resource capability flags. As a result, management controls cannot yet be precisely hidden for every combination of workspace role and team membership; attempted operations are still rejected by backend authorization and surfaced as errors. A capability contract (or an equivalent frontend/backend-approved permission mapping) is required to fully satisfy permission-aware control visibility without guessing.
+The frontend does not assume unprovided resource capability flags. It displays controls according to the available role/permission context, submits only documented operations, and surfaces backend authorization failures. A separate actor-capability response is not an accepted requirement or blocker for this phase.
 
 ## Backend contracts verified
 
@@ -29,6 +29,7 @@ The backend checkout at `/home/philip-iorwua/Desktop/__NexusBackend__` contains 
 
 - The backend has no department-members list endpoint. Current frontend can assign a member and show aggregate counts but cannot verify/display department rosters or offer safe per-member removal. Backend dependency: expose authorized department membership records before that UI is added.
 - No team activity API is registered. Team activity view depends on an approved backend route/contract and cannot be implemented against the current API.
+- Team and institution-group member-list routes are present in the backend API/OpenAPI; those roster APIs are not missing contracts.
 - A dedicated `/app/teams/{teamId}` page now displays team details and its authorized member roster; activity remains unavailable.
 - Membership overview is permission-filtered by backend-readable rosters. A count does not reveal membership identities, and inaccessible rosters are not inferred.
 - End-to-end integration against a configured backend session and representative Company/Institution workspaces remains necessary; mocked service tests alone do not prove live integration.
@@ -60,7 +61,7 @@ The previous validation record above is historical. The following results supers
 
 ### Backend dependencies and requested contracts
 
-These contracts were checked against the adjacent backend source and route registrations. They are proposals for the backend team; no backend files were changed.
+These contracts were checked against the adjacent backend `docs/API.md`, `docs/openapi.yaml`, source routes, and route registrations. The real missing APIs are the first two items below. The former capability-flags proposal is withdrawn: no separate endpoint or response field is needed for the current scope.
 
 1. **Department roster listing**
    - Need: list department-member identities and roles so the UI can show an authorized roster and offer removal only for known assignments.
@@ -78,17 +79,9 @@ These contracts were checked against the adjacent backend source and route regis
    - Authorization: require active workspace membership plus team/activity visibility; enforce resource visibility for linked resources.
    - Blocks live activity rendering only; team details and membership remain usable.
 
-3. **Resource capability flags**
-   - Need: hide or explain controls according to authoritative resource-specific permissions rather than workspace type or visibility alone.
-   - Missing behavior: current list/detail responses do not include capabilities for the current actor.
-   - Proposed response addition on team, department, and group list/detail records: `capabilities` with booleans only for implemented operations (for example `canUpdate`, `canArchive`/`canDelete`, `canAssignLead`, `canAddMember`, and `canRemoveMember`). Backend should define the exact operation set and apply the same checks when each mutation is submitted.
-   - Request parameters: none beyond the existing workspace/resource path parameters; capabilities must be computed for the authenticated actor, not accepted from the client.
-   - Authorization: each mutation still performs an independent server-side check and returns the established 401/403 response. The frontend must handle 403 even when a capability previously indicated an action was available.
-   - Improves precise control visibility; current operations are usable with backend rejection/error feedback, but controls cannot be accurately pre-filtered.
-
 ### Verification results
 
-- `npx vitest run` — passed, 40 test files and 269 tests.
+- Historical validation above predates subsequent Phases 5–7 work. See the current repository checks and task report for current command results; automated checks do not constitute user-confirmed Phase 8 verification.
 - Focused Phase 8 page, navigation, and API-contract run — passed, 3 files and 8 tests. Invitation and legal regression focus run — passed, 5 files and 18 tests before the final additions; the full suite above includes the final code.
 - `npx tsc --noEmit` — passed.
 - `npm run lint` — passed with 0 errors and 3 existing unused-function warnings in Discover, Invitations, and Join Requests.
@@ -99,7 +92,7 @@ These contracts were checked against the adjacent backend source and route regis
 
 ### Remaining limitations and disposition
 
-- Department roster listing, team activity, and actor-specific resource capability flags remain backend dependencies with proposed contracts above.
+- Department roster listing and team activity remain backend dependencies with proposed contracts above. Actor-specific resource capability flags are not considered a missing contract or blocker.
 - Live authenticated backend integration and browser responsive testing remain manual verification requirements.
 - The separate AWS S3 SDK integration request is backend-owned. The current task explicitly prohibits backend-repository modifications; the frontend repository has no storage adapter or backend storage setup guide, so no S3 implementation/configuration was changed here. The backend adapter was inspected read-only and currently uses a custom S3-compatible SigV4 fetch implementation that requires a non-empty endpoint; it does not yet meet the requested AWS SDK v3/default-endpoint requirement. This remains unimplemented and must be handled in an authorized backend task.
-- Phase 8 remains **In Progress**. Phase 7 status is unchanged; Phase 9 has not started.
+- Phase 8 remains **In Progress** pending the user's manual verification. Phase 7 status is unchanged. Phase 9 implementation is authorized separately on `feature/phase-9-projects`.

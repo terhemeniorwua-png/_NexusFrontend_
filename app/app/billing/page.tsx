@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ApiRequestError } from '@/lib/api';
 import { formatSubscriptionPrice, subscriptionPricing, type BillingPeriod } from '@/lib/subscription-plans';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { AccessState } from '@/components/shared/AccessState';
 import {
   apiInterval, cancelBilling, getBillingHistory, getBillingSummary, scheduleBillingChange,
   startBillingCheckout, verifyBillingCheckout, type BillingPayment, type BillingPlanId, type BillingSummary,
@@ -49,6 +50,7 @@ function WorkspaceBilling() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);
   const workspaceId = activeWorkspace?.id;
 
   const isOwner = Boolean(activeWorkspace && user && activeWorkspace.ownerId === user.id);
@@ -94,7 +96,14 @@ function WorkspaceBilling() {
           setBillingPeriod(nextSummary.subscription.interval === 'MONTHLY' ? 'monthly' : 'annual');
         }
       })
-      .catch((cause: unknown) => { if (active) setError(friendlyError(cause)); });
+      .catch((cause: unknown) => {
+        if (!active) return;
+        if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
+          setAccessStatus(cause.status);
+        } else {
+          setError(friendlyError(cause));
+        }
+      });
     return () => { active = false; };
   }, [workspaceId]);
 
@@ -156,7 +165,7 @@ function WorkspaceBilling() {
     }
   }
 
-  if (workspaceLoading || (activeWorkspace && !summary && !error)) return <div className="mx-auto max-w-5xl px-5 py-10"><p role="status">Loading workspace billing…</p></div>;
+  if (workspaceLoading || (activeWorkspace && !summary && !error && !accessStatus)) return <div className="mx-auto max-w-5xl px-5 py-10"><p role="status">Loading workspace billing…</p></div>;
   if (!activeWorkspace) return <div className="mx-auto max-w-5xl px-5 py-10"><EmptyState title="Choose a workspace" description="Select a workspace before viewing its billing." action={<Link href="/app/workspaces" className="text-[var(--color-primary)] underline">Manage workspaces</Link>} /></div>;
 
   return (
@@ -168,6 +177,7 @@ function WorkspaceBilling() {
 
       {error && <Alert variant="error" title="Billing request failed">{error}</Alert>}
       {notice && <Alert variant="info" title="Billing update">{notice}</Alert>}
+      {accessStatus && <AccessState status={accessStatus} onRetry={() => { setAccessStatus(null); }} />}
 
       <Card className="p-5 sm:p-7">
         <h2 className="text-xl font-semibold">Current subscription</h2>

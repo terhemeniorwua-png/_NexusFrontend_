@@ -78,4 +78,18 @@ describe('TeamsPage workspace scoping', () => {
     expect(screen.getByText('Team Beta')).toBeInTheDocument();
     expect(screen.queryByText('Team Alpha')).not.toBeInTheDocument();
   });
+
+  it('shows an unauthenticated access state when the team load returns 401', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    mocks.listTeams.mockRejectedValue(new ApiRequestError('Unauthorized', 401));
+    render(<TeamsPage />);
+    expect(await screen.findByText('Sign in to continue')).toBeInTheDocument();
+  });
+
+  it('shows a forbidden access state when the team load returns 403', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    mocks.listTeams.mockRejectedValue(new ApiRequestError('Forbidden', 403));
+    render(<TeamsPage />);
+    expect(await screen.findByText('You do not have access')).toBeInTheDocument();
+  });
 });

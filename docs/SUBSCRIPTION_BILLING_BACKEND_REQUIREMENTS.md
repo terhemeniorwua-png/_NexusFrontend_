@@ -25,7 +25,7 @@ The workspace owner counts once and consumes an included seat. These prices and 
 - Pending invitations, suspended members, removed members, and deactivated accounts do not count.
 - The workspace owner counts once as an active member and consumes one included seat, if the owner account is active.
 - Additional-member charges apply only above the selected plan's included allowance.
-- Pro additional members cost $0.50 per selected billing period; Business additional members cost $1 per selected billing period.
+- Additional members cost $0.50 monthly or $1 annually for both Pro and Business.
 - Additional seats use the base subscription cadence: annual subscriptions bill additional seats annually.
 - A new additional seat takes effect immediately only after verified successful payment and is prorated for the remaining base subscription billing period.
 - A committed seat reduction takes effect at renewal; there is no automatic credit for an already-paid period.
@@ -83,13 +83,15 @@ Paystack docs state supported currencies are account/market dependent. USD is di
 Configure these values in the backend's local `.env` (never in the frontend `.env.local`) and the backend deployment secret manager. `.env.example` contains empty placeholders only:
 
 - `PAYSTACK_SECRET_KEY`: test secret key from Paystack Dashboard **Settings → API keys & webhooks** for sandbox verification; replace with the live secret only after a separately approved production launch.
+- `PAYSTACK_WEBHOOK_SECRET`: the Paystack webhook signing secret (`whsec_...`) used to verify the timestamped `Paystack-Signature` header. Keep it server-side; Paystack's current signature supports a 300-second timestamp window and key-rotation signatures.
+- `PAYSTACK_WEBHOOK_PREVIOUS_SECRET`: optional previous `whsec_...` secret during Paystack's signing-secret rotation overlap. Remove it when the overlap ends. The legacy `x-paystack-signature` is accepted only when the timestamped header is absent and is verified with `PAYSTACK_SECRET_KEY`.
 - `PAYSTACK_USD_ENABLED`: leave `false` until Paystack confirms USD transactions are enabled for the actual merchant account; set `true` only after that confirmation.
 - `PAYSTACK_CALLBACK_URL`: absolute Nexus billing return URL, for example `https://<your-domain>/app/billing`. Production configuration requires HTTPS.
 - `PAYSTACK_ENCRYPTION_KEY`: generate a stable base64url-encoded 32-byte key for encrypting subscription management tokens at rest. Preserve it across deployments; losing it prevents provider subscription management.
 - `PAYSTACK_API_URL`: keep the documented default `https://api.paystack.co` unless Paystack supplies a different endpoint.
 - `PAYSTACK_REQUEST_TIMEOUT_MS`: optional request timeout; documented default is 15000 ms.
 
-The browser public key is not required because checkout uses Paystack's hosted transaction URL. There is no separate webhook signing secret variable: the official `x-paystack-signature` HMAC-SHA512 is verified with the Paystack secret key. In Paystack Dashboard, configure the webhook URL as `https://<backend-domain>/api/v1/webhooks/paystack` for the matching test/live environment. Local webhook testing requires a publicly reachable HTTPS tunnel. Do not paste credentials into chat or commit them.
+The browser public key is not required because checkout uses Paystack's hosted transaction URL. In Paystack Dashboard, configure the webhook URL as `https://<backend-domain>/api/v1/webhooks/paystack` for the matching test/live environment and configure the webhook signing secret. The backend reads raw request bytes and validates Paystack's timestamped signature; it retains legacy `x-paystack-signature` support for installations that have not migrated to the new header. Local webhook testing requires a publicly reachable HTTPS tunnel. Do not paste credentials into chat or commit them.
 
 ## Provider-dependent blockers
 

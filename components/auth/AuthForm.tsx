@@ -41,7 +41,7 @@ function friendlyError(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return 'Something went wrong. Please try again.';
   if (error.status === 401) return 'That email and password combination was not recognised.';
   if (error.code === 'ACCOUNT_DEACTIVATED') return 'This account is deactivated. You can reactivate it with your current password.';
-  if (error.code === 'ACCOUNT_PENDING_DELETION') return 'This account is scheduled for deletion. Reactivate it before its recovery period ends.';
+  if (error.code === 'ACCOUNT_PENDING_DELETION') return 'This account is scheduled for deletion. Restore it within 30 days to sign in.';
   if (error.status === 403) return error.message;
   if (error.status === 400 && (error.code === 'TOKEN_INVALID' || error.code === 'TOKEN_EXPIRED')) return 'This verification link is invalid or expired. Request a new verification email to continue.';
   if (error.status === 409) return 'An account with this email already exists. Try signing in instead.';
@@ -50,7 +50,7 @@ function friendlyError(error: unknown): string {
   return error.message;
 }
 
-export function AuthForm({ mode, initialToken = '', initialEmail = '', accountType, redirectPath, onSwitchMode, onBackToAccountType }: { mode: AuthMode; initialToken?: string; initialEmail?: string; accountType?: AuthAccountType; redirectPath?: string; onSwitchMode?: (mode: 'sign-in' | 'sign-up') => void; onBackToAccountType?: () => void }) {
+export function AuthForm({ mode, initialToken = '', initialEmail = '', accountType, redirectPath, deletionScheduledAt, onSwitchMode, onBackToAccountType }: { mode: AuthMode; initialToken?: string; initialEmail?: string; accountType?: AuthAccountType; redirectPath?: string; deletionScheduledAt?: string; onSwitchMode?: (mode: 'sign-in' | 'sign-up') => void; onBackToAccountType?: () => void }) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState(initialEmail);
@@ -60,6 +60,9 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const deletionDate = deletionScheduledAt && !Number.isNaN(Date.parse(deletionScheduledAt))
+    ? new Intl.DateTimeFormat(undefined, { dateStyle: 'long', timeStyle: 'short' }).format(new Date(deletionScheduledAt))
+    : null;
   const [complete, setComplete] = useState(false);
   const [reactivationAvailable, setReactivationAvailable] = useState(false);
   const [verifiedAccountType, setVerifiedAccountType] = useState<AuthAccountType | null>(null);
@@ -239,6 +242,7 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
 
       {error && <Alert variant="error" className="mb-5">{error}</Alert>}
       {notice && <Alert variant={complete ? 'success' : 'info'} className="mb-5">{notice}</Alert>}
+      {mode === 'sign-in' && deletionDate && <Alert variant="success" title="Deletion scheduled" className="mb-5">Your account is scheduled for final deletion on {deletionDate}. Sign in with your email and password and choose Restore account before then to cancel deletion. No session is restored automatically.</Alert>}
       {reactivationAvailable && mode === 'sign-in' && <div className="mb-5 space-y-2"><p className="text-sm text-[var(--color-text-secondary)]">Use the email and password above to restore access. You will need to sign in again afterward.</p><Button type="button" className="w-full" variant="secondary" loading={busy} onClick={() => { void handleReactivate(); }}>Reactivate account</Button></div>}
 
       {mode === 'sign-up' && complete ? (

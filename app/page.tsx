@@ -26,10 +26,19 @@ export default function HomePage() {
 
       <section className="relative overflow-hidden border-b border-[var(--color-border)]">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,rgba(81,70,216,0.13),transparent_48%)]" />
-        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:py-32">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:py-20">
           <div className="max-w-2xl">
-            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)]"><span className="size-1.5 rounded-full bg-[var(--color-primary)]" />A more connected way to work</p>
-            <h1 className="text-4xl font-semibold leading-[1.1] tracking-[-0.04em] sm:text-6xl">Bring your work <span className="text-[var(--color-primary)]">together.</span></h1>
+            {/* <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+              <span className="size-1.5 rounded-full bg-[var(--color-primary)]" />A more connected way to work</p> */}
+            <h1 className="text-4xl font-semibold leading-[1.1] tracking-[-0.04em] sm:text-6xl">
+              Bring your work {/* Everything your team needs, */} <span className="text-[var(--color-primary)]">
+
+
+
+
+                together.
+                {/* connected. */}
+                </span></h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-[var(--color-text-secondary)] sm:text-lg sm:leading-8">Projects, conversations, and the people behind them belong in one clear workspace. Nexus helps your team keep the whole picture in view.</p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link className="inline-flex h-12 items-center justify-center rounded-lg bg-[var(--color-primary)] px-6 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-hover)]" href="/sign-up">Start with Nexus <span className="ml-2" aria-hidden="true">→</span></Link>

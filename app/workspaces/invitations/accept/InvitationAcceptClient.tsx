@@ -40,17 +40,8 @@ function expiresLabel(value: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
-/**
- * Whether a refresh attempt is worth making.
- *
- * The access token lives in memory only, so a full page load cannot tell an
- * authenticated visitor from an anonymous one. The refresh cookie is
- * HttpOnly, but the companion CSRF cookie is readable and is set whenever a
- * session exists. Skipping the request when there is no hint avoids a
- * guaranteed 401 on a public page.
- */
-function hasSessionHint(): boolean {
-  if (getAccessToken()) return true;
+/** The CSRF companion cookie indicates that a refresh-cookie session may exist. */
+function hasRefreshSessionHint(): boolean {
   if (typeof document === 'undefined') return false;
   return document.cookie.split('; ').some((entry) => entry.startsWith('nexus_csrf='));
 }
@@ -72,7 +63,12 @@ export function InvitationAcceptClient() {
 
     // Resolve the session and the public preview independently: the preview
     // must render even when the visitor is not signed in.
-    if (hasSessionHint()) {
+    if (getAccessToken()) {
+      // The in-memory access token is already the session state established by
+      // the auth provider. Avoid a redundant refresh; protected API calls retry
+      // once through their service layer if that token has expired.
+      Promise.resolve().then(() => { if (active) setSession('authenticated'); });
+    } else if (hasRefreshSessionHint()) {
       refreshSession()
         .then(() => { if (active) setSession('authenticated'); })
         .catch(() => { if (active) setSession('anonymous'); });

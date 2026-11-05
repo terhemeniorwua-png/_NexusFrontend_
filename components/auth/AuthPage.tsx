@@ -7,7 +7,7 @@ import { AuthForm } from './AuthForm';
 
 type AuthMode = 'sign-in' | 'sign-up' | 'forgot-password' | 'reset-password' | 'verify-email';
 
-export function AuthPage({ mode, token, email, initialAccountType, redirectPath }: { mode: AuthMode; token?: string; email?: string; initialAccountType?: AuthAccountType; redirectPath?: string }) {
+export function AuthPage({ mode, token, email, initialAccountType, redirectPath, deletionScheduledAt }: { mode: AuthMode; token?: string; email?: string; initialAccountType?: AuthAccountType; redirectPath?: string; deletionScheduledAt?: string }) {
   const router = useRouter();
   const [accountType, setAccountType] = useState<AuthAccountType | null>(initialAccountType ?? null);
   const [entryMode, setEntryMode] = useState<'sign-in' | 'sign-up'>(mode === 'sign-in' ? 'sign-in' : 'sign-up');
@@ -27,6 +27,7 @@ export function AuthPage({ mode, token, email, initialAccountType, redirectPath 
           initialEmail={email}
           accountType={accountType ?? undefined}
           redirectPath={redirectPath}
+          deletionScheduledAt={deletionScheduledAt}
           onSwitchMode={requiresAccountSelection ? setEntryMode : undefined}
           onBackToAccountType={requiresAccountSelection ? () => setAccountType(null) : undefined}
         />

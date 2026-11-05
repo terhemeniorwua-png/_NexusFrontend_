@@ -83,6 +83,8 @@ export interface IncomingOwnershipTransfer {
   acceptedAt: string | null;
   billingAcceptedAt: string | null;
   workspace: { id: string; name: string; type: WorkspaceType; status: WorkspaceStatus };
+  /** The current workspace owner who initiated the transfer. */
+  initiatedBy: { id: string; name: string };
 }
 
 export interface IncomingOwnershipTransfersPage {

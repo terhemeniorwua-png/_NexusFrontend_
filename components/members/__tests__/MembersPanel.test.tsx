@@ -108,6 +108,9 @@ describe('MembersPanel', () => {
     await user.selectOptions(screen.getByLabelText('Role'), 'COMPANY_COLLABORATOR');
     await user.click(screen.getByRole('button', { name: 'Save role' }));
 
+    expect(mocks.updateWorkspaceMemberRole).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Change role' }));
+
     await waitFor(() => expect(mocks.updateWorkspaceMemberRole).toHaveBeenCalledWith(
       'workspace-1',
       'user-2',
@@ -123,6 +126,9 @@ describe('MembersPanel', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Manage Grace Member' }));
     await user.click(screen.getByRole('menuitem', { name: 'Suspend membership' }));
+
+    expect(mocks.suspendWorkspaceMember).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Suspend member' }));
 
     await waitFor(() => expect(mocks.suspendWorkspaceMember).toHaveBeenCalledWith('workspace-1', 'user-2'));
     expect(await screen.findByText(/Grace Member’s membership is suspended/)).toBeInTheDocument();

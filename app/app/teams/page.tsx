@@ -62,7 +62,7 @@ export default function TeamsPage() {
   }, [activeWorkspace?.id]);
 
   const isInstitution = activeWorkspace?.type === 'INSTITUTION';
-  const selectedTeam = teams.find((team) => team.id === selectedTeamId) ?? null;
+  const selectedTeam = loadedWorkspaceId === activeWorkspace?.id ? teams.find((team) => team.id === selectedTeamId) ?? null : null;
   const visibleTeamMembers = useMemo(
     () => visibleTeamMembersState && visibleTeamMembersState.workspaceId === activeWorkspace?.id
       ? visibleTeamMembersState.members
@@ -74,6 +74,7 @@ export default function TeamsPage() {
   const load = useCallback(async () => {
     if (activeWorkspace && activeWorkspace.id !== activeWorkspaceIdRef.current) return;
     const loadId = ++latestLoad.current;
+    setTeams([]); setMembers([]); setDepartments([]); setVisibleTeamMembersState(null); setLoadedWorkspaceId('');
     if (!activeWorkspace || !['COMPANY', 'INSTITUTION'].includes(activeWorkspace.type)) {
       return;
     }

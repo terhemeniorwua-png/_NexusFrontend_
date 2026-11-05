@@ -13,7 +13,7 @@ import { workspaceCan } from '@/lib/permissions';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 
 export default function MembersPage() {
-  const { activeWorkspace, loading } = useWorkspaceContext();
+  const { activeWorkspace, loading, retry } = useWorkspaceContext();
   const [activeTab, setActiveTab] = useState('members');
 
   if (loading) {
@@ -38,7 +38,7 @@ export default function MembersPage() {
     {
       id: 'members',
       label: 'Members',
-      content: <MembersPanel key={activeWorkspace.id} workspace={activeWorkspace} canManage={canManage} />,
+      content: <MembersPanel key={activeWorkspace.id} workspace={activeWorkspace} canManage={canManage} onAccessChanged={retry} />,
     },
     ...(canManage ? [
       {

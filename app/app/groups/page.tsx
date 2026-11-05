@@ -53,6 +53,7 @@ export default function GroupsPage() {
   const load = useCallback(async () => {
     if (activeWorkspace && activeWorkspace.id !== activeWorkspaceIdRef.current) return;
     const loadId = ++latestLoad.current;
+    setGroups([]); setWorkspaceMembers([]); setGroupMembersState(null); setSelectedId(''); setLoadedWorkspaceId('');
     if (!activeWorkspace || activeWorkspace.type !== 'INSTITUTION') { setLoading(false); return; }
     setLoading(true); setError(null);
     try {

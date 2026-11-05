@@ -1,4 +1,4 @@
-import { apiRequest, ApiRequestError } from '@/lib/api';
+import { apiRawRequest, apiRequest, ApiRequestError } from '@/lib/api';
 import { refreshSession } from '@/services/auth';
 import type {
   MembershipStatus,
@@ -72,6 +72,55 @@ export interface OwnershipTransferCreated {
 export interface OwnershipTransferAccepted {
   workspaceId: string;
   billingAcceptanceRequired: boolean;
+}
+
+export interface IncomingOwnershipTransfer {
+  id: string;
+  workspaceId: string;
+  status: 'PENDING';
+  createdAt: string;
+  expiresAt: string | null;
+  acceptedAt: string | null;
+  billingAcceptedAt: string | null;
+  workspace: { id: string; name: string; type: WorkspaceType; status: WorkspaceStatus };
+}
+
+export interface IncomingOwnershipTransfersPage {
+  items: IncomingOwnershipTransfer[];
+  limit: number;
+  offset: number;
+}
+
+export interface OrganizationLogoResponse { logoReference: string | null }
+
+export function listIncomingOwnershipTransfers(limit = 50, offset = 0): Promise<IncomingOwnershipTransfersPage> {
+  const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return authorizedRequest<IncomingOwnershipTransfersPage>(`/workspaces/owner-transfers/incoming?${query}`);
+}
+
+export function rejectWorkspaceOwnershipTransfer(workspaceId: string, transferId: string): Promise<{ workspaceId: string; status: 'REJECTED' }> {
+  return authorizedRequest(`/workspaces/${encodeURIComponent(workspaceId)}/owner-transfers/${encodeURIComponent(transferId)}/reject`, { method: 'POST' });
+}
+
+function logoPath(workspaceId: string, type: 'COMPANY' | 'INSTITUTION'): string {
+  return workspacePath(workspaceId, `/${type === 'COMPANY' ? 'company' : 'institution'}-profile/logo`);
+}
+
+export async function getWorkspaceLogo(workspaceId: string, type: 'COMPANY' | 'INSTITUTION'): Promise<Blob> {
+  try { return await (await apiRawRequest(logoPath(workspaceId, type), { authenticated: true })).blob(); }
+  catch (error) {
+    if (!(error instanceof ApiRequestError) || error.status !== 401) throw error;
+    await refreshSession();
+    return (await apiRawRequest(logoPath(workspaceId, type), { authenticated: true })).blob();
+  }
+}
+
+export function uploadWorkspaceLogo(workspaceId: string, type: 'COMPANY' | 'INSTITUTION', image: Blob): Promise<OrganizationLogoResponse> {
+  return authorizedRequest(logoPath(workspaceId, type), { method: 'POST', headers: { 'Content-Type': image.type }, body: image });
+}
+
+export function deleteWorkspaceLogo(workspaceId: string, type: 'COMPANY' | 'INSTITUTION'): Promise<OrganizationLogoResponse> {
+  return authorizedRequest(logoPath(workspaceId, type), { method: 'DELETE' });
 }
 
 export function initiateWorkspaceOwnershipTransfer(

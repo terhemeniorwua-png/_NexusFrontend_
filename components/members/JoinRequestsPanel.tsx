@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -68,17 +68,6 @@ export function JoinRequestsPanel({ workspace, canManage }: JoinRequestsPanelPro
   // A grantable role is required for approval; derive the default instead of
   // copying it into state from an effect.
   const effectiveRole = role || roleOptions[0]?.value || '';
-
-  const loadRequests = useCallback(async (nextStatus: JoinRequestListStatus) => {
-    try {
-      const loaded = await listWorkspaceJoinRequests(workspace.id, nextStatus);
-      setRequests(loaded);
-    } catch (cause) {
-      setError(errorText(cause, 'Join requests could not be loaded.'));
-    } finally {
-      setLoading(false);
-    }
-  }, [workspace.id]);
 
   useEffect(() => {
     let active = true;
@@ -192,7 +181,7 @@ export function JoinRequestsPanel({ workspace, canManage }: JoinRequestsPanelPro
           <div>
             <h2 className="text-xl font-semibold">Join requests</h2>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Requests expire after seven days. Applicants gain no workspace access until a request is approved.
+              Applicants gain no workspace access until a request is approved. The request list includes server-provided expiry dates.
             </p>
           </div>
           <div className="w-full sm:w-56">

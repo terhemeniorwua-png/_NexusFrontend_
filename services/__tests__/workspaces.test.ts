@@ -8,6 +8,9 @@ import {
   listWorkspaceMembers,
   listWorkspaces,
   initiateWorkspaceOwnershipTransfer,
+  getWorkspaceLogo,
+  uploadWorkspaceLogo,
+  deleteWorkspaceLogo,
   removeWorkspaceMember,
   restoreWorkspaceMember,
   suspendWorkspaceMember,
@@ -132,5 +135,21 @@ describe('workspace API service', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/backend/workspaces/workspace-1/owner/member-2', expect.objectContaining({ method: 'PATCH', body: '{}' }));
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/backend/workspaces/workspace-1/owner-transfers/transfer-1/accept', expect.objectContaining({ method: 'POST' }));
     expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/backend/workspaces/workspace-1/owner-transfers/transfer-1/billing-acceptance', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('reads private logos as authenticated bytes and uploads raw bytes with image content type', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'Content-Type': 'image/png' } }))
+      .mockResolvedValueOnce(response({ logoReference: 'private-logo' }))
+      .mockResolvedValueOnce(response({ logoReference: null }));
+    const logo = await getWorkspaceLogo('workspace-1', 'COMPANY');
+    const file = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' });
+    await uploadWorkspaceLogo('workspace-1', 'COMPANY', file);
+    await deleteWorkspaceLogo('workspace-1', 'COMPANY');
+    expect(logo.type).toBe('image/png');
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/backend/workspaces/workspace-1/company-profile/logo', expect.objectContaining({ headers: expect.any(Headers), credentials: 'include' }));
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({ method: 'POST', body: file, headers: expect.objectContaining({}) }));
+    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('Content-Type')).toBe('image/png');
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/backend/workspaces/workspace-1/company-profile/logo', expect.objectContaining({ method: 'DELETE' }));
   });
 });

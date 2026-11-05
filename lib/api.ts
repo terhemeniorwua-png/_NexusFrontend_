@@ -94,3 +94,32 @@ export async function apiRequest<T>(
 
   return (payload as ApiEnvelope<T>).data;
 }
+
+/** Authenticated raw-response request for private binary resources. */
+export async function apiRawRequest(
+  path: string,
+  options: RequestInit & { authenticated?: boolean } = {},
+): Promise<Response> {
+  const { authenticated = false, headers: inputHeaders, ...requestOptions } = options;
+  const headers = new Headers(inputHeaders);
+  if (authenticated && accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  const csrfToken = readCsrfCookie();
+  if ((path === '/auth/refresh' || path === '/auth/logout') && csrfToken) headers.set('x-csrf-token', csrfToken);
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, { ...requestOptions, headers, credentials: 'include' });
+  } catch {
+    throw new ApiRequestError('Unable to reach Nexus. Check your connection and try again.', 0);
+  }
+  if (!response.ok) {
+    let message = 'Something went wrong. Please try again.';
+    let code: string | undefined;
+    try {
+      const body = await response.clone().json() as { error?: { message?: string; code?: string }; message?: string };
+      message = body.error?.message ?? body.message ?? message;
+      code = body.error?.code;
+    } catch { /* Binary endpoint may return an empty error body. */ }
+    throw new ApiRequestError(message, response.status, code);
+  }
+  return response;
+}

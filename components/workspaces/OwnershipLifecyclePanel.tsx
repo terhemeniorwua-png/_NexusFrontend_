@@ -1,16 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Select } from '@/components/ui/Select';
 import { ApiRequestError } from '@/lib/api';
 import {
   acceptWorkspaceBillingResponsibility,
   acceptWorkspaceOwnershipTransfer,
   initiateWorkspaceOwnershipTransfer,
+  listIncomingOwnershipTransfers,
+  rejectWorkspaceOwnershipTransfer,
+  type IncomingOwnershipTransfer,
   type Workspace,
   type WorkspaceMember,
 } from '@/services/workspaces';
@@ -31,13 +35,28 @@ export function OwnershipLifecyclePanel({
   onChanged: () => void;
 }) {
   const [recipientId, setRecipientId] = useState('');
-  const [transferId, setTransferId] = useState('');
-  const [createdTransferId, setCreatedTransferId] = useState<string | null>(null);
+  const [incoming, setIncoming] = useState<IncomingOwnershipTransfer[] | null>(null);
+  const [incomingLoading, setIncomingLoading] = useState(true);
+  const [rejectTarget, setRejectTarget] = useState<IncomingOwnershipTransfer | null>(null);
+  const [billingTransfer, setBillingTransfer] = useState<{ workspaceId: string; id: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const isOwner = workspace.ownerId === userId;
   const eligibleMembers = members.filter((member) => member.userId !== userId && member.status === 'ACTIVE' && member.membershipStatus === 'ACTIVE');
+
+  async function loadIncoming() {
+    try {
+      const result = await listIncomingOwnershipTransfers();
+      setIncoming(result.items);
+    } catch (cause) {
+      setError(message(cause));
+    } finally {
+      setIncomingLoading(false);
+    }
+  }
+
+  useEffect(() => { let active = true; void listIncomingOwnershipTransfers().then((result) => { if (active) setIncoming(result.items); }).catch((cause: unknown) => { if (active) setError(message(cause)); }).finally(() => { if (active) setIncomingLoading(false); }); return () => { active = false; }; }, []);
 
   async function startTransfer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,9 +65,8 @@ export function OwnershipLifecyclePanel({
     setError(null);
     setNotice(null);
     try {
-      const result = await initiateWorkspaceOwnershipTransfer(workspace.id, recipientId);
-      setCreatedTransferId(result.transferId);
-      setNotice('Transfer request created. Give the transfer reference to the selected member so they can accept it. Billing responsibility is a separate decision.');
+      await initiateWorkspaceOwnershipTransfer(workspace.id, recipientId);
+      setNotice('Transfer request created. Billing responsibility remains a separate decision.');
       onChanged();
     } catch (cause) {
       setError(message(cause));
@@ -57,16 +75,17 @@ export function OwnershipLifecyclePanel({
     }
   }
 
-  async function acceptTransfer() {
+  async function acceptTransfer(transfer: IncomingOwnershipTransfer) {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const result = await acceptWorkspaceOwnershipTransfer(workspace.id, transferId.trim());
+      const result = await acceptWorkspaceOwnershipTransfer(transfer.workspaceId, transfer.id);
       setNotice(result.billingAcceptanceRequired
         ? 'Ownership accepted. This workspace remains suspended until you separately accept billing responsibility.'
         : 'Workspace ownership accepted.');
-      if (result.billingAcceptanceRequired) setCreatedTransferId(transferId.trim());
+      setIncoming((current) => current?.filter((item) => item.id !== transfer.id) ?? null);
+      if (result.billingAcceptanceRequired) setBillingTransfer({ workspaceId: transfer.workspaceId, id: transfer.id });
       onChanged();
     } catch (cause) {
       setError(message(cause));
@@ -76,14 +95,14 @@ export function OwnershipLifecyclePanel({
   }
 
   async function acceptBilling() {
-    const id = createdTransferId ?? transferId.trim();
-    if (!id) return;
+    if (!billingTransfer) return;
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      await acceptWorkspaceBillingResponsibility(workspace.id, id);
+      await acceptWorkspaceBillingResponsibility(billingTransfer.workspaceId, billingTransfer.id);
       setNotice('Billing responsibility accepted separately.');
+      setBillingTransfer(null);
       onChanged();
     } catch (cause) {
       setError(message(cause));
@@ -92,7 +111,16 @@ export function OwnershipLifecyclePanel({
     }
   }
 
-  if (workspace.isPersonal) return null;
+  async function rejectTransfer() {
+    if (!rejectTarget) return;
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      await rejectWorkspaceOwnershipTransfer(rejectTarget.workspaceId, rejectTarget.id);
+      setIncoming((current) => current?.filter((item) => item.id !== rejectTarget.id) ?? null);
+      setNotice(`The transfer offer for ${rejectTarget.workspace.name} was rejected.`); setRejectTarget(null);
+    } catch (cause) { setError(message(cause)); await loadIncoming(); }
+    finally { setBusy(false); }
+  }
 
   return (
     <Card className="space-y-5 p-5 sm:p-7">
@@ -104,29 +132,23 @@ export function OwnershipLifecyclePanel({
       </div>
       {workspace.status === 'SUSPENDED' && <Alert variant="warning" title="Workspace suspended">This workspace remains suspended until an eligible owner and any required billing responsibility are resolved.</Alert>}
       {error && <Alert variant="error" title="Ownership action failed">{error}</Alert>}
-      {notice && <Alert variant="success" title="Ownership update">{notice}{createdTransferId && <span className="mt-2 block break-all">Transfer reference: {createdTransferId}</span>}</Alert>}
+      {notice && <Alert variant="success" title="Ownership update">{notice}</Alert>}
 
-      {isOwner && <form onSubmit={(event) => void startTransfer(event)} className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      {isOwner && !workspace.isPersonal && <form onSubmit={(event) => void startTransfer(event)} className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <Select id="ownership-recipient" label="Transfer to an active member" value={recipientId} onChange={(event) => setRecipientId(event.target.value)} options={[{ value: '', label: 'Choose a member' }, ...eligibleMembers.map((member) => ({ value: member.userId, label: `${member.name} · ${member.email}` }))]} />
         <Button type="submit" loading={busy} disabled={!recipientId}>Start transfer</Button>
       </form>}
 
-      <div className="border-t border-[var(--color-border)] pt-5">
-        <h3 className="font-semibold">Accept an ownership transfer</h3>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Enter the transfer reference provided by the current owner. The backend verifies that you are the intended active member.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-          <Input id="ownership-transfer-id" label="Transfer reference" value={transferId} onChange={(event) => setTransferId(event.target.value)} />
-          <Button type="button" variant="secondary" loading={busy} disabled={!transferId.trim()} onClick={() => void acceptTransfer()}>Accept ownership</Button>
-        </div>
-      </div>
+      <div className="border-t border-[var(--color-border)] pt-5"><h3 className="font-semibold">Incoming ownership transfers</h3><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Only pending offers addressed to your active account appear here.</p>{incomingLoading ? <p role="status" className="mt-4 text-sm">Loading transfers…</p> : incoming?.length ? <ul className="mt-3 divide-y divide-[var(--color-border)]">{incoming.map((transfer) => <li key={transfer.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{transfer.workspace.name}</p><p className="text-xs text-[var(--color-text-secondary)]">Sent {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(transfer.createdAt))} · Sender details are not included by the backend contract.</p></div><div className="flex gap-2"><Button size="sm" loading={busy} disabled={busy} onClick={() => void acceptTransfer(transfer)}>Accept</Button><Button size="sm" variant="secondary" disabled={busy} onClick={() => setRejectTarget(transfer)}>Reject</Button></div></li>)}</ul> : <EmptyState title="No incoming transfers" description="Ownership offers sent to you will appear here." />}</div>
 
-      {createdTransferId && <div className="border-t border-[var(--color-border)] pt-5">
+      {billingTransfer && <div className="border-t border-[var(--color-border)] pt-5">
         <h3 className="font-semibold">Billing responsibility</h3>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Accept only if you understand and agree to take responsibility for this workspace subscription. This is not implied by accepting ownership.</p>
         <Button className="mt-3" type="button" variant="secondary" loading={busy} onClick={() => void acceptBilling()}>Accept billing responsibility</Button>
       </div>}
 
       {!isOwner && eligibleMembers.length === 0 && <p className="text-xs text-[var(--color-text-muted)]">The current account is not the workspace owner. The backend remains authoritative for transfer permissions.</p>}
+      <ConfirmDialog open={rejectTarget !== null} onClose={() => setRejectTarget(null)} onConfirm={() => void rejectTransfer()} title="Reject ownership transfer?" description={rejectTarget ? `Reject the offer to take ownership of ${rejectTarget.workspace.name}? This does not accept billing responsibility.` : undefined} confirmLabel="Reject transfer" destructive loading={busy} />
     </Card>
   );
 }

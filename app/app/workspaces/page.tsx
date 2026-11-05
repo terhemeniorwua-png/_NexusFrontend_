@@ -16,6 +16,7 @@ import { listWorkspaceMembers, listWorkspaces, type WorkspaceMember } from '@/se
 import { ApiRequestError } from '@/lib/api';
 import { clearPendingOnboardingIntent } from '@/lib/onboarding-intent';
 import { OwnershipLifecyclePanel } from '@/components/workspaces/OwnershipLifecyclePanel';
+import { WorkspaceLogoManager } from '@/components/workspaces/WorkspaceLogoManager';
 
 type MemberState =
   | { status: 'loading'; workspaceId: string | null }
@@ -92,7 +93,7 @@ function WorkspaceSettings({ workspaceId }: { workspaceId: string }) {
         {workspace.isPersonal ? <p className="text-sm text-[var(--color-text-secondary)]">Personal workspaces stay private.</p> : <Select id="workspace-visibility" name="visibility" label="Visibility" defaultValue={workspace.visibility} options={[{ value: 'PRIVATE', label: 'Private' }, { value: 'PUBLIC', label: 'Publicly discoverable' }]} helperText="Public workspaces can appear in discovery; membership still requires an invitation or approved request." />}
         <div className="flex justify-end"><Button type="submit" loading={saving}>Save workspace</Button></div>
       </form>
-      <p className="mt-5 border-t border-[var(--color-border)] pt-4 text-xs text-[var(--color-text-secondary)]">Workspace logos and other branding controls are not available in the current backend contract.</p>
+      <WorkspaceLogoManager workspace={workspace} />
     </Card>
   );
 }
@@ -129,11 +130,16 @@ export default function WorkspacesPage() {
 
   useEffect(() => {
     const workspaceId = activeWorkspace?.id;
-    if (!workspaceId) return;
     let current = true;
-    listWorkspaceMembers(workspaceId)
-      .then((members) => { if (current) setMemberState({ status: 'success', workspaceId, members }); })
-      .catch((cause: unknown) => { if (current) setMemberState({ status: 'error', workspaceId, message: errorText(cause, 'Workspace members could not be loaded.') }); });
+    void Promise.resolve().then(() => {
+      if (!current) return null;
+      setMemberState({ status: 'loading', workspaceId: workspaceId ?? null });
+      return workspaceId ? listWorkspaceMembers(workspaceId) : null;
+    }).then((members) => {
+      if (current && workspaceId && members) setMemberState({ status: 'success', workspaceId, members });
+    }).catch((cause: unknown) => {
+      if (current && workspaceId) setMemberState({ status: 'error', workspaceId, message: errorText(cause, 'Workspace members could not be loaded.') });
+    });
     return () => { current = false; };
   }, [activeWorkspace?.id]);
 

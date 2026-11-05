@@ -24,7 +24,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({ useRouter: () => mocks.router }));
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a> }));
 vi.mock('@/providers/WorkspaceProvider', () => ({ useWorkspaceContext: () => mocks.context }));
-vi.mock('@/services/workspaces', () => ({ listWorkspaceMembers: vi.fn(), listWorkspaces: vi.fn() }));
+vi.mock('@/services/workspaces', () => ({ listWorkspaceMembers: vi.fn(), listWorkspaces: vi.fn(), listIncomingOwnershipTransfers: vi.fn().mockResolvedValue({ items: [], limit: 50, offset: 0 }), initiateWorkspaceOwnershipTransfer: vi.fn(), acceptWorkspaceOwnershipTransfer: vi.fn(), acceptWorkspaceBillingResponsibility: vi.fn(), rejectWorkspaceOwnershipTransfer: vi.fn() }));
+vi.mock('@/components/workspaces/WorkspaceLogoManager', () => ({ WorkspaceLogoManager: () => null }));
 
 describe('WorkspacesPage', () => {
   beforeEach(() => {
@@ -52,6 +53,19 @@ describe('WorkspacesPage', () => {
     await waitFor(() => expect(mocks.context.createAndActivateWorkspace).toHaveBeenCalledWith({ name: 'Acme', description: null, type: 'COMPANY', visibility: 'PRIVATE' }));
     expect(listWorkspaceMembers).toHaveBeenCalledWith('company-1');
   }, 15_000);
+
+  it('does not render member data from the previous workspace during a switch', async () => {
+    const first = mocks.context.activeWorkspace!;
+    const second = { ...first, id: 'company-2', name: 'Other Company' };
+    const { rerender } = render(<WorkspacesPage />);
+    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
+    mocks.context.activeWorkspace = second;
+    mocks.context.workspaces = [first, second];
+    vi.mocked(listWorkspaceMembers).mockResolvedValueOnce([{ id: 'member-2', userId: 'user-2', name: 'Grace Hopper', email: 'grace@example.com', status: 'ACTIVE', role: 'MEMBER', organizationRole: 'COMPANY_MEMBER', membershipStatus: 'ACTIVE', joinedAt: '2026-11-02T00:00:00.000Z', owner: false }]);
+    rerender(<WorkspacesPage />);
+    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument();
+    expect(await screen.findByText('Grace Hopper')).toBeInTheDocument();
+  });
 
   it('saves documented workspace profile fields', async () => {
     const user = userEvent.setup();

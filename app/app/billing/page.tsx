@@ -196,6 +196,7 @@ export default function BillingPage() {
 
       <Card className="p-5 sm:p-7">
         <h2 className="text-xl font-semibold">Billing history</h2>
+        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Cancellation does not issue an automatic refund. Outstanding invoices remain payable. The current backend provides payment history, but does not yet expose an invoice list.</p>
         {payments.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]"><th scope="col" className="py-2 pr-3">Date</th><th scope="col" className="py-2 pr-3">Reference</th><th scope="col" className="py-2 pr-3">Amount</th><th scope="col" className="py-2">Status</th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.providerReference} className="border-b border-[var(--color-border)] last:border-0"><td className="py-3 pr-3">{dateLabel(payment.paidAt ?? payment.createdAt)}</td><td className="py-3 pr-3 font-mono text-xs">{payment.providerReference}</td><td className="py-3 pr-3">{formatSubscriptionPrice(payment.amountSubunit / 100)}</td><td className="py-3">{payment.status.toLowerCase()}</td></tr>)}</tbody></table></div> : <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No billing transactions are recorded yet.</p>}
       </Card>
 

@@ -21,12 +21,12 @@ describe('subscription pricing configuration', () => {
   it('contains approved additional-seat prices and included allowances', () => {
     expect(subscriptionPricing.plans.find((plan) => plan.id === 'pro')).toMatchObject({
       additionalMemberMonthlyPrice: 0.5,
-      additionalMemberAnnualPrice: 0.5,
+      additionalMemberAnnualPrice: 1,
       includedSeats: 15,
       ownerConsumesIncludedSeat: true,
     });
     expect(subscriptionPricing.plans.find((plan) => plan.id === 'business')).toMatchObject({
-      additionalMemberMonthlyPrice: 1,
+      additionalMemberMonthlyPrice: 0.5,
       additionalMemberAnnualPrice: 1,
       includedSeats: 25,
       ownerConsumesIncludedSeat: true,
@@ -78,8 +78,7 @@ describe('PricingPage', () => {
     expect(screen.getByLabelText('Price: Free')).toBeInTheDocument();
     expect(screen.getAllByText('/ year')).toHaveLength(2);
     expect(screen.getAllByText('Billed annually')).toHaveLength(2);
-    expect(screen.getAllByText('$0.50 per additional seat per year')).toHaveLength(1);
-    expect(screen.getAllByText('$1 per additional seat per year')).toHaveLength(1);
+    expect(screen.getAllByText('$1 per additional seat per year')).toHaveLength(2);
     expect(screen.getAllByText(/follow the subscription duration/i)).toHaveLength(2);
   });
 

@@ -59,6 +59,20 @@ describe('BillingPage', () => {
     expect(screen.getByText('Jan 1, 2027')).toBeInTheDocument();
   });
 
+  it('shows an unauthenticated access state when the billing load returns 401', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    mocks.getBillingSummary.mockRejectedValue(new ApiRequestError('Unauthorized', 401));
+    render(<BillingPage />);
+    expect(await screen.findByText('Sign in to continue')).toBeInTheDocument();
+  });
+
+  it('shows a forbidden access state when the billing load returns 403', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    mocks.getBillingSummary.mockRejectedValue(new ApiRequestError('Forbidden', 403));
+    render(<BillingPage />);
+    expect(await screen.findByText('You do not have access')).toBeInTheDocument();
+  });
+
   it('requires explicit confirmation to schedule period-end cancellation', async () => {
     const user = userEvent.setup();
     render(<BillingPage />);

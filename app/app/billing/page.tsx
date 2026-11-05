@@ -32,6 +32,13 @@ function totalCents(planId: BillingPlanId, interval: 'MONTHLY' | 'ANNUAL', seats
 }
 
 export default function BillingPage() {
+  const { activeWorkspace, loading } = useWorkspaceContext();
+  if (loading) return <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8"><p role="status">Loading workspace…</p></div>;
+  if (!activeWorkspace) return <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8"><EmptyState title="Choose a workspace" description="Select a workspace to view its billing information." /></div>;
+  return <WorkspaceBilling key={activeWorkspace.id} />;
+}
+
+function WorkspaceBilling() {
   const { activeWorkspace, user, loading: workspaceLoading } = useWorkspaceContext();
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [payments, setPayments] = useState<BillingPayment[]>([]);
@@ -42,6 +49,7 @@ export default function BillingPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const workspaceId = activeWorkspace?.id;
 
   const isOwner = Boolean(activeWorkspace && user && activeWorkspace.ownerId === user.id);
   const interval = apiInterval(billingPeriod);
@@ -72,9 +80,9 @@ export default function BillingPage() {
   }, [activeWorkspace]);
 
   useEffect(() => {
-    if (!activeWorkspace) return;
+    if (!workspaceId) return;
     let active = true;
-    void Promise.all([getBillingSummary(activeWorkspace.id), getBillingHistory(activeWorkspace.id)])
+    void Promise.all([getBillingSummary(workspaceId), getBillingHistory(workspaceId)])
       .then(([nextSummary, history]) => {
         if (!active) return;
         setSummary(nextSummary);
@@ -88,7 +96,7 @@ export default function BillingPage() {
       })
       .catch((cause: unknown) => { if (active) setError(friendlyError(cause)); });
     return () => { active = false; };
-  }, [activeWorkspace]);
+  }, [workspaceId]);
 
   useEffect(() => {
     if (!activeWorkspace || !isOwner) return;

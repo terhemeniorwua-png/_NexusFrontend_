@@ -30,7 +30,10 @@ export default function TeamDetailPage() {
       return;
     }
     let current = true;
-    void Promise.resolve().then(() => Promise.all([getTeam(activeWorkspace.id, teamId), listTeamMembers(activeWorkspace.id, teamId)]))
+    void Promise.resolve().then(() => {
+      if (current) { setLoading(true); setTeam(null); setMembers([]); setLoadedScope(''); setError(null); }
+      return Promise.all([getTeam(activeWorkspace.id, teamId), listTeamMembers(activeWorkspace.id, teamId)]);
+    })
       .then(([loadedTeam, loadedMembers]) => {
         if (!current) return;
         setError(null);

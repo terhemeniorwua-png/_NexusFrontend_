@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { ApiRequestError } from '@/lib/api';
+import { AccessState } from '@/components/shared/AccessState';
 import {
   assignableRoleOptions,
   canManageMember,
@@ -41,6 +42,7 @@ function joinedLabel(value: string): string {
 interface MembersPanelProps {
   workspace: Workspace;
   canManage: boolean;
+  onAccessChanged?: () => void;
 }
 
 /**
@@ -50,7 +52,7 @@ interface MembersPanelProps {
  * backend re-evaluates each mutation. A member whose role cannot manage a
  * particular target sees no action menu for that target.
  */
-export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
+export function MembersPanel({ workspace, canManage, onAccessChanged }: MembersPanelProps) {
   const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,9 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
   const [roleTarget, setRoleTarget] = useState<WorkspaceMember | null>(null);
   const [roleValue, setRoleValue] = useState('');
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [accessStatus, setAccessStatus] = useState<401 | 403 | null>(null);
+  const [confirmRole, setConfirmRole] = useState(false);
+  const [membershipTarget, setMembershipTarget] = useState<{ member: WorkspaceMember; action: 'suspend' | 'restore' } | null>(null);
 
   const roleOptions = assignableRoleOptions(workspace);
 
@@ -69,6 +74,7 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
       setMembers(loaded);
     } catch (cause) {
       setError(errorText(cause, 'Workspace members could not be loaded.'));
+      setAccessStatus(cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403) ? cause.status : null);
     } finally {
       setLoading(false);
     }
@@ -82,6 +88,7 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
         if (active) setMembers(loaded);
       } catch (cause) {
         if (active) setError(errorText(cause, 'Workspace members could not be loaded.'));
+        if (active) setAccessStatus(cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403) ? cause.status : null);
       } finally {
         if (active) setLoading(false);
       }
@@ -114,6 +121,8 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
       setMembers((current) => current?.map((member) => member.userId === updated.userId ? updated : member) ?? null);
       setNotice(`${updated.name} is now ${roleLabel(updated.role, updated.organizationRole)}.`);
       setRoleTarget(null);
+      setConfirmRole(false);
+      onAccessChanged?.();
     } catch (cause) {
       setRoleError(errorText(cause, 'The member role could not be changed.'));
     } finally {
@@ -133,6 +142,8 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
       setNotice(action === 'suspend'
         ? `${updated.name}’s membership is suspended.`
         : `${updated.name}’s membership is active again.`);
+      setMembershipTarget(null);
+      onAccessChanged?.();
     } catch (cause) {
       setError(errorText(cause, 'The membership could not be updated.'));
     } finally {
@@ -175,13 +186,13 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
       items.push({
         id: 'suspend',
         label: 'Suspend membership',
-        onSelect: () => { void changeMembershipState(member, 'suspend'); },
+        onSelect: () => setMembershipTarget({ member, action: 'suspend' }),
       });
     } else {
       items.push({
         id: 'restore',
         label: 'Restore membership',
-        onSelect: () => { void changeMembershipState(member, 'restore'); },
+        onSelect: () => setMembershipTarget({ member, action: 'restore' }),
       });
     }
     items.push({
@@ -200,6 +211,7 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
 
   if (error && !members) {
     return (
+      accessStatus ? <AccessState status={accessStatus} onRetry={() => { setLoading(true); setError(null); void loadMembers(); }} /> :
       <Card className="p-5 sm:p-7">
         <Alert variant="error" title="Members unavailable">{error}</Alert>
         <Button className="mt-4" onClick={() => { setLoading(true); setError(null); void loadMembers(); }}>Try again</Button>
@@ -250,6 +262,7 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
                     {member.membershipStatus === 'SUSPENDED'
                       ? <Badge variant="warning">Suspended</Badge>
                       : <Badge variant="success">Active</Badge>}
+                    {member.status !== member.membershipStatus && <Badge variant={member.status === 'ACTIVE' ? 'success' : 'outline'}>{member.status.replaceAll('_', ' ').toLowerCase()}</Badge>}
                     {items.length > 0 && (
                       <Dropdown
                         items={items}
@@ -291,7 +304,7 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
         footer={(
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setRoleTarget(null)}>Cancel</Button>
-            <Button loading={roleTarget !== null && busyMemberId === roleTarget.userId} onClick={() => { void saveRole(); }}>Save role</Button>
+            <Button loading={roleTarget !== null && busyMemberId === roleTarget.userId} onClick={() => setConfirmRole(true)}>Save role</Button>
           </div>
         )}
       >
@@ -305,6 +318,8 @@ export function MembersPanel({ workspace, canManage }: MembersPanelProps) {
           disabled={roleOptions.length === 0}
         />
       </Modal>
+      <ConfirmDialog open={confirmRole} onClose={() => setConfirmRole(false)} onConfirm={() => { void saveRole(); }} title="Change member role?" description={roleTarget ? `Change ${roleTarget.name} from ${roleLabel(roleTarget.role, roleTarget.organizationRole)} to ${roleLabel(roleValue, isOrganizationRole(roleValue) ? roleValue as OrganizationRole : null)}? Their available actions and workspace navigation will change.` : undefined} confirmLabel="Change role" loading={roleTarget !== null && busyMemberId === roleTarget.userId} />
+      <ConfirmDialog open={membershipTarget !== null} onClose={() => setMembershipTarget(null)} onConfirm={() => { if (membershipTarget) void changeMembershipState(membershipTarget.member, membershipTarget.action); }} title={membershipTarget?.action === 'suspend' ? 'Suspend member?' : 'Restore member?'} description={membershipTarget ? `${membershipTarget.action === 'suspend' ? 'Suspend' : 'Restore'} ${membershipTarget.member.name}’s membership in ${workspace.name}. Their access to workspace resources will ${membershipTarget.action === 'suspend' ? 'be disabled' : 'be restored'} according to backend permissions.` : undefined} confirmLabel={membershipTarget?.action === 'suspend' ? 'Suspend member' : 'Restore member'} destructive={membershipTarget?.action === 'suspend'} loading={membershipTarget !== null && busyMemberId === membershipTarget.member.userId} />
     </div>
   );
 }

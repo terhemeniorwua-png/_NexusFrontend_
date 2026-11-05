@@ -24,9 +24,9 @@ The frontend must provide a consistent, responsive, accessible, and intuitive ex
 | Design tokens              | `globals.css` uses Next.js defaults, not Nexus palette                                                        |
 | Path alias                 | `@/*` → repo root (defined in `tsconfig.json`)                                                                |
 | Environment file           | No `.env` present                                                                                             |
-| Nexus features implemented | **Zero**                                                                                                      |
+| Nexus features implemented | See current phase evidence and verification records below; this historical baseline is superseded.                                                                                                      |
 
-All phases began at `NOT_STARTED`. Phase 0 is now `COMPLETE`: all foundation tasks have been finished and committed. One item remains open (backend repository location — must be resolved before Phase 3). Phase 1 is next.
+This roadmap has historical planning records followed by dated implementation and verification evidence. Use the latest phase evidence sections below as the current status; the adjacent backend repository is available at `../__NexusBackend__/`.
 
 1. Individual
 2. Company
@@ -68,7 +68,7 @@ Establish a verified understanding of the repository's actual state, resolve env
 - [x] Decide on and document the authentication token storage strategy (HttpOnly cookie preferred per `AGENTS.md`).
 - [x] Identify which form validation and test libraries to install in Phase 1, consistent with `SKILL.md`.
 - [x] Record all backend API contracts required across phases as a dependency checklist.
-- [ ] Confirm backend repository location and documentation access.
+- [x] Confirm backend repository location and documentation access (adjacent repository: `../__NexusBackend__/`).
 
 ### Frontend Deliverables
 
@@ -113,7 +113,6 @@ Establish a verified understanding of the repository's actual state, resolve env
 
 **Remaining open item:**
 
-- Backend repository location and documentation are still unknown. This must be resolved before Phase 3 begins.
 
 ### Notes and Blockers
 
@@ -123,7 +122,6 @@ Establish a verified understanding of the repository's actual state, resolve env
 - Test framework decided: Vitest + Testing Library. Install in Phase 1. See `CONVENTIONS.md` §5.
 - Form validation library decided: Zod. Install in Phase 1. See `CONVENTIONS.md` §4.
 - Drag-and-drop library decided: `@dnd-kit/core`. Install in Phase 6. See `CONVENTIONS.md` §6.
-- **OPEN:** Backend repository location and documentation are unknown at audit time. This must be resolved before Phase 3.
 
 The frontend must use the technology already established in the repository.
 
@@ -244,7 +242,7 @@ At the end of each phase:
 
 ## Phase Status Summary
 
-Last verified: 2026-11-03, on branch `feature/frontend-authentication`.
+Last verified: 2026-11-05, on branch `feature/frontend-authentication`.
 
 | Phase | Title                                                            | Status      |
 | ----- | ---------------------------------------------------------------- | ----------- |
@@ -253,9 +251,9 @@ Last verified: 2026-11-03, on branch `feature/frontend-authentication`.
 | 2     | Application Layout and Navigation Architecture                   | Completed   |
 | 3     | Public Website and Authentication Interfaces                     | In Progress |
 | 4     | User Onboarding and Profile Management                           | Blocked     |
-| 5     | Workspace Creation and Workspace Switching                       | Not Started |
-| 6     | Organisation Membership, Join Requests, and Invitations          | Not Started |
-| 7     | Roles, Permissions, and Access-Controlled UI                     | Not Started |
+| 5     | Workspace Creation and Workspace Switching                       | In Progress |
+| 6     | Organisation Membership, Join Requests, and Invitations          | In Progress |
+| 7     | Roles, Permissions, and Access-Controlled UI                     | In Progress |
 | 8     | Departments, Teams, and Groups                                   | In Progress |
 | 9     | Projects and Project Visibility                                  | Not Started |
 | 10    | Tasks and Work Management                                        | Not Started |
@@ -285,7 +283,48 @@ Last verified: 2026-11-03, on branch `feature/frontend-authentication`.
 
 Status meanings: **Not Started**, **In Progress**, **Blocked**, **Completed**. A phase is only marked **Completed** when its functional requirements, integrations, and validation requirements have been verified.
 
-Phases 0, 1, and 2 are complete. Phase 3 is in progress on `feature/frontend-authentication`; the backend auth contract has been confirmed and connected through a same-origin Next.js proxy. Approved Pro/Business prices, included seats, active-member billing rules, and lifecycle policies are displayed/documented and their provider-independent calculations are unit tested. Terms and Privacy drafts still require legal review and approval. Phase 3 still depends on the payment-provider/backend contract and implementation and user-owned live auth verification. Responsive review is user-confirmed. OAuth remains deferred because no provider or backend contract is approved. Phase 4 remains In Progress with the existing profile editor work.
+Phases 0, 1, and 2 remain verified complete. Phase 3 is in progress on `feature/frontend-authentication`; its frontend auth and billing interfaces are connected to the inspected backend contracts. Terms and Privacy drafts still require legal review and approval. Phase 3 still depends on external payment-provider/database validation and user-owned live auth verification. Responsive review is user-confirmed. OAuth remains deferred because no provider or backend contract is approved. Phase 4 is blocked by missing backend contracts for avatar management and cross-device onboarding persistence; profile editing and account-security functionality already present do not satisfy those blocked requirements. Its account-deletion UI now follows the finalized 30-day recovery contract recorded below. Phases 5–7 have substantial implementation and remain In Progress pending remaining acceptance criteria and verification; Phase 8 is also In Progress. Phase 9 has not started.
+
+### Frontend-to-backend phase and contract map
+
+Backend phase numbers below refer to the adjacent backend roadmap/API documentation, not frontend phase numbers. `docs/openapi.yaml` paths are relative to the backend `/api/v1` base path. A missing API is called out only where the current backend API reference and OpenAPI do not register the capability.
+
+| Frontend phase | Backend phase/module | Contract or dependency |
+|---|---|---|
+| FE-0 Repository foundation | Cross-cutting infrastructure | No runtime API contract. |
+| FE-1 Design system | Cross-cutting UI | No runtime API contract. |
+| FE-2 Application shell | Workspaces/authentication | `/auth/me`, `/workspaces`, `/workspaces/{workspaceId}/switch` support authenticated workspace context. |
+| FE-3 Public site and authentication | BE-3 Auth and billing | `/auth/register`, `/auth/login`, `/auth/verify-email`, `/auth/resend-verification`, `/auth/password/*`, `/auth/refresh`, `/auth/logout`; billing `/billing/plans` and `/billing/workspaces/{workspaceId}/*`. |
+| FE-4 Onboarding and profile | BE-3 account lifecycle; users | `/users/me`, `/auth/sessions`, `/auth/password/change`, `/auth/email/change`, `/auth/delete`, `/auth/reactivate`. Avatar upload/removal and persisted cross-device onboarding intent are not registered. |
+| FE-5 Workspaces | BE-4/5 workspace lifecycle (backend phase labels vary by backend audit) | `/workspaces`, `/workspaces/{workspaceId}`, `/workspaces/{workspaceId}/switch`, `/workspaces/{workspaceId}/members`; company/institution profile and logo routes are separately available. |
+| FE-6 Membership, invitations, join requests | BE-5 membership/onboarding | `/workspaces/discover`, `/workspaces/join`, `/workspaces/join-requests/*`, `/workspaces/{workspaceId}/join-requests/*`, `/invitations/*`, `/workspaces/{workspaceId}/invitations/*`, `/workspaces/{workspaceId}/members/*`. |
+| FE-7 Roles and access-controlled UI | BE-6 authorization; BE-7 organization/channel access | Workspace member/role routes, project and channel access policies, `/workspaces/{workspaceId}/notification-preferences`, `/privacy-requests/*`, and incoming/accept/reject ownership-transfer routes. There is no separate general notification feed API. |
+| FE-8 Teams, departments, and groups UI | BE-7 organization structure | `/workspaces/{workspaceId}/teams/*`, `/departments/*`, `/institution-groups/*`; project association at `/projects/{projectId}/organizational-access`. Department roster listing and team activity APIs are absent. |
+| FE-9 Projects and visibility UI | BE-8 Projects and visibility | `/workspaces/{workspaceId}/projects*`, project members, activity, milestones, archive/restore and ownership transfer. This is BE-8 project work, distinct from FE-8 Teams UI. |
+| FE-10 Tasks | No task module/API registered | Task CRUD, comments, status, assignment, and task views have no registered API contract. |
+| FE-11 Messaging and conversations | BE-7 Channel access metadata only | `/workspaces/{workspaceId}/channels*` covers channel metadata/access only. Message, conversation, thread, reaction, and real-time delivery APIs are absent. |
+| FE-12 Notifications and activity feed | Partial workspace preferences; project activity | Notification preferences and project audit activity exist. General notification list/read/feed APIs are absent. |
+| FE-13 File management | Organization profile media only | Company/institution logo upload/read/delete endpoints exist. General file/folder/attachment upload, download, sharing, and version APIs are absent. |
+| FE-14 Document collaboration | No document module/API registered | Document content, comments, sharing, and version APIs are absent. |
+| FE-15 Calendar and scheduling | No calendar module/API registered | Calendar/event and provider-sync APIs are absent. |
+| FE-16 Meetings and calling | No meeting module/API registered | Meeting/calling/session APIs are absent. |
+| FE-17 Forms and surveys | No forms module/API registered | Form and response APIs are absent. |
+| FE-18 Subscription and billing | BE-3 Billing | `/billing/plans`, `/billing/workspaces/{workspaceId}`, `/payments`, `/checkout`, `/verify`, `/change`, `/cancel`. Invoice list/detail/pay APIs remain absent. |
+| FE-19 Global and document search | No search module/API registered | Global and full-document search APIs are absent. |
+| FE-20 Integrations | No integration module/API registered | OAuth connection and provider-sync management APIs are absent. |
+| FE-21 Automation | No automation module/API registered | Workflow definition and execution APIs are absent. |
+| FE-22 Nexus AI Assistant | AI orchestration not exposed in application API | No approved frontend-facing AI conversation/context API is registered. |
+| FE-23 Nexus Write | AI writing assistance not exposed | No approved writing-analysis/suggestion API is registered. |
+| FE-24 AI action approval | AI action execution not exposed | No proposal/approval/execution API is registered. |
+| FE-25 Real-time state and presence | Existing backend real-time infrastructure; no frontend contract documented | Socket connection/auth/event names and payload contracts are not documented in the current API reference/OpenAPI. |
+| FE-26 User settings and preferences | Users/workspaces | `/users/me` and workspace notification-preference routes cover current profile and notification settings; broader settings are not contracted. |
+| FE-27 Reporting and analytics | Projects | Project activity endpoint exists; aggregate reporting/analytics APIs are absent. |
+| FE-28 UX/accessibility refinement | Cross-cutting frontend | No runtime API contract. |
+| FE-29 Security and privacy review | BE-3 auth; BE-6 authorization; privacy | Auth/session, role/membership, private-resource policies, and `/privacy-requests/*` contracts exist; validation spans the exposed APIs. |
+| FE-30 Testing and QA | Cross-cutting | Uses contracts listed above; no separate API. |
+| FE-31 Performance optimization | Cross-cutting | No separate API. |
+| FE-32 Deployment configuration | Infrastructure | `/health`, `/health/live`, `/health/ready`; deployment secrets/configuration remain environment-specific. |
+| FE-33 Release readiness | Cross-cutting | Validate all available contracts and document unimplemented backend domains above. |
 
 ---
 
@@ -372,16 +411,18 @@ The following contracts must be verified against the backend before dependent ph
 | ------------------------------------------------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API base URL and versioning convention                             | Phase 3        | Confirmed: backend OpenAPI server is `/api/v1`; local upstream is `http://localhost:4000`                                                            |
 | Authentication/session contract (cookie vs token, refresh, logout) | Phase 3        | Confirmed: short-lived bearer access token in response; rotating refresh token in HttpOnly cookie; CSRF cookie plus header; session logout endpoints |
-| User and session response shapes                                   | Phase 3        | Confirmed in OpenAPI and auth controller; workspace permission shapes remain unconfirmed for later phases                                            |
-| Workspace list, switching, and scoping contract                    | Phase 5        | Unconfirmed                                                                                                                                          |
-| Membership, join request, and invitation contracts                 | Phase 6        | Unconfirmed                                                                                                                                          |
-| Role and permission payloads for Company and Institution           | Phase 7        | Unconfirmed                                                                                                                                          |
-| Project, task, and visibility contracts                            | Phase 9–10     | Unconfirmed                                                                                                                                          |
-| Pagination, filtering, and sorting                                 | Phase 3 onward | Unconfirmed                                                                                                                                          |
+| User and session response shapes                                   | Phase 3–4      | Confirmed in OpenAPI and auth/user routes. Workspace membership roles are returned by membership contracts; server authorization remains authoritative. |
+| Workspace list, switching, and scoping contract                    | Phase 5        | Confirmed: `/workspaces`, `/workspaces/{workspaceId}`, `/workspaces/{workspaceId}/switch`, and workspace member routes.                               |
+| Membership, join request, and invitation contracts                 | Phase 6        | Confirmed in OpenAPI and API reference: discovery, join requests, invitations, and member-management routes.                                        |
+| Role and permission contracts for Company and Institution           | Phase 7–8      | Confirmed for membership roles and organization/team policies; no actor-specific department roster or team activity API is registered.               |
+| Project, task, and visibility contracts                            | Phase 9–10     | Projects and visibility confirmed at `/workspaces/{workspaceId}/projects*`; no task API is registered.                                               |
+| Pagination, filtering, and sorting                                 | Phase 3 onward | Confirmed per endpoint where documented (including discovery, billing, invitations, privacy requests, channels, projects, and activity); not a global contract. |
 | Error envelope                                                     | Phase 3        | Confirmed: `{ success: false, error: { code, message, details?, requestId } }`                                                                       |
-| Socket.IO URL, auth method, event names, and payloads              | Phase 11, 25   | Unconfirmed                                                                                                                                          |
+| Real-time connection, auth method, event names, and payloads        | Phase 11, 25   | Not documented in API reference/OpenAPI; requires an approved client transport contract.                                                             |
 | File upload/download and signed URL contract                       | Phase 13       | Backend API inspected 2026-11-05: general file/presigned upload contracts absent; only authenticated raw-byte organization-logo proxy routes exist. See `docs/FRONTEND_STORAGE_INTEGRATION.md`. |
-| AI request, streaming, and action-approval contract                | Phase 22–24    | Unconfirmed                                                                                                                                          |
+| AI request, streaming, and action-approval contract                | Phase 22–24    | Not registered in the application API/OpenAPI.                                                                                                       |
+
+This checklist has been reconciled against the adjacent backend docs on 2026-11-05. Historical entries marked unconfirmed are superseded by the statuses above.
 
 #### Known limitations recorded during the audit
 
@@ -389,7 +430,7 @@ The following contracts must be verified against the backend before dependent ph
 - `types/ui.ts` contains a legacy `UserRole` union (`OWNER | PM | MEMBER | VIEWER | COLLABORATOR`) that does not match the Company and Institution role model in `branding.md`.
 - `README.md` and `AGENTS.md` are byte-identical.
 - `npm run build` warns that an out-of-repository `pnpm-lock.yaml` is ignored; the project uses npm.
-- The backend repository and its API documentation are not available in this repository.
+- Historical note (superseded 2026-11-04): the adjacent backend repository was not identified during the Phase 0 audit. It is now available at `../__NexusBackend__/`; see the contract reconciliation above.
 
 ## Phase 1 — Design System, Branding, and UI Foundation
 
@@ -785,7 +826,7 @@ This continuation records the current Phase 3 implementation and validation acro
 | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Registration, sign-in, email verification, recovery/reset, session restoration and logout                  | IMPLEMENTED; MOCK/CONTRACT TESTED; LIVE WRITE WORKFLOW BLOCKED           | Existing frontend and backend contracts remain aligned: short-lived bearer access token in memory, rotating HttpOnly refresh cookie, CSRF checks on refresh/logout, and session revocation. Live health and invalid-token behavior were checked. Registration, email delivery, refresh rotation/reuse, logout and restoration were not exercised because the configured database is remote and no disposable `TEST_DATABASE_URL` is configured.                                                                                                                                                                                                                                                                                                     |
 | Account reactivation                                                                                       | IMPLEMENTED; DATABASE INTEGRATION BLOCKED                                | Deactivated accounts may reactivate after password verification and must sign in again. Pending deletion is irreversible; the frontend no longer offers reactivation for that backend status. Database-backed workflow tests were skipped.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Account deletion request and immediate access revocation                                                   | BACKEND IMPLEMENTED; FRONTEND FLOW/POLICY BLOCKED                        | `POST /auth/delete` requires current password and exact email confirmation, revokes sessions and tokens, schedules cleanup at the request time, and disallows recovery. Cleanup is asynchronous and retains an anonymized user tombstone for shared records and billing/financial rows. Personal file metadata currently blocks cleanup because no object-storage deletion adapter exists. The backend worktree currently transfers an owned workspace to an eligible active member or archives it without a successor; product-owner approval of that ownership behavior is pending. No frontend delete action is exposed until this behavior is approved.                                                                                         |
+| Account deletion request, recovery, and access revocation                                                 | FRONTEND FLOW IMPLEMENTED; LIVE/DATABASE INTEGRATION BLOCKED             | The finalized policy and current UI use a 30-day scheduled deletion period with immediate session revocation, identity-verified recovery, retained shared records, and separate workspace-transfer/billing acceptance. The frontend submits the documented `/auth/delete` request and supports the documented `/auth/reactivate` sign-in recovery path. Personal-file cleanup remains held where private objects cannot be deleted safely; full lifecycle, race, migration, and live-backend verification remain outstanding.                                                                                         |
 | Paystack plans, checkout, verification, webhooks, subscription lifecycle, payments and owner authorization | IMPLEMENTED IN WORKTREE; UNIT TESTED; PROVIDER/DB VERIFICATION BLOCKED   | Hosted checkout, backend amount/currency/reference verification, idempotent webhook processing, encrypted provider management tokens, renewal/cancellation/status reconciliation, payment history and owner-only mutations are present. Webhook verification supports Paystack's current timestamped `Paystack-Signature` and the legacy `x-paystack-signature` fallback. Current provider API behavior was checked against [Paystack transaction documentation](https://paystack.com/docs/api/transaction/), [subscription documentation](https://paystack.com/docs/payments/subscriptions/), and [webhook documentation](https://paystack.com/docs/payments/webhooks/). No sandbox credentials or verified USD merchant capability are available. |
 | Active-seat counts, transactional capacity enforcement and seat reductions                                 | IMPLEMENTED IN WORKTREE; UNIT TESTED; DB/PAYSTACK RECONCILIATION BLOCKED | Owner counts once; only active memberships and active accounts count. Invitation acceptance, approved join requests, member creation and suspension restoration check paid capacity transactionally. Removal/suspension now enqueue durable seat-sync work for renewal; the worker creates/reconciles the provider replacement plan. Backend catalog and frontend catalog use approved prices and same-cadence seat rates.                                                                                                                                                                                                                                                                                                                          |
 | Database migration and schema verification                                                                 | BLOCKED; NO REMOTE MIGRATION APPLIED                                     | `prisma migrate status` found 15 migrations and reports `20261105030000_phase3_account_deletion_cancellation` plus two Phase 7 migrations pending. Runtime startup also reported `public.BillingSeatSync` missing even though migration history did not list the Phase 3 Paystack migration as pending, indicating remote schema/history drift. The configured `DATABASE_URL` targets remote Aiven `defaultdb`; no disposable local test database credentials are available. No migration was applied.                                                                                                                                                                                                                                              |
@@ -802,7 +843,7 @@ This continuation records the current Phase 3 implementation and validation acro
 - Backend `npm run build` passed after the latest formatting changes. Frontend `npx next build --webpack` passed after the configured Turbopack build timed out.
 - Live backend startup succeeded with a process-local `TRUST_PROXY=false` override because the existing backend `.env` has a duplicate invalid `TRUST_PROXY=1` entry. The file was not changed. `GET /api/v1/health/live` returned 200; `/api/v1/auth/me` with an invalid bearer token returned 401 `ACCESS_TOKEN_INVALID`. Startup connected to the remote database and its billing worker reported the missing `BillingSeatSync` table. No registration, billing mutation, email delivery, migration, or deletion was attempted.
 
-Phase 3 remains **In Progress**. Outstanding requirements include safe disposable-database integration tests and migration/drift resolution, Paystack sandbox and merchant USD verification, the account-deletion ownership/data-retention decision and frontend flow, storage cleanup for personal files, legal/product approval and missing facts, full live authentication lifecycle verification, and resolution of the two existing later-phase test failures before claiming the repository-wide frontend suite passes.
+Phase 3 remains **In Progress**. At this checkpoint, outstanding requirements included safe disposable-database integration tests and migration/drift resolution, Paystack sandbox and merchant USD verification, an account-deletion ownership/data-retention decision and frontend flow, personal-file cleanup, legal/product approval and missing facts, live authentication verification, and two later-phase invitation test failures. The account-deletion policy and frontend flow were subsequently resolved in the dated addenda below, and the invitation failures are superseded by the passing 40-file/272-test verification recorded at the end of this tracker. Remaining blockers are still external database/provider/legal/live-auth verification and safe personal-file cleanup.
 
 No other independent Phase 3 frontend implementation task is currently identified after the session-boundary redirect and its regression coverage.
 
@@ -821,10 +862,10 @@ Started on 2026-11-03 on `feature/frontend-authentication` at the user's directi
 | Time zone and locale preferences                   | Editable through the profile contract                                                               | UI/backend integration tests pass; confirm values against a live backend before completion.                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | First-time onboarding progress and return behavior | Partially implemented; cross-device persistence blocked                                             | The frontend stores account-type intent in browser local storage and can resume or reuse a matching workspace on that browser. The new provisional product policy requires backend persistence across browsers/devices. No onboarding status endpoint or registration/verification persistence contract exists.                                                                                                                                                                                                  |
 | Account security and session/device management     | Implemented against confirmed auth contracts                                                        | Password change, verified email-change request, active-session listing, and confirmed sign-out-all use `/auth/password/change`, `/auth/email/change`, `/auth/sessions`, and `/auth/logout-all`. Individual session revocation and 2FA are not supported by the inspected backend contract.                                                                                                                                                                                                                       |
-| Account deletion interface                         | Blocked; current contract conflicts with latest provisional product policy                          | The latest policy proposes immediate access revocation with no recovery period, ownership transfer or workspace restriction, asynchronous deletion/anonymization, and billing cancellation. The backend still schedules deletion with a 30-day recovery period and its worker can block on ownership, shared personal-workspace membership, or file metadata. No deletion UI is exposed. Backend lifecycle, ownership, billing, storage, anonymization, and retention must align before frontend implementation. |
+| Account deletion interface                         | Implemented against the documented 30-day request/recovery contract; live workflow verification pending | Account Security requires the current password, matching account email, and explicit confirmation; it submits `/auth/delete`, explains immediate session termination and the recovery period, and shows the scheduled timestamp after sign-in. `/auth/reactivate` recovery is integrated in sign-in. Backend lifecycle and storage cleanup integration still require live verification. |
 | Mobile, tablet, and desktop review                 | User-confirmed reviewed and responsive                                                              | This agent did not perform a manual viewport review in the current task.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
-Profile setup/editing, timezone and locale preferences, password/email security, and session review are implemented. Focused tests passed (8 tests); full frontend validation is recorded below. Phase 4 is **Blocked** because cross-device onboarding persistence and avatar upload/removal have no backend contracts, and the latest provisional immediate-deletion policy conflicts with the backend's 30-day recovery contract and cleanup behavior. Phase 5 work is tracked below.
+Profile setup/editing, timezone and locale preferences, password/email security, session review, and the 30-day account-deletion request/recovery interface are implemented against inspected contracts. Focused tests passed (8 tests); full frontend validation is recorded below. Phase 4 remains **Blocked** because cross-device onboarding persistence and authorized avatar upload/replacement/removal have no backend contracts. Live profile/session verification is also outstanding. The later account-deletion policy correction below supersedes earlier provisional-policy conflict notes. Phase 5 work is tracked below.
 
 #### Phase 4 validation — 2026-11-03
 
@@ -840,7 +881,7 @@ Profile setup/editing, timezone and locale preferences, password/email security,
 
 - After committing the Phase 3 authentication follow-up, Phase 4 was re-inspected as the next roadmap phase. Existing `/app/profile`, `AccountSecurity`, profile API, and same-browser onboarding intent functionality are present; no duplicate implementation was added.
 - `npm test -- --run components/profile/__tests__/AccountSecurity.test.tsx app/app/profile/page.test.tsx` passed (2 files, 8 tests).
-- No new Phase 4 feature could be safely implemented against the inspected contracts: cross-device onboarding requires backend-persisted intent; avatar upload, replacement, signature validation, and removal require authorized backend storage contracts; deletion remains blocked by the provisional immediate-deletion policy conflicting with the backend's 30-day recovery flow. Live profile/session verification is also blocked by the backend environment configuration documented under Phase 3.
+- No new Phase 4 feature could be safely implemented against the inspected contracts: cross-device onboarding requires backend-persisted intent; avatar upload, replacement, signature validation, and removal require authorized backend storage contracts. The account-deletion UI has since been added against the finalized 30-day request/recovery contract; live profile/session workflow verification remains outstanding.
 - Phase 4 remains **Blocked**. Resume implementation when these backend and product-policy dependencies are resolved; do not treat the existing profile editor's avatar URL field as the required secure upload workflow.
 
 #### Account-deletion policy update — 2026-11-04
@@ -920,7 +961,7 @@ Support Individual, Company, and Institution workspaces.
 | Workspace switcher and workspace information         | Implemented           | `/app` uses the existing `WorkspaceSwitcher`, displays workspace type and counts, and switches through the provider.                                                                               |
 | Company and Institution creation                     | Implemented           | `/app/workspaces` submits the documented create payload and activates the returned workspace. Personal workspace creation remains account-provisioned by the backend.                              |
 | Workspace settings                                   | Partially implemented | Name, description, and visibility use the documented update endpoint; permission denials surface from the backend.                                                                                 |
-| Workspace profile and branding settings              | Blocked in part       | Workspace profile fields are present. The current backend schema has no logo, colour, or other branding fields/upload contract, so those controls cannot be safely implemented.                    |
+| Workspace profile and branding settings              | Partially implemented | Workspace profile fields and company/institution private-logo read/upload/delete are integrated. Workspace colour and theme branding is descoped pending a backend contract. |
 | Workspace member overview                            | Implemented           | `/app/workspaces` loads members from the workspace-scoped member endpoint and clears stale results during switches.                                                                                |
 | Responsive success, loading, empty, and error states | Implemented in UI     | Creation and switching feedback, empty workspace/member states, and request errors are included. Manual device/browser review remains outstanding.                                                 |
 | Live end-to-end backend workflow                     | Not verified          | The frontend service/provider tests cover the confirmed API paths; no live authenticated backend session was used in this run.                                                                     |
@@ -937,8 +978,12 @@ Support Individual, Company, and Institution workspaces.
 - `npm run lint` — passed with three existing unused-function warnings in Phase 6 files (`app/app/discover/page.tsx`, `components/members/InvitationsPanel.tsx`, and `components/members/JoinRequestsPanel.tsx`).
 - `npm run build` — passed; `/app/workspaces` was generated. Next.js reported the existing parent-directory `pnpm-lock.yaml` warning.
 - `npm test` — 35 of 36 test files passed (252 of 254 tests). Two invitation acceptance tests failed because `refreshSession()` returned `undefined` in the test setup and the component called `.then()` on it. This failure is in Phase 6 code and was not changed as part of the Phase 5 audit.
-- Backend workspace API docs and `workspace.schemas.ts` were inspected in the adjacent `__NexusBackend__` repository. They confirm name, description, and visibility updates, but expose no logo, colour, or other workspace-branding fields. Branding remains blocked on a backend contract or approved scope reduction.
+- Backend workspace API docs and `workspace.schemas.ts` were inspected in the adjacent `__NexusBackend__` repository. The general workspace update route confirms name, description, and visibility fields, but has no workspace colour/theme contract. Company/institution profiles have separate logo routes, which are not yet integrated in the frontend. This was previously recorded too broadly as the absence of all branding endpoints; see the correction below.
 - No live authenticated workflow or manual responsive viewport review was performed; those requirements remain open.
+
+#### Phase 5 evidence reconciliation — 2026-11-05
+
+Phase 5 remains **In Progress**. Evidence includes `providers/WorkspaceProvider.tsx`, `services/workspaces.ts`, `app/app/workspaces/page.tsx`, `app/app/page.tsx`, the workspace switcher, and tests in `providers/__tests__/WorkspaceProvider.test.tsx`, `services/__tests__/workspaces.test.ts`, `app/app/workspaces/page.test.tsx`, and `app/app/page.test.tsx`. These tests are included in the latest full 44-file/283-test pass recorded in the Phase 5–7 gap-closure evidence below. Backend routes consumed are `GET/POST /workspaces`, `GET/PATCH /workspaces/{workspaceId}`, `POST /workspaces/{workspaceId}/switch`, and workspace member routes. Company/institution profile logo upload/read/delete routes are integrated through authenticated raw-byte services and private blob URLs. Workspace colour/theme branding is descoped pending a backend contract. Live authenticated workflow and manual responsive review remain unverified. The earlier claim that no company/institution logo contract exists is superseded by the current OpenAPI routes.
 
 ## Phase 6 — Organisation Membership, Join Requests, and Invitations
 
@@ -978,6 +1023,14 @@ Implement organisation membership and invitation workflows.
 - Invitation management.
 - Membership management interfaces.
 
+### Current evidence — In Progress (2026-11-05)
+
+- `app/app/discover/page.tsx`, `app/app/invitations/page.tsx`, `app/app/members/page.tsx`, `components/members/InvitationsPanel.tsx`, `components/members/JoinRequestsPanel.tsx`, and `components/members/MembersPanel.tsx` implement discovery, join requests, invitations, and membership management.
+- Services `services/invitations.ts`, `services/join-requests.ts`, and `services/workspaces.ts` call the shared API client.
+- Backend OpenAPI/API contracts include `/workspaces/discover`, `/workspaces/join`, `/workspaces/join-requests/*`, `/workspaces/{workspaceId}/join-requests/*`, `/invitations/*`, `/workspaces/{workspaceId}/invitations/*`, and `/workspaces/{workspaceId}/members/*`. Client status rendering uses the backend `status` and `expiresAt` fields; no expiry duration is computed client-side. Workspace invitation history uses the backend-supported `status` filter; pending applicants are told access is only granted after approval.
+- Evidence tests include `services/__tests__/invitations.test.ts`, `services/__tests__/join-requests.test.ts`, `services/__tests__/workspaces.test.ts`, `components/members/__tests__/*`, `app/app/discover/page.test.tsx`, and `app/workspaces/invitations/accept/InvitationAcceptClient.test.tsx`. Current task adds expiry/status assertions where needed; full-suite totals are recorded after this change.
+- Live authenticated workflow and manual responsive review remain unverified. Phase 6 is **In Progress**.
+
 ## Phase 7 — Roles, Permissions, and Access-Controlled UI
 
 ### Objectives
@@ -996,6 +1049,22 @@ Make the frontend reflect the user's actual permissions.
 - Build unauthorised and forbidden pages.
 - Ensure private resources are not exposed through frontend navigation, cached data, or client-side state.
 - Refresh relevant views after role changes.
+
+### Current evidence — In Progress (2026-11-05)
+
+- `lib/permissions.ts` centralizes role/capability checks; `lib/navigation.ts` and `components/layout/Sidebar.tsx` filter navigation; `components/members/MembersPanel.tsx` provides role/member actions with backend responses remaining authoritative.
+- Backend routes consumed include workspace member list/add/change/remove/suspend/restore, join-request decisions, invitation management, and workspace switching. The current OpenAPI also includes incoming ownership transfer listing, accept/reject, and separate billing acceptance; the UI now provides an incoming-transfer inbox and rejection confirmation. Sender identity is absent from the OpenAPI item shape and remains a backend dependency.
+- Privacy request endpoints (`POST /privacy-requests`, own-request list/detail, review, decision, completion, and comment redaction) exist in backend OpenAPI. The Privacy Requests page now submits requests and lists/loads the current user’s requests. Reviewer, decision, completion, and redaction screens remain out of scope because they require platform reviewer authority.
+- Evidence tests: `lib/__tests__/permissions.test.ts`, `lib/__tests__/navigation.test.ts`, `components/members/__tests__/MembersPanel.test.tsx`, `components/layout/__tests__/Sidebar.test.tsx`, and `components/layout/__tests__/AuthenticatedShell.test.tsx`; new ownership inbox tests are in `services/__tests__/ownership-inbox.test.ts` and `components/workspaces/__tests__/OwnershipLifecyclePanel.test.tsx`; privacy request tests are in `services/__tests__/privacy-requests.test.ts` and `app/app/privacy-requests/page.test.tsx`.
+- Remaining: sender identity is not present in the incoming-transfer contract; live backend authorization verification and manual responsive review remain outstanding. Reviewer-only privacy workflows are out of scope. Phase 7 remains **In Progress**.
+
+#### Phase 5–7 gap closure — 2026-11-05
+
+- FE-5 added `components/workspaces/WorkspaceLogoManager.tsx` and logo methods in `services/workspaces.ts`. Company/institution logo POST sends raw PNG/JPEG/WebP bytes with matching `Content-Type`; GET uses the authenticated API client and a revocable object URL; DELETE is confirmed. Contract limits and formats come from backend API.md (2 MB, PNG/JPEG/WebP). Workspace colour/theme branding is descoped pending a backend contract. Routes: `GET/POST/DELETE /workspaces/{workspaceId}/company-profile/logo` and the corresponding `institution-profile/logo` routes.
+- FE-6 removed only the three unused duplicate loader callbacks. Existing resend/revoke/approve/reject/withdraw actions were already wired. Acceptance now disables itself for non-pending previews and explicitly shows the backend `EXPIRED` state. User-facing status and expiry dates use backend fields; invitation creation feedback uses returned `expiresAt`; no client expiry duration is calculated.
+- FE-7 added `services/privacy-requests.ts`, the submitting/list/detail UI, and incoming ownership-transfer list/reject services and inbox UI. Billing acceptance remains a separate action after ownership acceptance. Reviewer-only review/decision/completion/redaction screens remain out of end-user scope. OpenAPI incoming-transfer items omit sender identity, so that detail is explicitly unavailable in the UI and remains a backend contract dependency.
+- FE-7 member role edits, suspension and restoration now require consequence confirmation; successful changes update the member data and refresh the workspace context/navigation. `components/shared/AccessState.tsx` handles workspace-member list 401/403 responses. Workspace-scoped local state is keyed or invalidated on workspace changes in billing, workspaces, members, teams, team detail, and groups; list/detail request guards prevent older responses replacing current workspace data. The workspace settings regression test verifies old member data is not shown after switching. `WorkspaceProvider` persists only the active workspace ID; private resource records are not written to local/session storage.
+- Added or updated tests: `services/__tests__/workspaces.test.ts`, `services/__tests__/ownership-inbox.test.ts`, `services/__tests__/privacy-requests.test.ts`, `components/workspaces/__tests__/OwnershipLifecyclePanel.test.tsx`, `app/app/privacy-requests/page.test.tsx`, `app/app/workspaces/page.test.tsx`, and `app/workspaces/invitations/accept/InvitationAcceptClient.test.tsx`. Latest full verification after the workspace-state guard changes passed 44 test files and 283 tests; `npx tsc --noEmit`, `npm run lint` (zero warnings), `npm run build`, and `git diff --check` also passed. Live backend and manual responsive checks remain unverified, so Phases 5–7 remain **In Progress**. Live backend and manual responsive checks remain unverified, so Phases 5–7 remain **In Progress**.
 
 ### Business rules
 
@@ -1065,8 +1134,9 @@ Provide organisational structure management.
 - The team view presents member assignment counts, users with no team assignment, and multiple team memberships only from team membership records the current user is authorized to read.
 - API contract tests cover department, team, and group request paths and payloads.
 - Remediation (2026-11-05): fixed the Teams route JSX/import errors and filtered organization navigation by workspace kind; guarded team/group loads against out-of-order responses after workspace switches. Added an out-of-order Teams workspace regression test.
-- Current verification and the proposed department-roster, team-activity, and resource-capability backend contracts are recorded in `docs/PHASE_8_ORGANISATION_STRUCTURE.md`. Phase 8 remains In Progress pending backend dependencies and authenticated browser verification. Standard Turbopack build remains timed out; the production build succeeds with `npx next build --webpack`.
+- Current verification and the two remaining backend contracts (department-member roster and team activity) are recorded in `docs/PHASE_8_ORGANISATION_STRUCTURE.md`. Phase 8 remains In Progress pending those dependencies and authenticated browser verification. A separate capability-flags contract is not required. The earlier Turbopack timeout was superseded by the subsequent successful default `npm run build` recorded below.
 - Backend currently has no team activity endpoint. Department membership APIs permit assignment/removal but do not return department member identities; the UI therefore does not claim to show the roster or offer removal controls without a confirmed member list.
+- Current backend contract gap review: department-member roster listing and team activity are absent from `docs/openapi.yaml` and registered routes. Team/group member list routes do exist. Actor-specific capability flags are not treated as a missing contract or phase blocker; the frontend handles documented operations and backend authorization errors.
 - TypeScript, lint, test, and production build results are recorded in `docs/PHASE_8_ORGANISATION_STRUCTURE.md` after this implementation's validation.
 - Phase 8 remains In Progress. Phase 7 status is unchanged and Phase 9 has not started.
 
@@ -1983,106 +2053,53 @@ Confirm that the frontend is ready for release.
 
 ---
 
-## Appendix B — Backend Contract Tracking
+## Appendix B — Frontend-to-Backend Phase and Contract Map
 
-All backend contracts marked "Requires confirmation" in the phases above are listed here. Update the Status and Confirmed Date columns as contracts are verified with the backend team.
+Status reflects contract inspection against `../__NexusBackend__/docs/API.md` and `docs/openapi.yaml`; it does not claim live integration verification. Frontend and backend phase names intentionally differ where their scopes differ.
 
-| Phase    | Contract                                                                                    | Status                                       | Confirmed Date |
-| -------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- | -------------- |
-| Phase 3  | `POST /auth/login` — request/response shape, cookie vs. token strategy                      | Pending                                      | —              |
-| Phase 3  | `POST /auth/register` — validation rules, email verification flow                           | Pending                                      | —              |
-| Phase 3  | `POST /auth/logout` — cookie clearing or token revocation                                   | Pending                                      | —              |
-| Phase 3  | `POST /auth/forgot-password`                                                                | Pending                                      | —              |
-| Phase 3  | `POST /auth/reset-password` — token param, expiry behavior                                  | Pending                                      | —              |
-| Phase 3  | `GET /auth/verify-email` — query param name and flow                                        | Pending                                      | —              |
-| Phase 3  | `GET /users/me` — response shape including roles/workspace memberships                      | Pending                                      | —              |
-| Phase 3  | `PATCH /users/me` — updatable fields, validation rules                                      | Pending                                      | —              |
-| Phase 3  | 401 response format and refresh token behavior                                              | Pending                                      | —              |
-| Phase 4  | `GET /workspaces` — list user's workspaces                                                  | Pending                                      | —              |
-| Phase 4  | `POST /workspaces` — create workspace, validation rules                                     | Pending                                      | —              |
-| Phase 4  | `GET /workspaces/:id`                                                                       | Pending                                      | —              |
-| Phase 4  | `PATCH /workspaces/:id`                                                                     | Pending                                      | —              |
-| Phase 4  | `DELETE /workspaces/:id`                                                                    | Pending                                      | —              |
-| Phase 4  | `GET /workspaces/:id/members` — includes role field                                         | Pending                                      | —              |
-| Phase 4  | `POST /workspaces/:id/invite` — email, role                                                 | Pending                                      | —              |
-| Phase 4  | `PATCH /workspaces/:id/members/:userId` — role update                                       | Pending                                      | —              |
-| Phase 4  | `DELETE /workspaces/:id/members/:userId`                                                    | Pending                                      | —              |
-| Phase 4  | `GET /teams` or `GET /workspaces/:id/teams`                                                 | Pending                                      | —              |
-| Phase 4  | `POST /teams`, `PATCH /teams/:id`, `DELETE /teams/:id`                                      | Pending                                      | —              |
-| Phase 4  | `POST /invitations/:token/accept` — for email-link acceptance                               | Pending                                      | —              |
-| Phase 4  | Role enum values: `OWNER`, `PM`, `MEMBER`, `VIEWER`, `COLLABORATOR` — confirm exact strings | Pending                                      | —              |
-| Phase 5  | `GET /workspaces/:id/projects` — pagination, filter, sort params                            | Pending                                      | —              |
-| Phase 5  | `POST /projects`                                                                            | Pending                                      | —              |
-| Phase 5  | `GET /projects/:id` — includes progress calculation field                                   | Pending                                      | —              |
-| Phase 5  | `PATCH /projects/:id`                                                                       | Pending                                      | —              |
-| Phase 5  | `POST /projects/:id/archive` or `PATCH` with status field                                   | Pending                                      | —              |
-| Phase 5  | `DELETE /projects/:id`                                                                      | Pending                                      | —              |
-| Phase 5  | `GET /projects/:id/members`                                                                 | Pending                                      | —              |
-| Phase 5  | `POST /projects/:id/members`                                                                | Pending                                      | —              |
-| Phase 5  | `DELETE /projects/:id/members/:userId`                                                      | Pending                                      | —              |
-| Phase 5  | Progress field — confirm whether backend returns a numeric percentage or raw counts         | Pending                                      | —              |
-| Phase 6  | `GET /projects/:id/tasks` — filter params, sort, pagination                                 | Pending                                      | —              |
-| Phase 6  | `POST /tasks` — required fields, validation rules                                           | Pending                                      | —              |
-| Phase 6  | `GET /tasks/:id` — full detail including comments, activity                                 | Pending                                      | —              |
-| Phase 6  | `PATCH /tasks/:id`                                                                          | Pending                                      | —              |
-| Phase 6  | `DELETE /tasks/:id`                                                                         | Pending                                      | —              |
-| Phase 6  | `PATCH /tasks/:id/status` — accepted transitions per role                                   | **Pending (required before Kanban)**         | —              |
-| Phase 6  | `GET /tasks/:id/comments`, `POST /tasks/:id/comments`                                       | Pending                                      | —              |
-| Phase 6  | `PATCH /comments/:id`, `DELETE /comments/:id`                                               | Pending                                      | —              |
-| Phase 6  | `POST /tasks/:id/attachments`, `DELETE /attachments/:id` — file size/type limits            | Pending                                      | —              |
-| Phase 6  | `GET /tasks/:id/activity`                                                                   | Pending                                      | —              |
-| Phase 6  | Progress aggregation — confirm whether endpoint returns `progress` field or raw counts      | Pending                                      | —              |
-| Phase 7  | `GET /projects/:id/documents`                                                               | Pending                                      | —              |
-| Phase 7  | `POST /documents`                                                                           | Pending                                      | —              |
-| Phase 7  | `GET /documents/:id`                                                                        | Pending                                      | —              |
-| Phase 7  | `PATCH /documents/:id` — content format (JSON blocks, Markdown, or HTML)                    | **Pending (required before editor install)** | —              |
-| Phase 7  | `DELETE /documents/:id`                                                                     | Pending                                      | —              |
-| Phase 7  | Real-time collaboration service (Yjs/OT/CRDT), if any                                       | Pending                                      | —              |
-| Phase 7  | Document access permissions per role                                                        | Pending                                      | —              |
-| Phase 8  | `GET /conversations` — filter by type (direct/team/project)                                 | Pending                                      | —              |
-| Phase 8  | `POST /conversations`                                                                       | Pending                                      | —              |
-| Phase 8  | `GET /conversations/:id/messages` — pagination                                              | Pending                                      | —              |
-| Phase 8  | `POST /conversations/:id/messages` — text, file attachment                                  | Pending                                      | —              |
-| Phase 8  | `PATCH /messages/:id`                                                                       | Pending                                      | —              |
-| Phase 8  | `DELETE /messages/:id`                                                                      | Pending                                      | —              |
-| Phase 8  | `POST /messages/:id/reactions`                                                              | Pending                                      | —              |
-| Phase 8  | `POST /messages/:id/pin`                                                                    | Pending                                      | —              |
-| Phase 8  | Message search endpoint                                                                     | Pending                                      | —              |
-| Phase 8  | `POST /messages/:id/convert-to-task`                                                        | Pending                                      | —              |
-| Phase 8  | Message mention format (`@userId` or `@username`)                                           | Pending                                      | —              |
-| Phase 8  | File attachment endpoint and size limits                                                    | Pending                                      | —              |
-| Phase 8  | Thread/reply support                                                                        | Pending                                      | —              |
-| Phase 8  | Read receipt endpoint                                                                       | Pending                                      | —              |
-| Phase 9  | Socket.IO gateway URL and authentication method                                             | **Pending (required before Phase 9)**        | —              |
-| Phase 9  | `task:created`, `task:updated`, `task:deleted` — payload shapes                             | **Pending**                                  | —              |
-| Phase 9  | `message:created`, `message:edited`, `message:deleted`, `message:reaction` — payload shapes | **Pending**                                  | —              |
-| Phase 9  | `typing:start`, `typing:stop` — room/channel convention                                     | **Pending**                                  | —              |
-| Phase 9  | `user:online`, `user:offline` — presence events and payload                                 | Pending                                      | —              |
-| Phase 9  | `notification:created` — payload shape                                                      | **Pending**                                  | —              |
-| Phase 9  | Room naming convention (workspace/project/conversation ID based)                            | **Pending**                                  | —              |
-| Phase 9  | `GET /notifications` — pagination, filter params                                            | Pending                                      | —              |
-| Phase 9  | `POST /notifications/:id/read` or `PATCH`                                                   | Pending                                      | —              |
-| Phase 9  | `POST /notifications/read-all`                                                              | Pending                                      | —              |
-| Phase 10 | Calling SDK provider and credentials model                                                  | **Pending (required before Phase 10)**       | —              |
-| Phase 10 | `POST /meetings` — creation params                                                          | Pending                                      | —              |
-| Phase 10 | `GET /meetings/:id` — join token/URL from backend                                           | Pending                                      | —              |
-| Phase 10 | `POST /meetings/:id/end`                                                                    | Pending                                      | —              |
-| Phase 10 | `GET /meetings` — history, filter by project/team                                           | Pending                                      | —              |
-| Phase 10 | `POST /ai/ask` or streaming AI endpoint                                                     | Pending                                      | —              |
-| Phase 10 | `POST /ai/task-plan`                                                                        | Pending                                      | —              |
-| Phase 10 | `POST /ai/summarize-project/:id`                                                            | Pending                                      | —              |
-| Phase 10 | `POST /ai/summarize-conversation/:id`                                                       | Pending                                      | —              |
-| Phase 10 | AI response streaming protocol (SSE vs. chunked JSON)                                       | Pending                                      | —              |
-| Phase 10 | AI usage limits and rate-limit response format                                              | Pending                                      | —              |
-| Phase 10 | Meeting recording and summary endpoints                                                     | Pending                                      | —              |
-| Phase 11 | `GET /search?q=&type=` — response shape, supported entity types                             | Pending                                      | —              |
-| Phase 11 | Pagination for search results                                                               | Pending                                      | —              |
-| Phase 11 | `GET /workspaces/:id/activity`                                                              | Pending                                      | —              |
-| Phase 11 | `GET /projects/:id/activity`                                                                | Pending                                      | —              |
-| Phase 11 | Activity event schema: actor, verb, resource type, resource ID                              | Pending                                      | —              |
-| Phase 11 | `GET /workspaces/:id/analytics` — metric list and response shape                            | Pending                                      | —              |
-| Phase 11 | `GET /projects/:id/analytics`                                                               | Pending                                      | —              |
-| Phase 11 | Dashboard metrics: completion, overdue, workload, deadlines, activity trend                 | Pending                                      | —              |
+| Frontend phase | Frontend scope | Backend phase / scope | API contract used or current dependency |
+|---|---|---|---|
+| FE-0 | Repository audit and foundation | BE-1 — Foundation and infrastructure | API.md / OpenAPI inventory; no runtime route |
+| FE-1 | Design system, branding and UI foundation | Frontend-only foundation; no BE phase | No phase-specific API contract |
+| FE-2 | Application layout and navigation | Frontend shell; no BE phase | No phase-specific API contract |
+| FE-3 | Public website and authentication interfaces | BE-3 — Authentication and user identity | `/auth/*`, `/users/me` |
+| FE-4 | User onboarding and profile management | BE-3 — Authentication; BE-4 — Workspace management | `/auth/*`, `/users/me`, `/workspaces` |
+| FE-5 | Workspace creation and switching UI | BE-4 — Workspace creation and management | `GET/POST /workspaces`, `GET/PATCH /workspaces/{workspaceId}`, `/switch`, `/members`, company/institution `*-profile/logo` |
+| FE-6 | Membership, join requests and invitations UI | BE-5 — Membership, invitations and join requests | `/workspaces/discover`, `/workspaces/join*`, `/workspaces/{workspaceId}/join-requests*`, `/invitations*`, workspace invitations and members |
+| FE-7 | Roles, access control and lifecycle UI | BE-4 — Ownership lifecycle; BE-3 — Privacy/account APIs; BE-5 — Membership authorization | Workspace member role/state routes; owner transfer incoming/accept/reject/billing acceptance; `POST /privacy-requests`, `/privacy-requests/mine*` |
+| FE-8 | Departments, teams and institution groups UI | BE-7 — Teams and organizational structure | Workspace departments, teams, and institution-group routes; department roster and team activity are real gaps |
+| FE-9 | Projects and project visibility UI | BE-8 — Projects and project visibility | Project routes in OpenAPI; verify visibility and resource contracts before FE-9 work |
+| FE-10 | Tasks and work management UI | BE-8 — Projects / task resource contracts | Task routes where registered; verify full task contracts before FE-10 work |
+| FE-11 | Real-time messaging and conversations UI | Backend messaging contract phase not yet documented in the active backend roadmap | OpenAPI/API.md message and channel contracts; verify persistence and event support before implementation |
+| FE-12 | Notification centre and activity feed UI | Backend contract phase not yet mapped | Use only registered notification/activity contracts; verify before implementation |
+| FE-13 | File management and Nexus Drive UI | Backend contract phase not yet mapped | Use only registered file/storage contracts; verify authorization and upload shape first |
+| FE-14 | Document collaboration UI | Backend contract phase not yet mapped | Document routes/content model and collaboration contract require verification |
+| FE-15 | Calendar and scheduling UI | Backend contract phase not yet mapped | Calendar/event and provider-sync contracts require verification |
+| FE-16 | Meetings and calling UI | Backend contract phase not yet mapped | Meeting and managed-calling contracts require verification |
+| FE-17 | Forms and surveys UI | Backend contract phase not yet mapped | Form, publish, response, and result contracts require verification |
+| FE-18 | Subscription, billing and plan UI | Backend billing capability; exact roadmap phase not assigned here | Registered billing/checkout/subscription routes; verify pricing and limits against approved contracts |
+| FE-19 | Global and full-document search UI | Backend contract phase not yet mapped | Search contract, filters, pagination, and permission behavior require verification |
+| FE-20 | Integrations management UI | Backend contract phase not yet mapped | Provider connection/OAuth/sync contracts require verification |
+| FE-21 | Automation and workflow builder UI | Backend contract phase not yet mapped | Automation trigger/action/execution contracts require verification |
+| FE-22 | Nexus AI assistant UI | Backend AI orchestration capability; roadmap phase not mapped | Use Express-mediated AI contracts only; verify routes and response/event schemas first |
+| FE-23 | Nexus Write UI | Backend AI orchestration capability; roadmap phase not mapped | Use approved backend writing-assistance contracts only |
+| FE-24 | AI action approval and execution UI | Backend AI action capability; roadmap phase not mapped | Action proposal/approval/execution contracts require verification |
+| FE-25 | Real-time state, presence and synchronization UI | Backend real-time contracts; roadmap phase not mapped | Socket/event names, payloads, authentication, and reconnect contracts require verification |
+| FE-26 | User settings and preferences UI | Backend user/settings contracts; roadmap phase not mapped | Use registered `/users/*` and preference routes only |
+| FE-27 | Reporting, insights and analytics UI | Backend analytics contracts; roadmap phase not mapped | Metric and pagination response schemas require verification |
+| FE-28 | Global UX, accessibility and responsive refinement | Cross-cutting; no single backend phase | No new API contract; verify each affected feature workflow |
+| FE-29 | Frontend security and privacy review | Cross-cutting; no single backend phase | Review registered auth, authorization, storage and privacy contracts |
+| FE-30 | Frontend testing and quality assurance | Cross-cutting; no single backend phase | Test the API contracts consumed by implemented phases |
+| FE-31 | Performance and production optimization | Cross-cutting; no single backend phase | No new API contract |
+| FE-32 | Deployment and production configuration | Cross-cutting; no single backend phase | Deployment and environment contract verification |
+| FE-33 | Final frontend review and release readiness | Cross-cutting; no single backend phase | End-to-end verification against contracts from all completed phases |
+
+### Confirmed gaps relevant to FE-5–FE-7
+
+- Ownership-transfer incoming items have no sender identity/name field; the inbox displays only contract-provided workspace and date information.
+- Workspace colour/theme branding has no backend route or schema; it is descoped until a contract exists.
+- No additional missing backend contracts were found for Phase 5–7 items implemented in this task. Privacy reviewer workflows are documented but out of the end-user frontend scope.
+
 
 ---
 
@@ -2178,7 +2195,7 @@ Do not implement backend functionality inside the frontend. Do not invent API en
 #### Sequential phase audit follow-up — 2026-11-04
 
 - Re-read the canonical `AGENTS.md`, `README.md`, `PHASES.md`, `branding.md`, `nexus-frontend/SKILL.md`, and `CONVENTIONS.md`; the lowercase filenames referenced by some instructions are not present. `README.md` duplicates `AGENTS.md`. The adjacent backend references are in `../__NexusBackend__/docs/API.md`, `docs/openapi.yaml`, and the relevant source schemas/controllers.
-- Phase 0 — **VERIFIED COMPLETE** for repository/configuration deliverables: package/lockfile, environment template, TypeScript/Next configuration, conventions, and backend dependency record are present. The Phase 0 historical note that the backend repository is unknown is obsolete; the adjacent repository and API docs are available. This does not establish completion of later backend-dependent functionality.
+- Phase 0 — **VERIFIED COMPLETE** for repository/configuration deliverables: package/lockfile, environment template, TypeScript/Next configuration, conventions, and backend dependency record are present. The adjacent backend repository and API docs are available; this does not establish completion of later backend-dependent functionality.
 - Phases 1–2 — **VERIFIED COMPLETE** for their design-system and application-shell scope: the tokenized themes, UI primitives, shell/navigation components, and their focused tests are present. The current grouped foundation/shell/Phase 3 workflow run passed 25 files and 192 tests.
 - Phase 3 — remains **PARTIALLY COMPLETE / IN PROGRESS**. The draft legal pack is not legal approval, live auth/email workflow verification remains outstanding, and billing still requires merchant USD enablement, migration/provider verification, and remaining backend lifecycle/reconciliation work. No additional independent frontend workflow can be completed safely against the current approved contracts.
 - This audit is intentionally sequential. It does not advance Phase 4 or later phases while Phase 3 remains open.
@@ -2242,9 +2259,26 @@ Phase 3 remains **IN PROGRESS** pending backend/frontend contract verification, 
 ## Account lifecycle frontend implementation — 2026-11-05
 
 - Added explicit confirmation before scheduling deletion, clear 30-day/recovery and no-refund messaging, and a sign-in notice that displays the backend scheduled deletion timestamp. Existing sign-in recovery uses the backend `/auth/reactivate` contract.
-- Added workspace owner transfer initiation and recipient ownership/billing acceptance UI using documented backend routes. Suspended workspace status is represented by the frontend type. Transfer references are shared out of band because the backend has no incoming-transfer listing endpoint.
+- Added workspace owner transfer initiation and recipient ownership/billing acceptance UI using documented backend routes. Suspended workspace status is represented by the frontend type. This UI still accepts a transfer reference directly; the subsequently registered incoming-transfer list/rejection routes are not yet integrated.
 - Billing continues to show backend subscription cancellation dates and payment status; UI clarifies that this is payment history, invoices are not currently exposed, outstanding invoices remain payable, and cancellation does not automatically refund.
-- Added a Privacy Requests route that transparently reports that submission/status/decision APIs are unavailable; it does not fake a request workflow. Retained collaboration content is described as retained and reviewed, not automatically erased.
+- Added a Privacy Requests route that transparently reports its workflow is not connected; it does not fake request persistence. Backend submission/status/decision APIs are now registered but are not yet integrated by the frontend. Retained collaboration content is described as retained and reviewed, not automatically erased.
 - API details and missing dependencies: `docs/ACCOUNT_LIFECYCLE_FRONTEND.md`.
 - Verification: targeted Vitest run passed 20/20; ESLint completed with 0 errors and 3 warnings outside changed files. Build and TypeScript check results are recorded in the completion report.
-- Remaining: backend incoming-transfer listing and rejection endpoints; invoice list/payment support; backend privacy request and authorized review/redaction workflow; backend integration testing for the connected flows. Phase 7 remains **IN PROGRESS**.
+- At the time of this note, the backend dependency list included incoming-transfer listing/rejection and privacy-request APIs. Backend OpenAPI now registers those routes; they remain frontend integration work. The confirmed API gap is invoice listing/payment, in addition to message/channel content contracts described in `docs/ACCOUNT_LIFECYCLE_FRONTEND.md`. Phase 7 remains **IN PROGRESS**.
+
+## Sequential roadmap continuation verification — 2026-11-05
+
+- Initial repository state: `feature/frontend-authentication` at `45e81b8a1fe09e09956fb5bc2ec8bf838d6bb4bd`; the working tree was clean. No application code changes were needed after reviewing the earliest incomplete phase (Phase 3) and its existing implementation.
+- Phases 0–2 remain verified complete for their documented frontend foundation, design-system, and application-shell scope. Phase 3 remains **In Progress**: the frontend requirements currently implementable against approved contracts are present; the remaining work depends on legal approval and required facts, live auth verification, and external billing/database/provider validation. Phase 4 remains **Blocked** by missing authorized avatar-management and cross-device onboarding contracts. The account-deletion interface follows the finalized 30-day request/recovery policy; earlier Phase 4 notes claiming no deletion UI or a current immediate-deletion-policy conflict are superseded by the updates above and the account-lifecycle sections.
+- Current frontend verification on this checkout: `npx tsc --noEmit` passed; `npm run lint` completed with no errors and three unused-function warnings in discover/invitation components; `npm test -- --maxWorkers=1` passed (40 files, 272 tests); `npm run build` passed using the default Next.js/Turbopack path and generated 23 routes; `git diff --check` passed. The full suite ran with one worker because the shared machine was concurrently running backend checks and had limited available memory.
+- No live authenticated backend workflow, manual browser/responsive review, database migration, or Paystack transaction was run as part of this verification. Phase 3 is not complete and no later phase was started.
+
+## Vitest diagnosis and backend contract reconciliation — 2026-11-05
+
+- The two previously reported `AuthForm` cases (“validates a weak sign-up password before making a request” and “shows a verified success message after requesting password recovery”) pass in isolation on the current branch: 2 passed, 17 skipped.
+- The same two tests pass in a detached worktree of `origin/main` at `d0b9c6d`: 2 passed, 6 skipped. This shows the failures are not introduced by the current branch.
+- `npx vitest run --pool=forks --reporter=verbose --testTimeout=15000` completed without a stalled file: 40 files, 272 tests passed. The final emitted file was `lib/__tests__/redirect.test.ts`, and Vitest exited successfully.
+- Plain `npx vitest run` completed: 40 files, 272 tests passed. No test hangs in an isolated full run. The earlier failures happened during a run competing with TypeScript, ESLint, and a production build; the isolated cases, base branch, and full suite pass. No assertions were loosened and no test/source fix was warranted.
+- Reconciled Phase 5–7 statuses to **In Progress** and recorded frontend files, tests, and consumed backend routes. Added the FE-to-BE phase/contract map with distinct frontend/backend phase labels.
+- Checked missing-contract claims against backend `docs/API.md`, `docs/openapi.yaml`, and route registration. Incoming ownership-transfer listing/rejection and privacy-request routes exist; invoice APIs, department-member roster listing, team activity, general notification feed, task APIs, and other roadmap domains without registered routes remain genuine gaps. Resource capability flags are not treated as a blocker.
+- No Phase 9 work was started. No frontend source or test files were changed.

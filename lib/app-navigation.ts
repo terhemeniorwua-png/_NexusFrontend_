@@ -30,6 +30,13 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
       ],
     },
     {
+      id: 'work',
+      label: 'Work',
+      items: [
+        { id: 'projects', label: 'Projects', href: '/app/projects', permissions: ['workspace:view'] },
+      ],
+    },
+    {
       id: 'people',
       label: 'People and access',
       items: [

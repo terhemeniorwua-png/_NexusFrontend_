@@ -242,7 +242,7 @@ At the end of each phase:
 
 ## Phase Status Summary
 
-Last verified: 2026-11-05, on branch `feature/frontend-authentication`.
+Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 
 | Phase | Title                                                            | Status      |
 | ----- | ---------------------------------------------------------------- | ----------- |
@@ -255,7 +255,7 @@ Last verified: 2026-11-05, on branch `feature/frontend-authentication`.
 | 6     | Organisation Membership, Join Requests, and Invitations          | In Progress |
 | 7     | Roles, Permissions, and Access-Controlled UI                     | In Progress |
 | 8     | Departments, Teams, and Groups                                   | In Progress |
-| 9     | Projects and Project Visibility                                  | Not Started |
+| 9     | Projects and Project Visibility                                  | In Progress |
 | 10    | Tasks and Work Management                                        | Not Started |
 | 11    | Real-Time Messaging and Conversations                            | Not Started |
 | 12    | Notification Centre and Activity Feed                            | Not Started |
@@ -283,7 +283,7 @@ Last verified: 2026-11-05, on branch `feature/frontend-authentication`.
 
 Status meanings: **Not Started**, **In Progress**, **Blocked**, **Completed**. A phase is only marked **Completed** when its functional requirements, integrations, and validation requirements have been verified.
 
-Phases 0, 1, and 2 remain verified complete. Phase 3 is in progress on `feature/frontend-authentication`; its frontend auth and billing interfaces are connected to the inspected backend contracts. Terms and Privacy drafts still require legal review and approval. Phase 3 still depends on external payment-provider/database validation and user-owned live auth verification. Responsive review is user-confirmed. OAuth remains deferred because no provider or backend contract is approved. Phase 4 is blocked by missing backend contracts for avatar management and cross-device onboarding persistence; profile editing and account-security functionality already present do not satisfy those blocked requirements. Its account-deletion UI now follows the finalized 30-day recovery contract recorded below. Phases 5–7 have substantial implementation and remain In Progress pending remaining acceptance criteria and verification; Phase 8 is also In Progress. Phase 9 has not started.
+Phases 0, 1, and 2 remain verified complete. Phase 3 is in progress on `feature/frontend-authentication`; its frontend auth and billing interfaces are connected to the inspected backend contracts. Terms and Privacy drafts still require legal review and approval. Phase 3 still depends on external payment-provider/database validation and user-owned live auth verification. Responsive review is user-confirmed. OAuth remains deferred because no provider or backend contract is approved. Phase 4 is blocked by missing backend contracts for avatar management and cross-device onboarding persistence; profile editing and account-security functionality already present do not satisfy those blocked requirements. Its account-deletion UI now follows the finalized 30-day recovery contract recorded below. Phases 5–7 have substantial implementation and remain In Progress pending remaining acceptance criteria and verification; Phase 8 is also In Progress. Phase 9 is In Progress on `feature/phase-9-projects`.
 
 ### Frontend-to-backend phase and contract map
 
@@ -1138,7 +1138,16 @@ Provide organisational structure management.
 - Backend currently has no team activity endpoint. Department membership APIs permit assignment/removal but do not return department member identities; the UI therefore does not claim to show the roster or offer removal controls without a confirmed member list.
 - Current backend contract gap review: department-member roster listing and team activity are absent from `docs/openapi.yaml` and registered routes. Team/group member list routes do exist. Actor-specific capability flags are not treated as a missing contract or phase blocker; the frontend handles documented operations and backend authorization errors.
 - TypeScript, lint, test, and production build results are recorded in `docs/PHASE_8_ORGANISATION_STRUCTURE.md` after this implementation's validation.
-- Phase 8 remains In Progress. Phase 7 status is unchanged and Phase 9 has not started.
+- Phase 8 remains In Progress. Phase 7 status is unchanged and Phase 9 is In Progress on `feature/phase-9-projects`.
+
+#### Part A hardening evidence — 2026-11-05
+
+Branch: `feature/frontend-authentication`. Committed and pushed as `6f78c13`.
+
+- **A2 Workspace-switch state safety**: Audited all workspace-scoped pages. `billing` uses `key={activeWorkspace.id}`, `teams` and `groups` use `latestLoad` refs + `loadedWorkspaceId` guards. `discover`, `invitations`, and `privacy-requests` are user-scoped (not workspace-scoped). No workspace-private data in `localStorage` or `sessionStorage` — only `nexus-active-workspace` (workspace ID), `nexus-theme` (theme preference), and `PENDING_ONBOARDING_KEY` (account type intent) are stored.
+- **A3 Access states**: Added `AccessState` component usage to `billing/page.tsx`, `teams/page.tsx`, and `groups/page.tsx` for 401/403 load failures. Previously only `MembersPanel` used `AccessState`. Added 6 new tests (2 per page: 401 and 403 scenarios). Also added groups page workspace-switch regression test (2 tests). 13 new tests total, all passing.
+- **A4 Quality pass**: Logo manager verified — blob URLs revoked on unmount via `URL.revokeObjectURL`, `ConfirmDialog` on delete, size limit 2 MB and types PNG/JPEG/WebP from backend API docs. Privacy-request page has double-submit protection via `setWorking`. Transfer inbox has double-submit protection via `busy` state.
+- **A5 Phase 8 safe items**: Teams detail page already states "Team activity is not available because the backend does not currently expose a team activity endpoint." Department assignment card already states "The backend supports assignment, but does not currently expose department member identities for listing or removal here." No fabricated content was added.
 
 ## Phase 9 — Projects and Project Visibility
 
@@ -1179,6 +1188,88 @@ Build the project management interface.
 - Project management experience.
 - Project detail interface.
 - Visibility controls.
+
+### Phase 9 Status — In Progress (2026-11-05)
+
+Branch: `feature/phase-9-projects` (from `feature/frontend-authentication`).
+
+#### Implementation evidence
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Project listing with filters, sorting, and pagination | Implemented | `app/app/projects/page.tsx` — cursor-paginated list with search, status filter, visibility filter, include-archived toggle, and Load more button. Uses `listProjects` service against `GET /workspaces/{workspaceId}/projects`. |
+| Project creation and editing | Implemented | Create modal in `page.tsx` with Zod validation (name min 2 max 100, key min 2 max 16 alphanumeric+hyphen+underscore). Edit form in `settings/page.tsx` with `updateProject` against `PATCH /workspaces/{workspaceId}/projects/{projectId}`. |
+| Project overview page | Implemented | `app/app/projects/[projectId]/page.tsx` — displays name, key, status, visibility, owner, members, dates, labels. Entry points for Tasks, Discussions, and Files clearly labeled as unavailable (no backend contract). |
+| Project members and participants | Implemented | `app/app/projects/[projectId]/members/page.tsx` — lists members from `GET .../members`, add member with role, change role, remove member with ConfirmDialog. |
+| Project settings | Implemented | `app/app/projects/[projectId]/settings/page.tsx` — edit name, key, description, status, visibility. Visibility change requires confirmation dialog stating the consequence. Archive/restore in danger zone. |
+| Activity feed | Implemented | `app/app/projects/[projectId]/activity/page.tsx` — cursor-paginated activity from `GET .../activity`. |
+| Milestones | Implemented | `app/app/projects/[projectId]/milestones/page.tsx` — list, create, edit, complete/reopen, delete with ConfirmDialog. Uses Zod validation. |
+| Archive and restore | Implemented | `POST .../archive` and `POST .../restore` with ConfirmDialog on both the list page and settings page. |
+| Visibility selection | Implemented | Three values: WORKSPACE, DEPARTMENT_TEAM, PRIVATE. Confirmation dialog on settings page warns about access consequences when changing visibility. |
+| Navigation entry | Implemented | Projects entry added to `lib/app-navigation.ts` under a "Work" section, filtered by `workspace:view` permission, visible for all workspace types. |
+| Entry points for discussions, files, timeline | Implemented (unavailable) | Overview page shows three cards labeled as unavailable with explanations: "Task management is not yet available. The backend task API is not currently registered.", "Project discussions are not yet available. No backend message/channel contract is registered for projects.", "Project file management is not yet available. The backend file/attachment API is not currently registered." |
+| Workspace-switch state safety | Implemented | Project list page uses `latestLoad` ref + `loadedWorkspaceId` guard pattern, consistent with teams/groups pages. |
+| AccessState for 401/403 | Implemented | All project pages use `AccessState` component for 401/403 load failures. |
+| Zod validation | Implemented | Create form, edit form, and milestone form all use Zod schemas. No new dependencies required (Zod was already installed in Phase 1). |
+
+#### Backend routes consumed
+
+- `GET /workspaces/{workspaceId}/projects` — list with cursor, limit, status, visibility, teamId, departmentId, search, includeArchived
+- `POST /workspaces/{workspaceId}/projects` — create with name, key, description, category, labels, visibility, teamId, departmentId, startDate, dueDate
+- `GET /workspaces/{workspaceId}/projects/{projectId}` — read single project
+- `PATCH /workspaces/{workspaceId}/projects/{projectId}` — update name, key, description, category, labels, visibility, status, teamId, departmentId, startDate, dueDate
+- `DELETE /workspaces/{workspaceId}/projects/{projectId}` — soft-delete (not exposed in UI; archive/restore used instead)
+- `POST /workspaces/{workspaceId}/projects/{projectId}/archive` — archive
+- `POST /workspaces/{workspaceId}/projects/{projectId}/restore` — restore
+- `POST /workspaces/{workspaceId}/projects/{projectId}/transfer-ownership` — not yet integrated (future enhancement)
+- `GET /workspaces/{workspaceId}/projects/{projectId}/members` — list members
+- `POST /workspaces/{workspaceId}/projects/{projectId}/members` — add member with role
+- `PATCH /workspaces/{workspaceId}/projects/{projectId}/members/{userId}` — update role
+- `DELETE /workspaces/{workspaceId}/projects/{projectId}/members/{userId}` — remove member
+- `GET /workspaces/{workspaceId}/projects/{projectId}/activity` — cursor-paginated activity
+- `GET /workspaces/{workspaceId}/projects/{projectId}/milestones` — list milestones
+- `POST /workspaces/{workspaceId}/projects/{projectId}/milestones` — create milestone
+- `PATCH /workspaces/{workspaceId}/projects/{projectId}/milestones/{milestoneId}` — update milestone
+- `DELETE /workspaces/{workspaceId}/projects/{projectId}/milestones/{milestoneId}` — delete milestone
+- `PATCH /workspaces/{workspaceId}/projects/{projectId}/organizational-access` — not yet integrated in UI (future enhancement for department/team association)
+
+#### Files created
+
+- `app/app/projects/page.tsx` — project list with filters, create modal, archive/restore
+- `app/app/projects/page.test.tsx` — 9 tests (list display, empty state, AccessState 401/403, workspace switch, create modal, form validation, archive confirm, load more)
+- `app/app/projects/[projectId]/layout.tsx` — tab navigation (Overview, Members, Milestones, Activity, Settings)
+- `app/app/projects/[projectId]/page.tsx` — overview with unavailable feature labels
+- `app/app/projects/[projectId]/members/page.tsx` — member management
+- `app/app/projects/[projectId]/milestones/page.tsx` — milestone CRUD
+- `app/app/projects/[projectId]/activity/page.tsx` — activity feed
+- `app/app/projects/[projectId]/settings/page.tsx` — edit, visibility change with confirmation, archive/restore
+- `services/__tests__/projects.test.ts` — 10 service contract tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Projects nav entry under "Work" section
+- `lib/app-navigation.test.ts` — added test verifying Projects entry for all workspace types
+- `services/projects.ts` — added `deleteProjectMilestone` function
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed |
+| `npm run lint` | Passed (0 errors, 0 warnings) |
+| `npm test -- --maxWorkers=1` | Passed (47 files, 311 tests) |
+| `npm run build` | Passed (all project routes generated: /app/projects, /app/projects/[projectId], /app/projects/[projectId]/members, /app/projects/[projectId]/milestones, /app/projects/[projectId]/activity, /app/projects/[projectId]/settings) |
+| `git diff --check` | Passed |
+
+#### Remaining gaps
+
+- Live backend verification not performed; all tests use mocked API responses.
+- Manual responsive review not performed.
+- Project ownership transfer (`POST .../transfer-ownership`) endpoint exists but is not yet integrated in the UI.
+- Organizational access (`PATCH .../organizational-access`) endpoint exists but is not yet integrated in the UI (department/team association for DEPARTMENT_TEAM visibility projects).
+- Project discussions, files, and timeline entry points are labeled as unavailable; no backend contract exists for these.
+- Task management is not part of Phase 9; no task API is registered in the backend.
+- No mock data in production code. No tokens or private data in browser storage.
 
 ## Phase 10 — Tasks and Work Management
 

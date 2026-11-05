@@ -27,6 +27,7 @@ import {
   type ProjectSummary,
   type ProjectVisibility,
 } from '@/services/projects';
+import { listDepartments, listTeams, type Department, type Team } from '@/services/organization-structure';
 
 // --- Validation schema (Zod) ---
 const createSchema = z.object({
@@ -103,6 +104,12 @@ export default function ProjectsPage() {
   const [createVisibility, setCreateVisibility] = useState<ProjectVisibility>('WORKSPACE');
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
 
+  // Organizational access options for DEPARTMENT_TEAM visibility
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [createTeamId, setCreateTeamId] = useState('');
+  const [createDepartmentId, setCreateDepartmentId] = useState('');
+
   // Archive/restore
   const [archiveTarget, setArchiveTarget] = useState<ProjectSummary | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<ProjectSummary | null>(null);
@@ -150,6 +157,21 @@ export default function ProjectsPage() {
     return () => { active = false; };
   }, [activeWorkspace, load]);
 
+  // Load departments and teams for DEPARTMENT_TEAM visibility create form
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    let active = true;
+    void Promise.all([
+      activeWorkspace.type === 'INSTITUTION' ? listDepartments(activeWorkspace.id) : Promise.resolve([]),
+      listTeams(activeWorkspace.id),
+    ]).then(([deptList, teamList]) => {
+      if (!active) return;
+      setDepartments(deptList);
+      setTeams(teamList);
+    }).catch(() => { /* non-fatal; org access can be set later in settings */ });
+    return () => { active = false; };
+  }, [activeWorkspace]);
+
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeWorkspace) return;
@@ -170,9 +192,11 @@ export default function ProjectsPage() {
         name: parsed.data.name, key: parsed.data.key,
         description: parsed.data.description ?? null,
         visibility: parsed.data.visibility,
+        ...(parsed.data.visibility === 'DEPARTMENT_TEAM' && createTeamId ? { teamId: createTeamId } : {}),
+        ...(parsed.data.visibility === 'DEPARTMENT_TEAM' && createDepartmentId ? { departmentId: createDepartmentId } : {}),
       });
       setShowCreate(false);
-      setCreateName(''); setCreateKey(''); setCreateDescription(''); setCreateVisibility('WORKSPACE');
+      setCreateName(''); setCreateKey(''); setCreateDescription(''); setCreateVisibility('WORKSPACE'); setCreateTeamId(''); setCreateDepartmentId('');
       setNotice('Project created.');
       await load();
     } catch (cause) {
@@ -458,6 +482,37 @@ export default function ProjectsPage() {
               {VISIBILITY_CONSEQUENCES[createVisibility]}
             </p>
           </div>
+          {createVisibility === 'DEPARTMENT_TEAM' && (
+            <div className="space-y-4 rounded-lg border border-[var(--color-border)] p-4">
+              <p className="text-sm font-medium">Department / team association</p>
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Associate a team{activeWorkspace?.type === 'INSTITUTION' ? ' and department' : ''} so their members can access this project.
+                You can also set this later in project settings.
+              </p>
+              <Select
+                id="create-project-team"
+                label="Team"
+                value={createTeamId}
+                onChange={(event) => setCreateTeamId(event.target.value)}
+                options={[
+                  { value: '', label: 'No team' },
+                  ...teams.map((team) => ({ value: team.id, label: team.name })),
+                ]}
+              />
+              {activeWorkspace?.type === 'INSTITUTION' && (
+                <Select
+                  id="create-project-department"
+                  label="Department"
+                  value={createDepartmentId}
+                  onChange={(event) => setCreateDepartmentId(event.target.value)}
+                  options={[
+                    { value: '', label: 'No department' },
+                    ...departments.map((dept) => ({ value: dept.id, label: dept.name })),
+                  ]}
+                />
+              )}
+            </div>
+          )}
           {error && <Alert variant="error">{error}</Alert>}
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>

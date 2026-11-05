@@ -81,14 +81,8 @@ These contracts were checked against the adjacent backend `docs/API.md`, `docs/o
 
 ### Verification results
 
-- Historical validation above predates subsequent Phases 5–7 work. See the current repository checks and task report for current command results; automated checks do not constitute user-confirmed Phase 8 verification.
-- Focused Phase 8 page, navigation, and API-contract run — passed, 3 files and 8 tests. Invitation and legal regression focus run — passed, 5 files and 18 tests before the final additions; the full suite above includes the final code.
-- `npx tsc --noEmit` — passed.
-- `npm run lint` — passed with 0 errors and 3 existing unused-function warnings in Discover, Invitations, and Join Requests.
-- `git diff --check` — passed.
-- Standard `npm run build` still fails before app compilation in the Tailwind Turbopack CSS loader worker with a subprocess message timeout. `next.config.ts` selects Next.js 16.4.2 Turbopack and maps `*.css` through the installed `@tailwindcss/turbopack` loader; Tailwind is v4; `app/globals.css` has one `@import "tailwindcss"`, and the root layout is its only application CSS import. No CSS import cycle or Phase 8 CSS change was found. The machine showed 3.9 GiB of 4 GiB swap used during investigation, which is consistent with resource pressure but does not by itself prove the cause.
-- `npx next build --webpack` completed successfully on the final implementation, including compilation, TypeScript, static generation of 23 routes, and trace collection. A production build therefore succeeds with the project's supported webpack builder; the configured Turbopack build worker timeout remains unresolved.
-- No authenticated live backend session, Company/Institution browser workflow, or responsive browser/E2E run was available. No production files or real object storage were used.
+- Historical validation above predates subsequent Phases 5–7 and Phase 9 work. The full suite on `feature/phase-9-projects` passed 47 files, 311 tests with `npm test -- --maxWorkers=1`; `npm run lint` passed with 0 errors and 0 warnings; `npx tsc --noEmit` passed; `npm run build` passed. These supersede the historical counts.
+- Phase 8 AccessState additions (commit `6f78c13` on `feature/frontend-authentication`) added 13 tests for 401/403 handling on teams, groups, and billing pages; full suite after that commit: 47 files, 311 tests passed.
 
 ### Remaining limitations and disposition
 

@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import {
   addProjectMember,
   listProjectMembers,
@@ -37,6 +38,7 @@ function requestError(cause: unknown, fallback: string): string {
 
 export default function ProjectMembersPage({ params }: { params: { projectId: string } }) {
   const { activeWorkspace } = useWorkspaceContext();
+  useWorkspaceRedirect();
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);

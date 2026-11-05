@@ -59,3 +59,13 @@ export const listProjectMilestones = (workspaceId: string, projectId: string) =>
 export const createProjectMilestone = (workspaceId: string, projectId: string, input: { name: string; description?: string | null; dueDate?: string | null; position?: number }) => request<ProjectMilestone>(path(workspaceId, projectId, '/milestones'), { method: 'POST', body: JSON.stringify(input) });
 export const updateProjectMilestone = (workspaceId: string, projectId: string, milestoneId: string, input: { name?: string; description?: string | null; dueDate?: string | null; completed?: boolean; position?: number }) => request<ProjectMilestone>(path(workspaceId, projectId, `/milestones/${encodeURIComponent(milestoneId)}`), { method: 'PATCH', body: JSON.stringify(input) });
 export const deleteProjectMilestone = (workspaceId: string, projectId: string, milestoneId: string) => request<{ id: string; deleted: true }>(path(workspaceId, projectId, `/milestones/${encodeURIComponent(milestoneId)}`), { method: 'DELETE' });
+
+// Ownership transfer
+export interface ProjectOwnershipTransferResult {
+  projectId: string; previousOwnerId: string; ownerId: string; ownerRole: 'PROJECT_MANAGER';
+  previousOwnerRole: 'MANAGER' | 'MEMBER' | 'REMOVE';
+  previousOwnerResultingRole: 'PROJECT_MANAGER' | 'MEMBER' | 'REMOVED';
+  forcedAdminTransfer: boolean; updatedAt: string;
+}
+export const transferProjectOwnership = (workspaceId: string, projectId: string, input: { newOwnerId: string; previousOwnerRole?: 'MANAGER' | 'MEMBER' | 'REMOVE' }) =>
+  request<ProjectOwnershipTransferResult>(path(workspaceId, projectId, '/transfer-ownership'), { method: 'POST', body: JSON.stringify(input) });

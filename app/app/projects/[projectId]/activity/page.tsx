@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import { listProjectActivity, type ProjectActivity } from '@/services/projects';
 
 function dateTimeLabel(value: string): string {
@@ -21,6 +22,7 @@ function formatAction(action: string): string {
 
 export default function ProjectActivityPage({ params }: { params: { projectId: string } }) {
   const { activeWorkspace } = useWorkspaceContext();
+  useWorkspaceRedirect();
   const [activity, setActivity] = useState<ProjectActivity[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

@@ -14,15 +14,25 @@ import { Textarea } from '@/components/ui/Textarea';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import {
   archiveProject,
   getProject,
   restoreProject,
+  transferProjectOwnership,
   updateProject,
+  updateProjectOrganizationAccess,
   type ProjectStatus,
   type ProjectSummary,
   type ProjectVisibility,
 } from '@/services/projects';
+import {
+  listDepartments,
+  listTeams,
+  type Department,
+  type Team,
+} from '@/services/organization-structure';
+import { listWorkspaceMembers, type WorkspaceMember } from '@/services/workspaces';
 
 const editSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -57,6 +67,7 @@ function requestError(cause: unknown, fallback: string): string {
 
 export default function ProjectSettingsPage({ params }: { params: { projectId: string } }) {
   const { activeWorkspace } = useWorkspaceContext();
+  useWorkspaceRedirect();
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);
@@ -80,17 +91,41 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
 
+  // Organizational access (department/team association for DEPARTMENT_TEAM visibility)
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [orgTeamId, setOrgTeamId] = useState<string>('');
+  const [orgDepartmentId, setOrgDepartmentId] = useState<string>('');
+  const [orgNotice, setOrgNotice] = useState<string | null>(null);
+  const [orgError, setOrgError] = useState<string | null>(null);
+  const [orgBusy, setOrgBusy] = useState(false);
+
+  // Ownership transfer
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
+  const [transferTargetId, setTransferTargetId] = useState('');
+  const [confirmTransfer, setConfirmTransfer] = useState(false);
+
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
     setLoading(true); setError(null); setAccessStatus(null);
     try {
-      const data = await getProject(activeWorkspace.id, params.projectId);
+      const [data, deptList, teamList, wsMembers] = await Promise.all([
+        getProject(activeWorkspace.id, params.projectId),
+        activeWorkspace.type === 'INSTITUTION' ? listDepartments(activeWorkspace.id) : Promise.resolve([]),
+        listTeams(activeWorkspace.id),
+        listWorkspaceMembers(activeWorkspace.id),
+      ]);
       setProject(data);
       setName(data.name);
       setKey(data.key);
       setDescription(data.description ?? '');
       setStatus(data.status === 'ARCHIVED' ? 'ACTIVE' : data.status);
       setVisibility(data.visibility);
+      setOrgTeamId(data.teamId ?? '');
+      setOrgDepartmentId(data.departmentId ?? '');
+      setDepartments(deptList);
+      setTeams(teamList);
+      setWorkspaceMembers(wsMembers.filter((m) => m.membershipStatus === 'ACTIVE' && !m.owner));
     } catch (cause) {
       if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
         setAccessStatus(cause.status);
@@ -169,6 +204,33 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
       setNotice('Project restored.');
       await load();
     } catch (cause) { setError(requestError(cause, 'Project could not be restored.')); }
+    finally { setBusy(false); }
+  }
+
+  async function handleOrgAccess() {
+    if (!activeWorkspace || !project) return;
+    setOrgBusy(true); setOrgError(null); setOrgNotice(null);
+    try {
+      const result = await updateProjectOrganizationAccess(activeWorkspace.id, project.id, {
+        teamId: orgTeamId || null,
+        departmentId: orgDepartmentId || null,
+      });
+      setProject((current) => current ? { ...current, teamId: result.teamId, departmentId: result.departmentId } : current);
+      setOrgNotice('Organizational access updated.');
+    } catch (cause) {
+      setOrgError(requestError(cause, 'Organizational access could not be updated.'));
+    } finally { setOrgBusy(false); }
+  }
+
+  async function handleTransfer() {
+    if (!activeWorkspace || !project || !transferTargetId) return;
+    setBusy(true); setError(null);
+    try {
+      await transferProjectOwnership(activeWorkspace.id, project.id, { newOwnerId: transferTargetId });
+      setConfirmTransfer(false); setTransferTargetId('');
+      setNotice('Project ownership transferred.');
+      await load();
+    } catch (cause) { setError(requestError(cause, 'Ownership could not be transferred.')); }
     finally { setBusy(false); }
   }
 
@@ -267,6 +329,85 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
         </form>
       </Card>
 
+      {/* Organizational access (department/team association) */}
+      {project.visibility === 'DEPARTMENT_TEAM' && (
+        <Card className="p-5">
+          <h3 className="font-semibold">Organizational access</h3>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            Associate this project with a team and{' '}
+            {activeWorkspace?.type === 'INSTITUTION' ? 'department' : 'team'} so their members can access it.
+            Department-bound teams must use the same department.
+          </p>
+          {orgError && <Alert className="mt-3" variant="error">{orgError}</Alert>}
+          {orgNotice && <Alert className="mt-3" variant="success">{orgNotice}</Alert>}
+          <div className="mt-4 space-y-4">
+            <Select
+              id="org-team"
+              label="Team"
+              value={orgTeamId}
+              onChange={(event) => setOrgTeamId(event.target.value)}
+              options={[
+                { value: '', label: 'No team' },
+                ...teams.map((team) => ({ value: team.id, label: team.name })),
+              ]}
+            />
+            {activeWorkspace?.type === 'INSTITUTION' && (
+              <Select
+                id="org-department"
+                label="Department"
+                value={orgDepartmentId}
+                onChange={(event) => setOrgDepartmentId(event.target.value)}
+                options={[
+                  { value: '', label: 'No department' },
+                  ...departments.map((dept) => ({ value: dept.id, label: dept.name })),
+                ]}
+              />
+            )}
+            <Button onClick={() => void handleOrgAccess()} loading={orgBusy} disabled={orgBusy}>
+              Save organizational access
+            </Button>
+            {project.teamId && (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Current: {teams.find((t) => t.id === project.teamId)?.name ?? 'Unknown team'}
+                {project.departmentId && departments.find((d) => d.id === project.departmentId)
+                  ? ` · ${departments.find((d) => d.id === project.departmentId)?.name}`
+                  : ''}
+              </p>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Ownership transfer */}
+      {workspaceMembers.length > 0 && (
+        <Card className="p-5">
+          <h3 className="font-semibold">Transfer ownership</h3>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            Transfer this project to another workspace member. The new owner becomes the project manager.
+            The previous owner keeps their membership with the selected role.
+          </p>
+          <div className="mt-4 space-y-3">
+            <Select
+              id="transfer-target"
+              label="New owner"
+              value={transferTargetId}
+              onChange={(event) => setTransferTargetId(event.target.value)}
+              options={[
+                { value: '', label: 'Select a member…' },
+                ...workspaceMembers.map((m) => ({ value: m.userId, label: `${m.name} · ${m.email}` })),
+              ]}
+            />
+            <Button
+              variant="destructive"
+              disabled={!transferTargetId || busy}
+              onClick={() => setConfirmTransfer(true)}
+            >
+              Transfer ownership
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Archive / restore */}
       <Card className="p-5 border-[var(--color-warning)] border">
         <h3 className="font-semibold">Danger zone</h3>
@@ -319,6 +460,18 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
         title="Restore project?"
         description={`Restore ${project.name} to its previous status?`}
         confirmLabel="Restore project"
+        loading={busy}
+      />
+
+      {/* Ownership transfer confirmation */}
+      <ConfirmDialog
+        open={confirmTransfer}
+        onClose={() => setConfirmTransfer(false)}
+        onConfirm={() => void handleTransfer()}
+        title="Transfer project ownership?"
+        description={`Transfer ${project.name} to ${workspaceMembers.find((m) => m.userId === transferTargetId)?.name ?? 'the selected member'}? This action is immediate and cannot be undone. The new owner becomes the project manager.`}
+        confirmLabel="Transfer ownership"
+        destructive
         loading={busy}
       />
     </div>

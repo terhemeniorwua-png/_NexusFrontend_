@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -68,17 +68,6 @@ export function InvitationsPanel({ workspace, canManage }: InvitationsPanelProps
 
   const roleOptions = assignableRoleOptions(workspace);
 
-  const loadInvitations = useCallback(async (nextStatus: InvitationListStatus) => {
-    try {
-      const loaded = await listWorkspaceInvitations(workspace.id, nextStatus);
-      setInvitations(loaded);
-    } catch (cause) {
-      setError(errorText(cause, 'Invitations could not be loaded.'));
-    } finally {
-      setLoading(false);
-    }
-  }, [workspace.id]);
-
   useEffect(() => {
     let active = true;
     async function load() {
@@ -126,7 +115,7 @@ export function InvitationsPanel({ workspace, canManage }: InvitationsPanelProps
           : { role: effectiveRole as WorkspaceRole }),
       });
       setEmail('');
-      setNotice(`Invitation sent to ${result.invitation.email}. Invitations expire after 48 hours.`);
+      setNotice(`Invitation sent to ${result.invitation.email}. It expires ${dateTimeLabel(result.invitation.expiresAt)}.`);
       if (!result.emailSent) {
         setWarning('The invitation was created, but the email could not be sent. Use Resend once mail delivery is available.');
       }
@@ -191,7 +180,7 @@ export function InvitationsPanel({ workspace, canManage }: InvitationsPanelProps
         <Card className="p-5 sm:p-7">
           <h2 className="text-xl font-semibold">Invite someone</h2>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            Send a workspace invitation by email. Direct invitations expire after 48 hours and can be accepted once.
+            Send a workspace invitation by email. Its expiration time is supplied by the backend and it can be accepted once.
           </p>
           <form onSubmit={sendInvitation} noValidate className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_auto] sm:items-end">
             <Input

@@ -100,7 +100,7 @@ export default function MyInvitationsPage() {
                       <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
                         {roleLabel(invitation.role, invitation.organizationRole)} · invited by {invitation.invitedBy.name}
                       </p>
-                      <p className="text-xs text-[var(--color-text-secondary)]">Expires {dateTimeLabel(invitation.expiresAt)}</p>
+                      <p className="text-xs text-[var(--color-text-secondary)]">{invitation.status === 'EXPIRED' ? 'Expired' : `Expires ${dateTimeLabel(invitation.expiresAt)}`}</p>
                     </div>
                     <Badge variant="warning">Awaiting your response by email</Badge>
                   </li>

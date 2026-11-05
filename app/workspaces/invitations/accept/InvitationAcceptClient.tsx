@@ -197,6 +197,9 @@ export function InvitationAcceptClient() {
               </p>
             </div>
 
+            {invitation.status === 'EXPIRED' && <Alert variant="error" title="Invitation expired">This invitation has expired and can no longer be accepted.</Alert>}
+            {invitation.status !== 'PENDING' && invitation.status !== 'EXPIRED' && <Alert variant="warning" title="Invitation already resolved">This invitation is {invitation.status.toLowerCase()} and can no longer be accepted.</Alert>}
+
             <dl className="grid gap-3 rounded-[var(--radius-lg)] bg-[var(--color-surface-secondary)] p-4 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-[var(--color-text-secondary)]">Role</dt>
@@ -222,7 +225,7 @@ export function InvitationAcceptClient() {
 
             {session === 'checking' ? (
               <p role="status" className="text-sm text-[var(--color-text-secondary)]">Checking your session…</p>
-            ) : session === 'authenticated' ? (
+            ) : session === 'authenticated' && invitation.status === 'PENDING' ? (
               <div className="space-y-3">
                 <Button className="w-full" loading={working === 'accept'} disabled={working !== null} onClick={() => { void handleAccept(); }}>
                   Accept invitation

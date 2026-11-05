@@ -62,15 +62,6 @@ export default function DiscoverPage() {
     }
   }, []);
 
-  const loadMyRequests = useCallback(async () => {
-    try {
-      const loaded = await listMyJoinRequests();
-      setMyRequests(loaded);
-    } catch (cause) {
-      setMyError(errorText(cause, 'Your join requests could not be loaded.'));
-    }
-  }, []);
-
   useEffect(() => {
     let active = true;
     async function load() {
@@ -257,7 +248,7 @@ export default function DiscoverPage() {
 
         <Card className="p-5 sm:p-7">
           <h2 className="text-xl font-semibold">Your join requests</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Requests expire seven days after they are sent.</p>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Request status and expiry dates are supplied by the workspace service.</p>
           {myError && <Alert variant="error" title="Requests unavailable" className="mt-4">{myError}</Alert>}
           {myRequests === null && !myError ? (
             <p role="status" className="mt-4 text-sm text-[var(--color-text-secondary)]">Loading your requests…</p>
@@ -274,9 +265,12 @@ export default function DiscoverPage() {
                     <p className="text-xs text-[var(--color-text-secondary)]">
                       Sent {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(request.createdAt))}
                     </p>
+                    <p className="text-xs text-[var(--color-text-secondary)]">
+                      Expires {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(request.expiresAt))}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={request.status === 'PENDING' ? 'warning' : request.status === 'APPROVED' ? 'success' : 'outline'}>
+                    <Badge variant={request.status === 'PENDING' ? 'warning' : request.status === 'APPROVED' ? 'success' : request.status === 'EXPIRED' || request.status === 'REJECTED' ? 'error' : 'outline'}>
                       {request.status.toLowerCase()}
                     </Badge>
                     {request.status === 'PENDING' && (

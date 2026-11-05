@@ -120,6 +120,16 @@ describe('invitation acceptance', () => {
     expect(screen.queryByRole('button', { name: 'Accept invitation' })).not.toBeInTheDocument();
   });
 
+  it('does not offer acceptance for an invitation whose backend status is expired', async () => {
+    mocks.getAccessToken.mockReturnValue('access-token');
+    mocks.previewInvitation.mockResolvedValue({ ...invitation, status: 'EXPIRED' });
+    render(<InvitationAcceptClient />);
+
+    expect(await screen.findByRole('heading', { name: 'Join Nexus Studio' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('This invitation has expired');
+    expect(screen.queryByRole('button', { name: 'Accept invitation' })).not.toBeInTheDocument();
+  });
+
   it('reports a missing token without calling the backend', async () => {
     mocks.searchParams = new URLSearchParams();
     render(<InvitationAcceptClient />);

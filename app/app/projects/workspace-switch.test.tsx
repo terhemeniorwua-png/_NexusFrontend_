@@ -77,17 +77,17 @@ describe('Project detail pages: workspace-switch redirect', () => {
 
   it('overview page redirects to /app/projects on workspace change', async () => {
     const { default: Page } = await import('./[projectId]/page');
-    const view = render(<Page params={{ projectId: 'project-1' }} />);
+    const view = render(<Page />);
     mocks.activeWorkspace = wsBeta;
-    view.rerender(<Page params={{ projectId: 'project-1' }} />);
+    view.rerender(<Page />);
     await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/app/projects'));
   });
 
   it('members page redirects to /app/projects on workspace change', async () => {
     const { default: Page } = await import('./[projectId]/members/page');
-    const view = render(<Page params={{ projectId: 'project-1' }} />);
+    const view = render(<Page />);
     mocks.activeWorkspace = wsBeta;
-    view.rerender(<Page params={{ projectId: 'project-1' }} />);
+    view.rerender(<Page />);
     await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/app/projects'));
   });
 
@@ -101,17 +101,17 @@ describe('Project detail pages: workspace-switch redirect', () => {
 
   it('activity page redirects to /app/projects on workspace change', async () => {
     const { default: Page } = await import('./[projectId]/activity/page');
-    const view = render(<Page params={{ projectId: 'project-1' }} />);
+    const view = render(<Page />);
     mocks.activeWorkspace = wsBeta;
-    view.rerender(<Page params={{ projectId: 'project-1' }} />);
+    view.rerender(<Page />);
     await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/app/projects'));
   });
 
   it('settings page redirects to /app/projects on workspace change', async () => {
     const { default: Page } = await import('./[projectId]/settings/page');
-    const view = render(<Page params={{ projectId: 'project-1' }} />);
+    const view = render(<Page />);
     mocks.activeWorkspace = wsBeta;
-    view.rerender(<Page params={{ projectId: 'project-1' }} />);
+    view.rerender(<Page />);
     await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/app/projects'));
   });
 });

@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
@@ -29,7 +30,8 @@ function dateLabel(value: string | null): string {
   return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
 }
 
-export default function ProjectOverviewPage({ params }: { params: { projectId: string } }) {
+export default function ProjectOverviewPage() {
+  const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
   useWorkspaceRedirect();
   const [project, setProject] = useState<ProjectSummary | null>(null);
@@ -41,7 +43,7 @@ export default function ProjectOverviewPage({ params }: { params: { projectId: s
     if (!activeWorkspace) return;
     setLoading(true); setError(null); setAccessStatus(null); setProject(null);
     try {
-      const data = await getProject(activeWorkspace.id, params.projectId);
+      const data = await getProject(activeWorkspace.id, projectId);
       setProject(data);
     } catch (cause) {
       if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
@@ -54,7 +56,7 @@ export default function ProjectOverviewPage({ params }: { params: { projectId: s
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace, params.projectId]);
+  }, [activeWorkspace, projectId]);
 
   useEffect(() => {
     let active = true;

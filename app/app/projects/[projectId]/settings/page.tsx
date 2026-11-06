@@ -66,7 +66,7 @@ function requestError(cause: unknown, fallback: string): string {
   return cause.message;
 }
 
-export default function ProjectOverviewPage() {
+export default function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
   useWorkspaceRedirect();

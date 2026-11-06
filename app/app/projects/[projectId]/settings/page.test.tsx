@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
   usePathname: () => '/app/projects/project-1/settings',
+  useParams: () => ({ projectId: 'project-1' }),
 }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) =>
@@ -65,14 +66,14 @@ describe('ProjectSettingsPage — organizational access', () => {
   });
 
   it('shows organizational access section when visibility is DEPARTMENT_TEAM', async () => {
-    render(<SettingsPage params={{ projectId: 'project-1' }} />);
+    render(<SettingsPage />);
     expect(await screen.findByText('Organizational access')).toBeInTheDocument();
     expect(screen.getByLabelText('Team')).toBeInTheDocument();
   });
 
   it('calls updateProjectOrganizationAccess with selected team', async () => {
     const user = userEvent.setup();
-    render(<SettingsPage params={{ projectId: 'project-1' }} />);
+    render(<SettingsPage />);
     await screen.findByText('Organizational access');
 
     const teamSelect = screen.getByLabelText('Team');
@@ -89,7 +90,7 @@ describe('ProjectSettingsPage — organizational access', () => {
 
   it('does not show organizational access section when visibility is WORKSPACE', async () => {
     mocks.getProject.mockResolvedValue(makeProject({ visibility: 'WORKSPACE' }));
-    render(<SettingsPage params={{ projectId: 'project-1' }} />);
+    render(<SettingsPage />);
     await screen.findByText('Project settings');
     expect(screen.queryByText('Organizational access')).not.toBeInTheDocument();
   });
@@ -109,13 +110,13 @@ describe('ProjectSettingsPage — ownership transfer', () => {
   });
 
   it('shows the ownership transfer section when workspace members are available', async () => {
-    render(<SettingsPage params={{ projectId: 'project-1' }} />);
+    render(<SettingsPage />);
     expect(await screen.findByRole('heading', { name: 'Transfer ownership' })).toBeInTheDocument();
   });
 
   it('opens confirmation dialog before transferring', async () => {
     const user = userEvent.setup();
-    render(<SettingsPage params={{ projectId: 'project-1' }} />);
+    render(<SettingsPage />);
     await screen.findByRole('heading', { name: 'Transfer ownership' });
 
     await user.selectOptions(screen.getByLabelText('New owner'), 'user-2');
@@ -129,7 +130,7 @@ describe('ProjectSettingsPage — ownership transfer', () => {
   it('calls transferProjectOwnership after confirmation', async () => {
     const user = userEvent.setup();
     mocks.getProject.mockResolvedValue(makeProject({ visibility: 'WORKSPACE' }));
-    render(<SettingsPage params={{ projectId: 'project-1' }} />);
+    render(<SettingsPage />);
     await screen.findByRole('heading', { name: 'Transfer ownership' });
 
     await user.selectOptions(screen.getByLabelText('New owner'), 'user-2');
@@ -152,7 +153,7 @@ describe('ProjectSettingsPage — ownership transfer', () => {
   it('shows a 401 access state when loading fails with unauthorized', async () => {
     const { ApiRequestError } = await import('@/lib/api');
     mocks.getProject.mockRejectedValue(new ApiRequestError('Unauthorized', 401));
-    render(<SettingsPage params={{ projectId: 'project-1' }} />);
+    render(<SettingsPage />);
     expect(await screen.findByText('Sign in to continue')).toBeInTheDocument();
   });
 });

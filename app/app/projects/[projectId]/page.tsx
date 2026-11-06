@@ -164,12 +164,21 @@ export default function ProjectOverviewPage({ params }: { params: { projectId: s
         </Card>
       )}
 
-      {/* Entry points for not-yet-implemented features */}
+      {/* Entry points for features */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="p-4 opacity-60">
+        <Card className="p-4">
           <h3 className="font-semibold mb-1">Tasks</h3>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Task management is not yet available. The backend task API is not currently registered.
+          <p className="text-sm text-[var(--color-text-secondary)] mb-3">
+            Create and manage tasks, track progress, and assign work to team members.
+          </p>
+          <Link
+            href={`/app/projects/${encodeURIComponent(project.id)}/tasks`}
+            className="text-sm text-[var(--color-primary)] underline font-medium"
+          >
+            View tasks →
+          </Link>
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            {project.taskCount} task{project.taskCount !== 1 ? 's' : ''}
           </p>
         </Card>
         <Card className="p-4 opacity-60">

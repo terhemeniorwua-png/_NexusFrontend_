@@ -229,12 +229,14 @@ export function AuthForm({ mode, initialToken = '', initialEmail = '', accountTy
   return (
     <section className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-lg)] sm:p-8">
       <div className="mb-7">
-        {onBackToAccountType && <button type="button" onClick={onBackToAccountType} className="mb-5 text-sm font-medium text-[var(--color-primary)] hover:underline">← Change account type</button>}
-        <Link href="/" className="mb-8 inline-flex items-center gap-2 font-semibold tracking-tight text-[var(--color-text-primary)]" aria-label="Nexus home">
-          <span className="grid size-8 place-items-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">N</span>
-          Nexus
-        </Link>
-        <h1 className="mt-7 text-2xl font-semibold tracking-tight">{mode === 'sign-up' && accountType === 'business' ? 'Create a business account' : mode === 'sign-up' && accountType === 'institution' ? 'Create an institution account' : content.title}</h1>
+        <div className="relative mb-8 flex min-h-10 flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight text-[var(--color-text-primary)]" aria-label="Nexus home">
+            <span className="grid size-10 place-items-center rounded-lg bg-[var(--color-primary)] text-base font-bold text-white">N</span>
+            Nexus
+          </Link>
+          {onBackToAccountType && <button type="button" onClick={onBackToAccountType} className="self-end text-sm font-medium text-[var(--color-primary)] hover:underline sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2">← Change account type</button>}
+        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">{mode === 'sign-up' && accountType === 'business' ? 'Create a business account' : mode === 'sign-up' && accountType === 'institution' ? 'Create an institution account' : content.title}</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{accountType ? `${accountType === 'personal' ? 'Personal' : accountType === 'business' ? 'Business' : 'Institution'} account · ${mode === 'sign-in' ? 'Sign in with your Nexus identity.' : content.subtitle}` : content.subtitle}</p>
         {mode === 'sign-up' && accountType === 'business' && <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">Register the business owner’s Nexus identity first. After email verification, create your company workspace; its creator becomes the Owner.</p>}
         {mode === 'sign-up' && accountType === 'institution' && <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">Register the institution administrator’s Nexus identity first. After email verification, create your institution workspace; its creator becomes the Owner.</p>}

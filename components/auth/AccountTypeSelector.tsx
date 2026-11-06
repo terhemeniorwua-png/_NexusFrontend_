@@ -32,16 +32,16 @@ export function AccountTypeSelector({
   onSelect: (type: AuthAccountType) => void;
 }) {
   return (
-    <Modal open={open} onClose={onClose} title="Choose your account type" description="Choose the workspace experience you want to continue with." maxWidth="lg">
+    <Modal open={open} onClose={onClose} title="Choose your account type" description="Choose the workspace experience you want to continue with." maxWidth="xl">
       <div className="p-5 sm:p-6">
         <p className="mb-4 text-sm text-[var(--color-text-secondary)]">{intent === 'sign-in' ? 'Choose which workspace you want to open after signing in.' : 'Choose how you plan to start with Nexus.'}</p>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4 lg:gap-6">
           {accountTypes.map((account) => (
             <button
               type="button"
               key={account.id}
               onClick={() => onSelect(account.id)}
-              className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]"
+              className="group h-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]"
             >
               <span className="grid size-10 place-items-center rounded-lg bg-[var(--color-primary-soft)] text-[var(--color-primary)]"><AccountIcon type={account.id} /></span>
               <span className="mt-4 block font-semibold text-[var(--color-text-primary)]">{account.title}</span>

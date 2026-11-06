@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
@@ -36,7 +37,8 @@ function requestError(cause: unknown, fallback: string): string {
   return cause.message;
 }
 
-export default function ProjectMembersPage({ params }: { params: { projectId: string } }) {
+export default function ProjectOverviewPage() {
+  const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
   useWorkspaceRedirect();
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -55,7 +57,7 @@ export default function ProjectMembersPage({ params }: { params: { projectId: st
     setLoading(true); setError(null); setAccessStatus(null);
     try {
       const [projectMembers, wsMembers] = await Promise.all([
-        listProjectMembers(activeWorkspace.id, params.projectId),
+        listProjectMembers(activeWorkspace.id, projectId),
         listWorkspaceMembers(activeWorkspace.id),
       ]);
       setMembers(projectMembers);
@@ -69,7 +71,7 @@ export default function ProjectMembersPage({ params }: { params: { projectId: st
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace, params.projectId]);
+  }, [activeWorkspace, projectId]);
 
   useEffect(() => { let active = true; void Promise.resolve().then(() => active ? load() : undefined); return () => { active = false; }; }, [load]);
 
@@ -78,7 +80,7 @@ export default function ProjectMembersPage({ params }: { params: { projectId: st
     if (!activeWorkspace || !addUserId) return;
     setBusy(true); setError(null);
     try {
-      await addProjectMember(activeWorkspace.id, params.projectId, addUserId, addRole);
+      await addProjectMember(activeWorkspace.id, projectId, addUserId, addRole);
       setAddUserId('');
       setNotice('Member added.');
       await load();
@@ -90,7 +92,7 @@ export default function ProjectMembersPage({ params }: { params: { projectId: st
     if (!activeWorkspace) return;
     setBusy(true); setError(null);
     try {
-      await updateProjectMember(activeWorkspace.id, params.projectId, userId, role);
+      await updateProjectMember(activeWorkspace.id, projectId, userId, role);
       setNotice('Role updated.');
       await load();
     } catch (cause) { setError(requestError(cause, 'Role could not be updated.')); }
@@ -101,7 +103,7 @@ export default function ProjectMembersPage({ params }: { params: { projectId: st
     if (!activeWorkspace || !removeTarget) return;
     setBusy(true); setError(null);
     try {
-      await removeProjectMember(activeWorkspace.id, params.projectId, removeTarget.userId);
+      await removeProjectMember(activeWorkspace.id, projectId, removeTarget.userId);
       setRemoveTarget(null);
       setNotice('Member removed.');
       await load();

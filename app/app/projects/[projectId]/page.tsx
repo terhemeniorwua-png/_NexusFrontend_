@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
@@ -29,7 +30,8 @@ function dateLabel(value: string | null): string {
   return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
 }
 
-export default function ProjectOverviewPage({ params }: { params: { projectId: string } }) {
+export default function ProjectOverviewPage() {
+  const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
   useWorkspaceRedirect();
   const [project, setProject] = useState<ProjectSummary | null>(null);
@@ -41,7 +43,7 @@ export default function ProjectOverviewPage({ params }: { params: { projectId: s
     if (!activeWorkspace) return;
     setLoading(true); setError(null); setAccessStatus(null); setProject(null);
     try {
-      const data = await getProject(activeWorkspace.id, params.projectId);
+      const data = await getProject(activeWorkspace.id, projectId);
       setProject(data);
     } catch (cause) {
       if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
@@ -54,7 +56,7 @@ export default function ProjectOverviewPage({ params }: { params: { projectId: s
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace, params.projectId]);
+  }, [activeWorkspace, projectId]);
 
   useEffect(() => {
     let active = true;
@@ -164,12 +166,21 @@ export default function ProjectOverviewPage({ params }: { params: { projectId: s
         </Card>
       )}
 
-      {/* Entry points for not-yet-implemented features */}
+      {/* Entry points for features */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="p-4 opacity-60">
+        <Card className="p-4">
           <h3 className="font-semibold mb-1">Tasks</h3>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Task management is not yet available. The backend task API is not currently registered.
+          <p className="text-sm text-[var(--color-text-secondary)] mb-3">
+            Create and manage tasks, track progress, and assign work to team members.
+          </p>
+          <Link
+            href={`/app/projects/${encodeURIComponent(project.id)}/tasks`}
+            className="text-sm text-[var(--color-primary)] underline font-medium"
+          >
+            View tasks →
+          </Link>
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            {project.taskCount} task{project.taskCount !== 1 ? 's' : ''}
           </p>
         </Card>
         <Card className="p-4 opacity-60">

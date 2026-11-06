@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { Alert } from '@/components/ui/Alert';
@@ -65,7 +66,8 @@ function requestError(cause: unknown, fallback: string): string {
   return cause.message;
 }
 
-export default function ProjectSettingsPage({ params }: { params: { projectId: string } }) {
+export default function ProjectSettingsPage() {
+  const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
   useWorkspaceRedirect();
   const [project, setProject] = useState<ProjectSummary | null>(null);
@@ -110,7 +112,7 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
     setLoading(true); setError(null); setAccessStatus(null);
     try {
       const [data, deptList, teamList, wsMembers] = await Promise.all([
-        getProject(activeWorkspace.id, params.projectId),
+        getProject(activeWorkspace.id, projectId),
         activeWorkspace.type === 'INSTITUTION' ? listDepartments(activeWorkspace.id) : Promise.resolve([]),
         listTeams(activeWorkspace.id),
         listWorkspaceMembers(activeWorkspace.id),
@@ -137,7 +139,7 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace, params.projectId]);
+  }, [activeWorkspace, projectId]);
 
   useEffect(() => { let active = true; void Promise.resolve().then(() => active ? load() : undefined); return () => { active = false; }; }, [load]);
 

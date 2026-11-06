@@ -13,6 +13,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const tabs = projectId
     ? [
         { href: `/app/projects/${encodeURIComponent(projectId)}`, label: 'Overview', exact: true },
+        { href: `/app/projects/${encodeURIComponent(projectId)}/tasks`, label: 'Tasks' },
         { href: `/app/projects/${encodeURIComponent(projectId)}/members`, label: 'Members' },
         { href: `/app/projects/${encodeURIComponent(projectId)}/milestones`, label: 'Milestones' },
         { href: `/app/projects/${encodeURIComponent(projectId)}/activity`, label: 'Activity' },

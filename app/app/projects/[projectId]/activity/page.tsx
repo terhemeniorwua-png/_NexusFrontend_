@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
@@ -20,7 +21,8 @@ function formatAction(action: string): string {
   return action.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 }
 
-export default function ProjectActivityPage({ params }: { params: { projectId: string } }) {
+export default function ProjectOverviewPage() {
+  const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
   useWorkspaceRedirect();
   const [activity, setActivity] = useState<ProjectActivity[]>([]);
@@ -34,7 +36,7 @@ export default function ProjectActivityPage({ params }: { params: { projectId: s
     if (!activeWorkspace) return;
     setLoading(true); setError(null); setAccessStatus(null); setActivity([]); setNextCursor(null);
     try {
-      const page = await listProjectActivity(activeWorkspace.id, params.projectId, { limit: 25 });
+      const page = await listProjectActivity(activeWorkspace.id, projectId, { limit: 25 });
       setActivity(page.items);
       setNextCursor(page.nextCursor);
     } catch (cause) {
@@ -46,13 +48,13 @@ export default function ProjectActivityPage({ params }: { params: { projectId: s
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace, params.projectId]);
+  }, [activeWorkspace, projectId]);
 
   async function loadMore() {
     if (!activeWorkspace || !nextCursor) return;
     setLoadingMore(true);
     try {
-      const page = await listProjectActivity(activeWorkspace.id, params.projectId, { cursor: nextCursor, limit: 25 });
+      const page = await listProjectActivity(activeWorkspace.id, projectId, { cursor: nextCursor, limit: 25 });
       setActivity((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor);
     } catch (cause) {

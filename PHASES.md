@@ -256,7 +256,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 7     | Roles, Permissions, and Access-Controlled UI                     | In Progress |
 | 8     | Departments, Teams, and Groups                                   | In Progress |
 | 9     | Projects and Project Visibility                                  | In Progress |
-| 10    | Tasks and Work Management                                        | Not Started |
+| 10    | Tasks and Work Management                                        | In Progress |
 | 11    | Real-Time Messaging and Conversations                            | Not Started |
 | 12    | Notification Centre and Activity Feed                            | Not Started |
 | 13    | File Management and Nexus Drive                                  | Not Started |
@@ -283,7 +283,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 
 Status meanings: **Not Started**, **In Progress**, **Blocked**, **Completed**. A phase is only marked **Completed** when its functional requirements, integrations, and validation requirements have been verified.
 
-Phases 0, 1, and 2 remain verified complete. Phase 3 is in progress on `feature/frontend-authentication`; its frontend auth and billing interfaces are connected to the inspected backend contracts. Terms and Privacy drafts still require legal review and approval. Phase 3 still depends on external payment-provider/database validation and user-owned live auth verification. Responsive review is user-confirmed. OAuth remains deferred because no provider or backend contract is approved. Phase 4 is blocked by missing backend contracts for avatar management and cross-device onboarding persistence; profile editing and account-security functionality already present do not satisfy those blocked requirements. Its account-deletion UI now follows the finalized 30-day recovery contract recorded below. Phases 5–7 have substantial implementation and remain In Progress pending remaining acceptance criteria and verification; Phase 8 is also In Progress. Phase 9 is In Progress on `feature/phase-9-projects`.
+Phases 0, 1, and 2 remain verified complete. Phase 3 is in progress on `feature/frontend-authentication`; its frontend auth and billing interfaces are connected to the inspected backend contracts. Terms and Privacy drafts still require legal review and approval. Phase 3 still depends on external payment-provider/database validation and user-owned live auth verification. Responsive review is user-confirmed. OAuth remains deferred because no provider or backend contract is approved. Phase 4 is blocked by missing backend contracts for avatar management and cross-device onboarding persistence; profile editing and account-security functionality already present do not satisfy those blocked requirements. Its account-deletion UI now follows the finalized 30-day recovery contract recorded below. Phases 5–7 have substantial implementation and remain In Progress pending remaining acceptance criteria and verification; Phase 8 is also In Progress. Phase 9 is In Progress on `feature/phase-9-projects`. Phase 10 is In Progress on `feature/phase-9-projects`.
 
 ### Frontend-to-backend phase and contract map
 
@@ -301,7 +301,7 @@ Backend phase numbers below refer to the adjacent backend roadmap/API documentat
 | FE-7 Roles and access-controlled UI | BE-6 authorization; BE-7 organization/channel access | Workspace member/role routes, project and channel access policies, `/workspaces/{workspaceId}/notification-preferences`, `/privacy-requests/*`, and incoming/accept/reject ownership-transfer routes. There is no separate general notification feed API. |
 | FE-8 Teams, departments, and groups UI | BE-7 organization structure | `/workspaces/{workspaceId}/teams/*`, `/departments/*`, `/institution-groups/*`; project association at `/projects/{projectId}/organizational-access`. Department roster listing and team activity APIs are absent. |
 | FE-9 Projects and visibility UI | BE-8 Projects and visibility | `/workspaces/{workspaceId}/projects*`, project members, activity, milestones, archive/restore and ownership transfer. This is BE-8 project work, distinct from FE-8 Teams UI. |
-| FE-10 Tasks | No task module/API registered | Task CRUD, comments, status, assignment, and task views have no registered API contract. |
+| FE-10 Tasks | BE-8 Projects / task module | Task API fully registered at `/workspaces/{workspaceId}/projects/{projectId}/tasks` with CRUD, assignees, dependencies, comments, archive/restore, complete/reopen. All routes verified in `src/modules/tasks/task.routes.ts` and `src/routes/index.ts`. |
 | FE-11 Messaging and conversations | BE-7 Channel access metadata only | `/workspaces/{workspaceId}/channels*` covers channel metadata/access only. Message, conversation, thread, reaction, and real-time delivery APIs are absent. |
 | FE-12 Notifications and activity feed | Partial workspace preferences; project activity | Notification preferences and project audit activity exist. General notification list/read/feed APIs are absent. |
 | FE-13 File management | Organization profile media only | Company/institution logo upload/read/delete endpoints exist. General file/folder/attachment upload, download, sharing, and version APIs are absent. |
@@ -1346,7 +1346,107 @@ Build the complete task management experience.
 - Multiple task views.
 - Task details and collaboration.
 
-## Phase 11 — Real-Time Messaging and Conversations
+### Phase 10 Status — In Progress (2026-11-06)
+
+Branch: `feature/phase-9-projects`.
+
+#### Contract correction
+
+The Phase Status Summary table previously recorded Phase 10 as "Not Started" and the contract map recorded "No task module/API registered." Both are incorrect. The adjacent backend has a complete task module registered at `src/modules/tasks/` and mounted in `src/routes/index.ts`:
+
+```
+/workspaces/:workspaceId/projects/:projectId/tasks       — CRUD, list
+/workspaces/:workspaceId/projects/:projectId/tasks/:id   — get, update, delete
+/:id/archive, /:id/restore, /:id/complete, /:id/reopen
+/:id/assignees, /:id/assignees/:userId
+/:id/dependencies, /:id/dependencies/:dependsOnTaskId
+/:id/comments, /:id/comments/:commentId
+```
+
+#### Pre-existing bug fixed
+
+The milestones page (`app/app/projects/[projectId]/milestones/page.tsx`) uses `useParams()` to destructure `projectId`, but a pre-existing workspace-switch test (`workspace-switch.test.tsx`) passed `params` as a prop and did not mock `useParams`. The test was corrected: `useParams` is now mocked in `next/navigation` and the milestones test case renders `<Page />` without a `params` prop. TypeScript now reports zero errors.
+
+#### Implementation evidence
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Task creation and editing | Implemented | Create task modal with Zod validation (title min 2/max 200, priority, status, dates, labels). `updateTask` on detail page inline edit form covers all backend-documented fields. |
+| Task detail view | Implemented | `app/app/projects/[projectId]/tasks/[taskId]/page.tsx` — full task with inline edit, metadata sidebar (status, priority, dates, creator, counts). |
+| Assignees (multiple) | Implemented | Assignee section in detail page: list current, add from project member select, remove with ConfirmDialog. Calls `addAssignee`/`removeAssignee`. |
+| Status and priority controls | Implemented | Status and priority shown as Badges in list and detail. Editable in inline edit form. Complete/reopen status transitions via dedicated backend endpoints. |
+| Due dates and scheduling | Implemented | Start and due date inputs (date type) in create and edit forms. Dates displayed in all views. |
+| Labels and categories | Implemented | Labels (comma-separated) and category in create/edit forms. Labels shown as Badge chips. Board/List/Timeline/Calendar all render labels. |
+| Task comments | Implemented | Comments section in detail page: list, add, inline edit, delete (with ConfirmDialog). Author-only edit/delete enforced by `user.id === comment.authorId` check. |
+| Task dependencies | Implemented | Dependencies section in detail page: list with status badge, add via task ID input, remove with ConfirmDialog. Read-only blockers section shows tasks waiting on this task. |
+| Task filters and sorting | Implemented | Status, priority, search, includeArchived filters. sortBy (position/dueDate/priority/createdAt) and sortOrder (asc/desc) selects. |
+| Task search | Implemented | Search input passes `search` param to `listTasks`. |
+| Board view | Implemented | Tasks grouped into 6 status columns. Cards show key, title, priority badge, assignee initials, due date. Horizontal-scroll on mobile. |
+| List view | Implemented | Table-style layout with columns: Key, Title, Status, Priority, Assignees, Due Date. Rows link to task detail. |
+| Calendar view | Implemented | Month grid with prev/next/today navigation. Tasks shown on due-date cells. Unscheduled tasks section below. |
+| Timeline view | Implemented | Tasks grouped by due date (chronological). Each entry shows key, title, status badge, priority badge, date range. "No due date" group. |
+| All views use same data | Implemented | Single `listTasks()` call at load. View mode state switches rendering. Filters/sorting affect all views. |
+| Task status transitions | Implemented | Complete → sets status to APPROVED via `/complete` endpoint. Reopen → sets status to IN_PROGRESS via `/reopen` endpoint. Both via ConfirmDialog. |
+| Task completion and reopening | Implemented | Complete/Reopen buttons in task detail header. State updates reflected immediately after response. |
+| Archive and restore | Implemented | Archive/Restore via dedicated endpoints on both list page (per-card) and detail page header. |
+| Task deletion | Implemented | Delete button on detail page with ConfirmDialog (destructive). Navigates to task list after deletion using `useRouter().push()`. |
+| Loading, empty, error, access-denied states | Implemented | Skeleton loaders, EmptyState, Alert for errors, AccessState for 401/403 on every page. |
+| Workspace-switch safety | Implemented | `latestLoad` ref + `loadedWorkspaceId` guard on task list. `useWorkspaceRedirect()` on both list and detail pages. |
+| Navigation entry | Implemented | Tasks tab added to `[projectId]/layout.tsx` between Overview and Members. Overview page Tasks card now links to the tasks page with task count. |
+
+#### Backend routes consumed
+
+- `GET /workspaces/{workspaceId}/projects/{projectId}/tasks` — list with cursor, limit, status, priority, assigneeId, labels, search, sortBy, sortOrder, includeArchived
+- `POST /workspaces/{workspaceId}/projects/{projectId}/tasks` — create
+- `GET /workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}` — get single task
+- `PATCH /workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}` — update
+- `DELETE /workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}` — soft-delete
+- `POST .../tasks/{taskId}/archive` — archive
+- `POST .../tasks/{taskId}/restore` — restore
+- `POST .../tasks/{taskId}/complete` — mark complete (sets status APPROVED)
+- `POST .../tasks/{taskId}/reopen` — reopen (sets status IN_PROGRESS)
+- `POST .../tasks/{taskId}/assignees` — add assignee (body: `{ targetUserId }`)
+- `DELETE .../tasks/{taskId}/assignees/{userId}` — remove assignee
+- `POST .../tasks/{taskId}/dependencies` — add dependency (body: `{ dependsOnTaskId }`)
+- `DELETE .../tasks/{taskId}/dependencies/{dependsOnTaskId}` — remove dependency
+- `GET .../tasks/{taskId}/comments` — list comments
+- `POST .../tasks/{taskId}/comments` — add comment (body: `{ body, parentId? }`)
+- `PATCH .../tasks/{taskId}/comments/{commentId}` — update comment
+- `DELETE .../tasks/{taskId}/comments/{commentId}` — delete comment
+
+#### Files created
+
+- `services/tasks.ts` — typed task API service with all operations and types
+- `services/__tests__/tasks.test.ts` — 23 contract tests covering all operations
+- `app/app/projects/[projectId]/tasks/page.tsx` — task list with Board/List/Calendar/Timeline views
+- `app/app/projects/[projectId]/tasks/page.test.tsx` — 8 page tests
+- `app/app/projects/[projectId]/tasks/[taskId]/page.tsx` — task detail page
+
+#### Files modified
+
+- `app/app/projects/workspace-switch.test.tsx` — fixed pre-existing test: added `useParams` mock, removed `params` prop from milestones render
+- `app/app/projects/[projectId]/layout.tsx` — added Tasks tab
+- `app/app/projects/[projectId]/page.tsx` — replaced unavailable Tasks card with link to tasks page
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 51 files, 358 tests |
+| `npm run build` | Passed — `/app/projects/[projectId]/tasks` and `/app/projects/[projectId]/tasks/[taskId]` routes generated |
+
+#### Remaining gaps
+
+Phase 10 remains **In Progress** due to:
+
+- **Attachments**: Task attachment upload, listing, and download are not implemented. The backend exposes no general file/attachment upload contract for tasks (only org logo routes exist). Blocked by the same missing backend storage contract as Phase 13.
+- **@mentions**: `@mention` interface in comments and task descriptions is not implemented. No backend @mention resolution or notification contract exists for task comments beyond the existing TASK_ASSIGNED notification.
+- **Subtasks / checklists**: Sub-task creation is not wired in the UI (though the backend supports `parentTaskId`). A dedicated subtask list panel was not built. No checklist model is registered in the backend.
+- **Activity history per task**: The backend records audit events for task mutations but does not expose a per-task activity timeline endpoint. Only the project-level activity feed exists.
+- **Live backend verification**: All tests use mocked API responses. No live authenticated backend session was used.
+- **Manual responsive review**: Not performed by this agent; awaiting user confirmation.
 
 ### Objectives
 
@@ -2197,7 +2297,7 @@ Status reflects contract inspection against `../__NexusBackend__/docs/API.md` an
 | FE-7 | Roles, access control and lifecycle UI | BE-4 — Ownership lifecycle; BE-3 — Privacy/account APIs; BE-5 — Membership authorization | Workspace member role/state routes; owner transfer incoming/accept/reject/billing acceptance; `POST /privacy-requests`, `/privacy-requests/mine*` |
 | FE-8 | Departments, teams and institution groups UI | BE-7 — Teams and organizational structure | Workspace departments, teams, and institution-group routes; department roster and team activity are real gaps |
 | FE-9 | Projects and project visibility UI | BE-8 — Projects and project visibility | Project routes in OpenAPI; verify visibility and resource contracts before FE-9 work |
-| FE-10 | Tasks and work management UI | BE-8 — Projects / task resource contracts | Task routes where registered; verify full task contracts before FE-10 work |
+| FE-10 | Tasks and work management UI | BE-8 — Projects / task module | Task API fully registered: `GET/POST /workspaces/{workspaceId}/projects/{projectId}/tasks`, `GET/PATCH/DELETE /{taskId}`, `POST /{taskId}/archive`, `/{taskId}/restore`, `/{taskId}/complete`, `/{taskId}/reopen`, `/{taskId}/assignees`, `/{taskId}/dependencies`, `/{taskId}/comments`. All routes verified in backend source. |
 | FE-11 | Real-time messaging and conversations UI | Backend messaging contract phase not yet documented in the active backend roadmap | OpenAPI/API.md message and channel contracts; verify persistence and event support before implementation |
 | FE-12 | Notification centre and activity feed UI | Backend contract phase not yet mapped | Use only registered notification/activity contracts; verify before implementation |
 | FE-13 | File management and Nexus Drive UI | Backend contract phase not yet mapped | Use only registered file/storage contracts; verify authorization and upload shape first |

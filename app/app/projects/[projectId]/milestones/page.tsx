@@ -1,5 +1,5 @@
 'use client';
-
+import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { Alert } from '@/components/ui/Alert';
@@ -39,7 +39,8 @@ function requestError(cause: unknown, fallback: string): string {
   return cause.message;
 }
 
-export default function ProjectMilestonesPage({ params }: { params: { projectId: string } }) {
+export default function ProjectMilestonesPage() {
+  const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
   useWorkspaceRedirect();
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
@@ -68,7 +69,7 @@ export default function ProjectMilestonesPage({ params }: { params: { projectId:
     if (!activeWorkspace) return;
     setLoading(true); setError(null); setAccessStatus(null);
     try {
-      const data = await listProjectMilestones(activeWorkspace.id, params.projectId);
+      const data = await listProjectMilestones(activeWorkspace.id, projectId);
       setMilestones(data);
     } catch (cause) {
       if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
@@ -79,7 +80,7 @@ export default function ProjectMilestonesPage({ params }: { params: { projectId:
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace, params.projectId]);
+  }, [activeWorkspace, projectId]);
 
   useEffect(() => { let active = true; void Promise.resolve().then(() => active ? load() : undefined); return () => { active = false; }; }, [load]);
 
@@ -95,7 +96,7 @@ export default function ProjectMilestonesPage({ params }: { params: { projectId:
     }
     setBusy(true); setError(null); setFormErrors({});
     try {
-      await createProjectMilestone(activeWorkspace.id, params.projectId, {
+      await createProjectMilestone(activeWorkspace.id, projectId, {
         name: parsed.data.name,
         description: parsed.data.description ?? null,
         dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate).toISOString() : null,
@@ -111,7 +112,7 @@ export default function ProjectMilestonesPage({ params }: { params: { projectId:
     if (!activeWorkspace) return;
     setBusy(true); setError(null);
     try {
-      await updateProjectMilestone(activeWorkspace.id, params.projectId, milestone.id, {
+      await updateProjectMilestone(activeWorkspace.id, projectId, milestone.id, {
         completed: !milestone.completedAt,
       });
       setNotice(milestone.completedAt ? 'Milestone reopened.' : 'Milestone completed.');
@@ -127,7 +128,7 @@ export default function ProjectMilestonesPage({ params }: { params: { projectId:
     if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? 'Check milestone details.'); return; }
     setBusy(true); setError(null);
     try {
-      await updateProjectMilestone(activeWorkspace.id, params.projectId, editId, {
+      await updateProjectMilestone(activeWorkspace.id, projectId, editId, {
         name: parsed.data.name,
         description: parsed.data.description ?? null,
         dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate).toISOString() : null,
@@ -143,7 +144,7 @@ export default function ProjectMilestonesPage({ params }: { params: { projectId:
     if (!activeWorkspace || !deleteTarget) return;
     setBusy(true); setError(null);
     try {
-      await deleteProjectMilestone(activeWorkspace.id, params.projectId, deleteTarget.id);
+      await deleteProjectMilestone(activeWorkspace.id, projectId, deleteTarget.id);
       setDeleteTarget(null);
       setNotice('Milestone deleted.');
       await load();

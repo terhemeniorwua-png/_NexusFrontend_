@@ -51,6 +51,27 @@ describe('Input', () => {
     expect(screen.getByRole('textbox')).toBeDisabled();
   });
 
+  it('starts with password hidden and toggles visibility accessibly', async () => {
+    const user = userEvent.setup();
+    render(<Input id="password" label="Password" type="password" />);
+
+    const input = screen.getByLabelText('Password');
+    expect(input).toHaveAttribute('type', 'password');
+
+    const showButton = screen.getByRole('button', { name: 'Show password' });
+    expect(showButton).toHaveAttribute('type', 'button');
+    await user.click(showButton);
+    expect(input).toHaveAttribute('type', 'text');
+
+    await user.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(input).toHaveAttribute('type', 'password');
+  });
+
+  it('does not render a password toggle for other input types', () => {
+    render(<Input id="email" label="Email" type="email" />);
+    expect(screen.queryByRole('button', { name: /password/i })).toBeNull();
+  });
+
   it('hides label visually when srOnlyLabel is true', () => {
     render(<Input id="search" label="Search" srOnlyLabel />);
     const label = screen.getByText('Search');

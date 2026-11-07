@@ -14,7 +14,7 @@ export interface AuthSession {
   expiresAt: string;
 }
 
-interface AuthResponse {
+export interface AuthResponse {
   user: AuthUser;
   accessToken: string;
   tokenType: 'Bearer';
@@ -23,11 +23,20 @@ interface AuthResponse {
   session: AuthSession;
 }
 
+export interface TwoFactorRequiredResponse {
+  twoFactorRequired: true;
+  challengeToken: string;
+  expiresIn: number;
+}
+
+export type GoogleExchangeResponse = AuthResponse | TwoFactorRequiredResponse;
+
 export interface AuthMessage {
   message: string;
 }
 
 let refreshInFlight: Promise<AuthResponse> | null = null;
+let googleExchangeInFlight: { code: string; promise: Promise<GoogleExchangeResponse> } | null = null;
 
 export async function register(input: {
   name: string;
@@ -42,6 +51,37 @@ export async function signIn(input: {
   password: string;
 }): Promise<AuthResponse> {
   const result = await apiRequest<AuthResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  setAccessToken(result.accessToken);
+  return result;
+}
+
+export function exchangeGoogleLoginCode(code: string): Promise<GoogleExchangeResponse> {
+  if (googleExchangeInFlight?.code === code) return googleExchangeInFlight.promise;
+
+  const promise = apiRequest<GoogleExchangeResponse>('/auth/google/exchange', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  }).then((result) => {
+    if ('accessToken' in result) setAccessToken(result.accessToken);
+    return result;
+  });
+  googleExchangeInFlight = { code, promise };
+  void promise.then(
+    () => { if (googleExchangeInFlight?.promise === promise) googleExchangeInFlight = null; },
+    () => { if (googleExchangeInFlight?.promise === promise) googleExchangeInFlight = null; },
+  );
+  return promise;
+}
+
+export async function completeTwoFactorLogin(input: {
+  challengeToken: string;
+  code?: string;
+  recoveryCode?: string;
+}): Promise<AuthResponse> {
+  const result = await apiRequest<AuthResponse>('/auth/2fa/challenge', {
     method: 'POST',
     body: JSON.stringify(input),
   });

@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
@@ -22,9 +21,6 @@ import {
   createChannel,
   archiveChannel,
   deleteChannel,
-  updateChannel,
-  addChannelMember,
-  removeChannelMember,
   type ChannelSummary,
   type ChannelType,
   type CreateChannelInput,
@@ -39,10 +35,8 @@ import {
   getReplies,
   addReaction,
   getUnreadCount,
-  markMessageRead,
   type MessageSummary,
 } from '@/services/messages';
-import { listWorkspaceMembers, type WorkspaceMember } from '@/services/workspaces';
 import { listTeams, listDepartments } from '@/services/organization-structure';
 
 // ---------------------------------------------------------------------------
@@ -109,7 +103,6 @@ export default function MessagesPage() {
   const [createBusy, setCreateBusy] = useState(false);
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [members, setMembers] = useState<WorkspaceMember[]>([]);
 
   // Archive/delete confirmation
   const [archiveTarget, setArchiveTarget] = useState<ChannelSummary | null>(null);
@@ -120,7 +113,6 @@ export default function MessagesPage() {
   const [messageLoading, setMessageLoading] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
 
   // Message composer
   const [messageBody, setMessageBody] = useState('');
@@ -156,15 +148,11 @@ export default function MessagesPage() {
     const seq = ++latestLoad.current;
     setChannelLoading(true); setChannelError(null); setAccessStatus(null);
     try {
-      const [page, memberData] = await Promise.all([
-        listChannels(activeWorkspace.id, { limit: 100 }),
-        listWorkspaceMembers(activeWorkspace.id),
-      ]);
+      const page = await listChannels(activeWorkspace.id, { limit: 100 });
       if (seq !== latestLoad.current) return;
       if (loadedWorkspaceId.current !== null && loadedWorkspaceId.current !== activeWorkspace.id) return;
       loadedWorkspaceId.current = activeWorkspace.id;
       setChannels(page.items);
-      setMembers(memberData);
       // Fetch unread counts for non-archived channels
       for (const ch of page.items) {
         if (!ch.archivedAt) {
@@ -186,13 +174,18 @@ export default function MessagesPage() {
     }
   }, [activeWorkspace]);
 
+  const prevWorkspaceId = useRef<string | null>(null);
+
   useEffect(() => {
     if (!activeWorkspace) return;
-    // Reset state on workspace change
-    setSelectedChannel(null);
-    setMessages([]);
-    setUnreadCounts({});
-    prevChannelRef.current = null;
+    // Reset state on workspace change — compare to avoid cascading renders
+    if (prevWorkspaceId.current !== null && prevWorkspaceId.current !== activeWorkspace.id) {
+      setSelectedChannel(null);
+      setMessages([]);
+      setUnreadCounts({});
+      prevChannelRef.current = null;
+    }
+    prevWorkspaceId.current = activeWorkspace.id;
     void loadChannels();
   }, [activeWorkspace, loadChannels]);
 

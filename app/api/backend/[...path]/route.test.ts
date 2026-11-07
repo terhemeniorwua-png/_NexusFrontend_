@@ -47,6 +47,36 @@ describe('same-origin backend proxy', () => {
     ]);
   });
 
+  it('passes the backend Google authorization redirect through the same-origin proxy', async () => {
+    const googleUrl = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=test&state=opaque-state';
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, {
+      status: 302,
+      headers: { Location: googleUrl },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const request = new NextRequest('http://localhost/api/backend/auth/google');
+
+    const response = await GET(request, { params: Promise.resolve({ path: ['auth', 'google'] }) });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('http://localhost:4000/api/v1/auth/google');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(googleUrl);
+  });
+
+  it('returns Google initiation failures to the styled frontend callback', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: false,
+      error: { code: 'GOOGLE_AUTH_UNAVAILABLE', message: 'Google sign-in is not configured.' },
+    }), { status: 503, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const request = new NextRequest('http://localhost/api/backend/auth/google');
+
+    const response = await GET(request, { params: Promise.resolve({ path: ['auth', 'google'] }) });
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe('http://localhost/auth/google/callback?error=GOOGLE_AUTH_UNAVAILABLE');
+  });
+
   it('proxies the confirmed workspace API for account-type workspace resolution', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

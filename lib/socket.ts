@@ -15,6 +15,7 @@
 
 import { io, type Socket } from 'socket.io-client';
 import { getAccessToken } from './api';
+import { refreshSession } from '@/services/auth';
 
 let socket: Socket | null = null;
 
@@ -25,10 +26,28 @@ let socket: Socket | null = null;
 export function getSocket(): Socket {
   if (socket) return socket;
 
-  socket = io('/api/backend', {
-    path: '/api/backend/socket.io',
+  // WebSockets cannot pass through the Vercel proxy, so connect directly to
+  // the backend. NEXT_PUBLIC_SOCKET_URL must be the Render URL, no trailing slash.
+  const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+  if (!socketUrl) {
+    console.warn('NEXT_PUBLIC_SOCKET_URL is not set; realtime will not connect.');
+  }
+
+  socket = io(socketUrl ?? '/api/backend', {
+    path: socketUrl ? '/socket.io' : '/api/backend/socket.io',
     auth: (cb) => {
-      cb({ token: getAccessToken() });
+      void (async () => {
+        let token = getAccessToken();
+        if (!token) {
+          try {
+            await refreshSession();
+            token = getAccessToken();
+          } catch {
+            // Fall through; the server will reject and the client will retry.
+          }
+        }
+        cb({ token });
+      })();
     },
     autoConnect: true,
     reconnection: true,

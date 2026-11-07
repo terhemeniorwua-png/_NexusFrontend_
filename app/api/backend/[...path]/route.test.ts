@@ -94,6 +94,8 @@ describe('same-origin backend proxy', () => {
     [['users', 'me'], 'http://localhost:4000/api/v1/users/me'],
     [['billing', 'plans'], 'http://localhost:4000/api/v1/billing/plans'],
     [['invitations'], 'http://localhost:4000/api/v1/invitations'],
+    [['notifications'], 'http://localhost:4000/api/v1/notifications'],
+    [['notifications', 'unread-count'], 'http://localhost:4000/api/v1/notifications/unread-count'],
   ])('proxies the confirmed %s module', async (path, expectedUrl) => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

@@ -258,7 +258,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 9     | Projects and Project Visibility                                  | In Progress |
 | 10    | Tasks and Work Management                                        | In Progress |
 | 11    | Real-Time Messaging and Conversations                            | In Progress |
-| 12    | Notification Centre and Activity Feed                            | Not Started |
+| 12    | Notification Centre and Activity Feed                            | In Progress |
 | 13    | File Management and Nexus Drive                                  | Not Started |
 | 14    | Document Collaboration                                           | Not Started |
 | 15    | Calendar and Scheduling                                          | Not Started |
@@ -1655,6 +1655,73 @@ General notification examples include:
 - General notification centre.
 - Activity feed.
 - Independent message and notification unread states.
+
+### Phase 12 Status — In Progress (2026-11-07)
+
+Branch: `feature/phase-12-notifications`.
+
+#### Backend contract audit (verified 2026-11-07)
+
+The backend `src/modules/notifications/` module was already complete. The previous entry that listed the inbox and unread-count APIs as absent was incorrect.
+
+| API | Correct path | Status |
+|---|---|---|
+| List notifications + unread count | `GET /notifications` | ✅ Real endpoint — returns `{items, nextCursor, unreadCount}` |
+| Unread count only | `GET /notifications/unread-count` | ✅ Real endpoint |
+| Mark notifications as read (batch) | `POST /notifications/read` — body: `{notificationIds[]}` | ✅ Real endpoint |
+| Mark all as read | `POST /notifications/read-all` | ✅ Real endpoint |
+| Get preferences | `GET /notifications/preferences/:workspaceId` | ✅ Real endpoint — **not** under `/workspaces/{id}/...` |
+| Update one preference | `PUT /notifications/preferences/:workspaceId` — body: `{type, inAppEnabled}` | ✅ Real endpoint — **PUT** (not PATCH), one type per request |
+| Workspace activity feed | `GET /notifications/activity/:workspaceId` | ✅ Real endpoint |
+| Socket.IO notification push event | none | ❌ Not registered — only gap remaining |
+
+All routes mounted at `/api/v1/notifications`; the proxy now forwards them via `/api/backend/notifications/*` (added `notifications` to `ALLOWED_API_PREFIXES`).
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Notification inbox (list, unread count) | Implemented | `GET /notifications` — infinite scroll with Load more, unread dot, unread-only filter, live unread count display |
+| Mark single notification as read | Implemented | Per-item "Read" button → `POST /notifications/read` with `{notificationIds:[id]}` |
+| Mark all as read | Implemented | "Mark all as read" button → ConfirmDialog → `POST /notifications/read-all` |
+| Notification preferences | Implemented | Preferences tab → `GET/PUT /notifications/preferences/:workspaceId` — grouped toggles, optimistic update per checkbox |
+| Workspace activity feed | Implemented | Activity tab → `GET /notifications/activity/:workspaceId` — paginated audit log |
+| Unread count in topbar bell | Implemented | `AuthenticatedShell` polls `GET /notifications/unread-count` on mount and every 60 s; clears on sign-out |
+| Notifications topbar bell | Wired | `notificationsHref="/app/notifications"` in `AuthenticatedShell` |
+| Navigation entry | Implemented | `/app/notifications` under Communication, all workspace types |
+| Notification/message separation | Maintained | `notificationUnreadCount` and `messageUnreadCount` are independent state — never combined or shared |
+| Workspace-switch safety | Implemented | `latestLoad` ref guards on both Inbox and Activity tabs |
+| Loading, empty, error states | Implemented | Skeletons, EmptyState, Alert+Retry on load error, per-type save errors in Preferences |
+| Real-time push | Not implemented | Backend emits no notification socket events; will require a new event when added |
+
+#### Files created / modified (2026-11-07 update)
+
+- `services/notifications.ts` — rewritten with real endpoints (`listNotifications`, `getUnreadCount`, `markNotificationsRead`, `markAllNotificationsRead`, `getNotificationPreferences`, `updateNotificationPreference`, `listActivity`)
+- `services/__tests__/notifications.test.ts` — 21 service contract tests covering all 7 operations
+- `app/app/notifications/page.tsx` — full inbox, activity, and preferences tabs
+- `app/app/notifications/page.test.tsx` — 14 page tests
+- `components/layout/AuthenticatedShell.tsx` — real unread-count polling every 60 s
+- `app/api/backend/[...path]/route.ts` — added `notifications` to `ALLOWED_API_PREFIXES`
+- `app/api/backend/[...path]/route.test.ts` — added proxy test for notifications module
+- `lib/app-navigation.ts` / `lib/app-navigation.test.ts` — Notifications nav entry
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 59 files, 435 tests |
+| `npm run build` | Passed — `/app/notifications` route generated |
+
+#### Remaining gaps
+
+Phase 12 remains **In Progress** due to:
+
+- **Socket.IO notification push**: `src/realtime/socket-server.ts` emits no notification events. A `notification:new` event (with payload `{id, type, title, unreadCount}`) is needed to update the unread badge and prepend to the inbox in real time without polling.
+- **Live backend verification**: all tests use mocked API responses against the jsdom environment. No live authenticated session was used.
+- **Manual responsive review**: not performed; awaiting user confirmation.
+
 
 ## Phase 13 — File Management and Nexus Drive
 

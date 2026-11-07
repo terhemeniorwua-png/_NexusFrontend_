@@ -93,10 +93,11 @@ describe('MessagesPage', () => {
     mocks.socket = { emit: vi.fn(), on: vi.fn(), off: vi.fn(), io: { on: vi.fn(), off: vi.fn() } };
     mocks.listChannels.mockResolvedValue({ items: [channelA], nextCursor: null });
     mocks.listMessages.mockResolvedValue({ items: [message1], nextCursor: null });
-    mocks.listWorkspaceMembers.mockResolvedValue([]);
     mocks.listTeams.mockResolvedValue([]);
     mocks.listDepartments.mockResolvedValue([]);
     mocks.getUnreadCount.mockResolvedValue({ unreadCount: 0 });
+    // jsdom does not implement scrollIntoView — mock it on Element.prototype
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
   it('shows channels loaded from the API', async () => {

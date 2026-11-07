@@ -104,7 +104,8 @@ describe('files service', () => {
 
     const createObjectURL = vi.fn().mockReturnValue('blob:fake-url');
     const revokeObjectURL = vi.fn();
-    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
 
     const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((el) => el);
     const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((el) => el);

@@ -35,6 +35,8 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
       items: [
         { id: 'projects', label: 'Projects', href: '/app/projects', permissions: ['workspace:view'] },
         { id: 'files', label: 'Files', href: '/app/files', permissions: ['workspace:view'] },
+        { id: 'documents', label: 'Documents', href: '/app/documents', permissions: ['workspace:view'] },
+        { id: 'calendar', label: 'Calendar', href: '/app/calendar', permissions: ['workspace:view'] },
       ],
     },
     {
@@ -42,6 +44,7 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
       label: 'Communication',
       items: [
         { id: 'messages', label: 'Messages', href: '/app/messages', permissions: ['workspace:view'] },
+        { id: 'meetings', label: 'Meetings', href: '/app/meetings', permissions: ['workspace:view'] },
         { id: 'notifications', label: 'Notifications', href: '/app/notifications', permissions: ['workspace:view'] },
       ],
     },

@@ -260,8 +260,8 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 11    | Real-Time Messaging and Conversations                            | In Progress |
 | 12    | Notification Centre and Activity Feed                            | In Progress |
 | 13    | File Management and Nexus Drive                                  | In Progress |
-| 14    | Document Collaboration                                           | Not Started |
-| 15    | Calendar and Scheduling                                          | Not Started |
+| 14    | Document Collaboration                                           | In Progress |
+| 15    | Calendar and Scheduling                                          | In Progress |
 | 16    | Meetings and Calling                                             | Not Started |
 | 17    | Forms and Surveys                                                | Not Started |
 | 18    | Subscription, Billing, and Plan Management                       | Not Started |
@@ -1846,6 +1846,75 @@ Build document creation and collaboration interfaces.
 - Document editing experience.
 - Document collaboration interfaces.
 
+### Phase 14 Status — In Progress (2026-11-07)
+
+Branch: `feature/phase-14-documents`.
+
+#### Backend contract (verified 2026-11-07)
+
+All routes mounted at `/api/v1/workspaces/:workspaceId/documents` — already forwarded by the proxy since `workspaces` is in `ALLOWED_API_PREFIXES`.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/workspaces/:wsId/documents` | list — `{items: DocumentSummary[], nextCursor}` — query: `cursor`, `limit`, `projectId?`, `taskId?`, `search?` |
+| `POST` | `/workspaces/:wsId/documents` | create — `DocumentSummary` (201) — body: `{title, content?, projectId?, taskId?}` |
+| `GET` | `/workspaces/:wsId/documents/:docId` | get single — `DocumentSummary` |
+| `PATCH` | `/workspaces/:wsId/documents/:docId` | update — `DocumentSummary` — body: `{title?, content?}` (at least one required) |
+| `DELETE` | `/workspaces/:wsId/documents/:docId` | soft-delete — `{ok: true}` |
+| `GET` | `/workspaces/:wsId/documents/:docId/revisions` | revision history — `Array<{id, authorId, authorName, content, createdAt}>` |
+| `GET` | `/workspaces/:wsId/documents/:docId/comments` | list comments — `DocumentCommentSummary[]` |
+| `POST` | `/workspaces/:wsId/documents/:docId/comments` | add comment (201) — body: `{body: string}` (1–10,000 chars) |
+| `DELETE` | `/workspaces/:wsId/documents/:docId/comments/:commentId` | delete comment |
+
+#### Implementation evidence
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Document listing with search | Implemented | Left panel with cursor-paginated list, debounced search input, Load more button |
+| Document creation | Implemented | Create form with title (required), content (optional), validated client-side |
+| Document editing | Implemented | Inline edit form in detail panel — title + content — PATCH to backend |
+| Document deletion | Implemented | Delete button in detail header with ConfirmDialog (destructive), optimistic list update |
+| Document preview | Implemented | Detail panel shows title, content, author, updated time, revision count |
+| Document comments | Implemented | Comments tab in detail panel — load-on-select, add, delete (author only), error handling |
+| Document revision history | Implemented | Revisions tab — load-on-select, version list with author and date, error handling |
+| Loading, empty, error states | Implemented | Skeleton loaders, EmptyState, Alert + Retry on all data-fetching paths |
+| Workspace-switch safety | Implemented | `latestLoad` ref + seq guard; workspace change resets list and clears selection |
+| Navigation entry | Implemented | `/app/documents` under Work section, visible for all workspace types |
+| AccessState for 401/403 | Not needed — documents page uses the workspace context for auth; API errors surface as Alert |
+
+#### Files created
+
+- `services/documents.ts` — typed document API service (all operations and types)
+- `services/__tests__/documents.test.ts` — 12 service contract tests
+- `app/app/documents/page.tsx` — full documents page (list, create form, detail panel, comments, revisions)
+- `app/app/documents/page.test.tsx` — 12 page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Documents entry under Work section
+- `lib/app-navigation.test.ts` — added test verifying Documents entry for all workspace types
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 63 files, 496 tests |
+| `npm run build` | Passed — `/app/documents` route generated |
+
+#### Remaining gaps
+
+Phase 14 remains **In Progress** due to:
+
+- **Rich text / WYSIWYG editor**: The document content is stored and edited as plain text. A rich collaborative editor (e.g., Tiptap, Quill, Yjs) is deferred pending a backend content-format decision and library approval. The edit textarea currently notes this limitation.
+- **Document sharing and access controls**: No per-document sharing or access-control endpoint is registered in the backend.
+- **Folder management**: No folder or nested-document API is registered in the backend.
+- **Real-time collaboration indicators**: No WebSocket events for document presence or concurrent-edit notifications are registered.
+- **Document search in global search**: Depends on Phase 19.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
+
 ## Phase 15 — Calendar and Scheduling
 
 ### Objectives
@@ -1882,6 +1951,80 @@ Build the Nexus calendar experience.
 - Calendar interface.
 - Scheduling workflows.
 - Calendar integration settings.
+
+### Phase 15 Status — In Progress (2026-11-07)
+
+Branch: `feature/phase-15-calendar`.
+
+#### Backend contract (verified 2026-11-07)
+
+All routes mounted at `/api/v1/workspaces/:workspaceId/events` — already forwarded by the proxy since `workspaces` is in `ALLOWED_API_PREFIXES`.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/workspaces/:wsId/events` | list — `{items, nextCursor}` — query: `cursor`, `limit`, `startAfter?`, `startBefore?`, `projectId?`, `status?` |
+| `POST` | `/workspaces/:wsId/events` | create — `EventSummary` (201) — body: `{title, description?, location?, startAt, endAt, allDay?, status?, visibility?, projectId?, inviteeIds?}` |
+| `GET` | `/workspaces/:wsId/events/:eventId` | get single — `EventSummary` |
+| `PATCH` | `/workspaces/:wsId/events/:eventId` | update — `EventSummary` — body: any subset of create fields |
+| `POST` | `/workspaces/:wsId/events/:eventId/cancel` | cancel — `{ok: true}` |
+| `DELETE` | `/workspaces/:wsId/events/:eventId` | soft-delete — `{ok: true}` |
+| `GET` | `/workspaces/:wsId/events/:eventId/invitations` | list invitees — `Array<{userId, status, createdAt}>` |
+| `POST` | `/workspaces/:wsId/events/:eventId/invitations` | add invitee (201) — body: `{userId}` |
+| `DELETE` | `/workspaces/:wsId/events/:eventId/invitations/:userId` | remove invitee |
+| `POST` | `/workspaces/:wsId/events/:eventId/respond` | respond to invitation — body: `{status: 'ACCEPTED' or 'DECLINED' or 'TENTATIVE'}` |
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Calendar page with month/week/day views | Implemented | `app/app/calendar/page.tsx` — full calendar grid with navigation, view switcher, today button |
+| Month view | Implemented | Grid with 7-column month display, event chips (up to 3 per cell + "+N more"), today highlight, day click navigates to day view |
+| Week view | Implemented | 7-column week grid with day headers and event listing per day |
+| Day view | Implemented | Single-day event list with full time display |
+| Event creation | Implemented | Modal with title, start/end datetime, all-day toggle, description, location, status (CONFIRMED/TENTATIVE/CANCELLED), visibility (PUBLIC/PRIVATE) |
+| Event editing | Implemented | Inline edit form in detail panel (creator only) |
+| Event cancellation | Implemented | "Cancel event" with ConfirmDialog (creator only), sets status to CANCELLED |
+| Event deletion | Implemented | "Delete" with ConfirmDialog destructive (creator only) |
+| Event detail panel | Implemented | Opens below calendar grid — title, status badge, visibility badge, date/time, location, description, invitations list |
+| Invitations list | Implemented | Loads GET .../invitations on panel open, shows userId prefix + ACCEPTED/DECLINED/TENTATIVE/PENDING badge |
+| Loading, empty, error states | Implemented | Skeleton loaders on load, EmptyState in day view, Alert+Retry on error |
+| Workspace-switch safety | Implemented | latestLoad ref + seq guard; events reload on workspace change |
+| Navigation entry | Implemented | Calendar under Work section in lib/app-navigation.ts, all workspace types |
+| Private event visibility | Implemented | Backend controls visibility; frontend renders whatever the backend returns |
+
+#### Files created
+
+- `services/events.ts` — typed calendar event service (all operations and types)
+- `services/__tests__/events.test.ts` — 15 service contract tests
+- `app/app/calendar/page.tsx` — full calendar page with month/week/day views, event CRUD
+- `app/app/calendar/page.test.tsx` — 13 page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Calendar entry under Work section
+- `lib/app-navigation.test.ts` — added calendar nav test (removed duplicate)
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 65 files, 525 tests |
+| `npm run build` | Passed — /app/calendar route generated |
+
+#### Remaining gaps
+
+Phase 15 remains **In Progress** due to:
+
+- **Google Calendar / Outlook integration**: No external calendar sync endpoints exist in the backend. Integration settings UI is deferred.
+- **Two-way sync**: No sync or conflict-detection contract exists in the backend.
+- **Invitation management UI**: addEventInvitation and removeEventInvitation services exist but the UI for adding/removing invitees is not wired (deferred until a workspace member picker is a shared component).
+- **Invitation response**: respondToEventInvitation service exists but the response UI for ACCEPT/DECLINE/TENTATIVE is not wired.
+- **Event search**: No search parameter in the backend list contract. Record as a backend gap.
+- **Personal vs workspace calendar**: All events are workspace-scoped; no personal calendar endpoint exists.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
 
 ## Phase 16 — Meetings and Calling
 
@@ -2540,8 +2683,8 @@ Status reflects contract inspection against `../__NexusBackend__/docs/API.md` an
 | FE-11 | Real-time messaging and conversations UI | Backend messaging contract phase not yet documented in the active backend roadmap | OpenAPI/API.md message and channel contracts; verify persistence and event support before implementation |
 | FE-12 | Notification centre and activity feed UI | Backend contract phase not yet mapped | Use only registered notification/activity contracts; verify before implementation |
 | FE-13 | File management and Nexus Drive UI | Backend contract phase not yet mapped | Use only registered file/storage contracts; verify authorization and upload shape first |
-| FE-14 | Document collaboration UI | Backend contract phase not yet mapped | Document routes/content model and collaboration contract require verification |
-| FE-15 | Calendar and scheduling UI | Backend contract phase not yet mapped | Calendar/event and provider-sync contracts require verification |
+| FE-14 | Document collaboration UI | Backend document module verified 2026-11-07 | `GET/POST /workspaces/{workspaceId}/documents`, `GET/PATCH/DELETE /{docId}`, `GET /{docId}/revisions`, `GET/POST /{docId}/comments`, `DELETE /{docId}/comments/{commentId}`. All routes verified in backend source. |
+| FE-15 | Calendar and scheduling UI | Backend calendar module verified 2026-11-07 | `GET/POST /workspaces/{workspaceId}/events`, `GET/PATCH /{eventId}`, `POST /{eventId}/cancel`, `DELETE /{eventId}`, `GET/POST /{eventId}/invitations`, `DELETE /{eventId}/invitations/{userId}`, `POST /{eventId}/respond`. EventSummary shape confirmed. No Google Calendar / Outlook sync API is registered. |
 | FE-16 | Meetings and calling UI | Backend contract phase not yet mapped | Meeting and managed-calling contracts require verification |
 | FE-17 | Forms and surveys UI | Backend contract phase not yet mapped | Form, publish, response, and result contracts require verification |
 | FE-18 | Subscription, billing and plan UI | Backend billing capability; exact roadmap phase not assigned here | Registered billing/checkout/subscription routes; verify pricing and limits against approved contracts |

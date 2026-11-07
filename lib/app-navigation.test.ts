@@ -42,10 +42,28 @@ describe('workspace-aware organization navigation', () => {
     expect(hrefs('INDIVIDUAL')).toContain('/app/files');
   });
 
+  it('shows the documents entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/documents');
+    expect(hrefs('INSTITUTION')).toContain('/app/documents');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/documents');
+  });
+
+  it('shows the calendar entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/calendar');
+    expect(hrefs('INSTITUTION')).toContain('/app/calendar');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/calendar');
+  });
+
   it('shows the messages entry for all workspace types', () => {
     expect(hrefs('COMPANY')).toContain('/app/messages');
     expect(hrefs('INSTITUTION')).toContain('/app/messages');
     expect(hrefs('INDIVIDUAL')).toContain('/app/messages');
+  });
+
+  it('shows the meetings entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/meetings');
+    expect(hrefs('INSTITUTION')).toContain('/app/meetings');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/meetings');
   });
 
   it('shows the notifications entry for all workspace types', () => {

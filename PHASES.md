@@ -1952,6 +1952,80 @@ Build the Nexus calendar experience.
 - Scheduling workflows.
 - Calendar integration settings.
 
+### Phase 15 Status — In Progress (2026-11-07)
+
+Branch: `feature/phase-15-calendar`.
+
+#### Backend contract (verified 2026-11-07)
+
+All routes mounted at `/api/v1/workspaces/:workspaceId/events` — already forwarded by the proxy since `workspaces` is in `ALLOWED_API_PREFIXES`.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/workspaces/:wsId/events` | list — `{items, nextCursor}` — query: `cursor`, `limit`, `startAfter?`, `startBefore?`, `projectId?`, `status?` |
+| `POST` | `/workspaces/:wsId/events` | create — `EventSummary` (201) — body: `{title, description?, location?, startAt, endAt, allDay?, status?, visibility?, projectId?, inviteeIds?}` |
+| `GET` | `/workspaces/:wsId/events/:eventId` | get single — `EventSummary` |
+| `PATCH` | `/workspaces/:wsId/events/:eventId` | update — `EventSummary` — body: any subset of create fields |
+| `POST` | `/workspaces/:wsId/events/:eventId/cancel` | cancel — `{ok: true}` |
+| `DELETE` | `/workspaces/:wsId/events/:eventId` | soft-delete — `{ok: true}` |
+| `GET` | `/workspaces/:wsId/events/:eventId/invitations` | list invitees — `Array<{userId, status, createdAt}>` |
+| `POST` | `/workspaces/:wsId/events/:eventId/invitations` | add invitee (201) — body: `{userId}` |
+| `DELETE` | `/workspaces/:wsId/events/:eventId/invitations/:userId` | remove invitee |
+| `POST` | `/workspaces/:wsId/events/:eventId/respond` | respond to invitation — body: `{status: 'ACCEPTED' or 'DECLINED' or 'TENTATIVE'}` |
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Calendar page with month/week/day views | Implemented | `app/app/calendar/page.tsx` — full calendar grid with navigation, view switcher, today button |
+| Month view | Implemented | Grid with 7-column month display, event chips (up to 3 per cell + "+N more"), today highlight, day click navigates to day view |
+| Week view | Implemented | 7-column week grid with day headers and event listing per day |
+| Day view | Implemented | Single-day event list with full time display |
+| Event creation | Implemented | Modal with title, start/end datetime, all-day toggle, description, location, status (CONFIRMED/TENTATIVE/CANCELLED), visibility (PUBLIC/PRIVATE) |
+| Event editing | Implemented | Inline edit form in detail panel (creator only) |
+| Event cancellation | Implemented | "Cancel event" with ConfirmDialog (creator only), sets status to CANCELLED |
+| Event deletion | Implemented | "Delete" with ConfirmDialog destructive (creator only) |
+| Event detail panel | Implemented | Opens below calendar grid — title, status badge, visibility badge, date/time, location, description, invitations list |
+| Invitations list | Implemented | Loads GET .../invitations on panel open, shows userId prefix + ACCEPTED/DECLINED/TENTATIVE/PENDING badge |
+| Loading, empty, error states | Implemented | Skeleton loaders on load, EmptyState in day view, Alert+Retry on error |
+| Workspace-switch safety | Implemented | latestLoad ref + seq guard; events reload on workspace change |
+| Navigation entry | Implemented | Calendar under Work section in lib/app-navigation.ts, all workspace types |
+| Private event visibility | Implemented | Backend controls visibility; frontend renders whatever the backend returns |
+
+#### Files created
+
+- `services/events.ts` — typed calendar event service (all operations and types)
+- `services/__tests__/events.test.ts` — 15 service contract tests
+- `app/app/calendar/page.tsx` — full calendar page with month/week/day views, event CRUD
+- `app/app/calendar/page.test.tsx` — 13 page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Calendar entry under Work section
+- `lib/app-navigation.test.ts` — added calendar nav test (removed duplicate)
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 65 files, 525 tests |
+| `npm run build` | Passed — /app/calendar route generated |
+
+#### Remaining gaps
+
+Phase 15 remains **In Progress** due to:
+
+- **Google Calendar / Outlook integration**: No external calendar sync endpoints exist in the backend. Integration settings UI is deferred.
+- **Two-way sync**: No sync or conflict-detection contract exists in the backend.
+- **Invitation management UI**: addEventInvitation and removeEventInvitation services exist but the UI for adding/removing invitees is not wired (deferred until a workspace member picker is a shared component).
+- **Invitation response**: respondToEventInvitation service exists but the response UI for ACCEPT/DECLINE/TENTATIVE is not wired.
+- **Event search**: No search parameter in the backend list contract. Record as a backend gap.
+- **Personal vs workspace calendar**: All events are workspace-scoped; no personal calendar endpoint exists.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
+
 ## Phase 16 — Meetings and Calling
 
 ### Objectives

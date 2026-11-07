@@ -35,6 +35,11 @@
  */
 
 import { apiRequest } from '@/lib/api';
+import { withAuthRetry } from '@/lib/with-auth-retry';
+
+function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return withAuthRetry(() => apiRequest<T>(path, { ...options, authenticated: true }));
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,7 +97,7 @@ export async function listDocuments(
   if (params.taskId) search.set('taskId', params.taskId);
   if (params.search) search.set('search', params.search);
   const qs = search.toString();
-  return apiRequest(`/workspaces/${workspaceId}/documents${qs ? `?${qs}` : ''}`);
+  return authed(`/workspaces/${workspaceId}/documents${qs ? `?${qs}` : ''}`);
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────
@@ -101,7 +106,7 @@ export async function createDocument(
   workspaceId: string,
   input: { title: string; content?: string; projectId?: string | null; taskId?: string | null },
 ): Promise<DocumentSummary> {
-  return apiRequest(`/workspaces/${workspaceId}/documents`, {
+  return authed(`/workspaces/${workspaceId}/documents`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -113,7 +118,7 @@ export async function getDocument(
   workspaceId: string,
   documentId: string,
 ): Promise<DocumentSummary> {
-  return apiRequest(`/workspaces/${workspaceId}/documents/${documentId}`);
+  return authed(`/workspaces/${workspaceId}/documents/${documentId}`);
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────
@@ -123,7 +128,7 @@ export async function updateDocument(
   documentId: string,
   input: { title?: string; content?: string },
 ): Promise<DocumentSummary> {
-  return apiRequest(`/workspaces/${workspaceId}/documents/${documentId}`, {
+  return authed(`/workspaces/${workspaceId}/documents/${documentId}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
   });
@@ -135,7 +140,7 @@ export async function deleteDocument(
   workspaceId: string,
   documentId: string,
 ): Promise<void> {
-  await apiRequest(`/workspaces/${workspaceId}/documents/${documentId}`, {
+  await authed(`/workspaces/${workspaceId}/documents/${documentId}`, {
     method: 'DELETE',
   });
 }
@@ -146,7 +151,7 @@ export async function listDocumentRevisions(
   workspaceId: string,
   documentId: string,
 ): Promise<DocumentRevision[]> {
-  const result = await apiRequest<DocumentRevision[] | unknown>(
+  const result = await authed<DocumentRevision[] | unknown>(
     `/workspaces/${workspaceId}/documents/${documentId}/revisions`,
   );
   return Array.isArray(result) ? result as DocumentRevision[] : [];
@@ -158,7 +163,7 @@ export async function listDocumentComments(
   workspaceId: string,
   documentId: string,
 ): Promise<DocumentCommentSummary[]> {
-  const result = await apiRequest<DocumentCommentSummary[] | unknown>(
+  const result = await authed<DocumentCommentSummary[] | unknown>(
     `/workspaces/${workspaceId}/documents/${documentId}/comments`,
   );
   return Array.isArray(result) ? result as DocumentCommentSummary[] : [];
@@ -169,7 +174,7 @@ export async function addDocumentComment(
   documentId: string,
   body: string,
 ): Promise<DocumentCommentSummary> {
-  return apiRequest(`/workspaces/${workspaceId}/documents/${documentId}/comments`, {
+  return authed(`/workspaces/${workspaceId}/documents/${documentId}/comments`, {
     method: 'POST',
     body: JSON.stringify({ body }),
   });
@@ -180,7 +185,7 @@ export async function deleteDocumentComment(
   documentId: string,
   commentId: string,
 ): Promise<void> {
-  await apiRequest(
+  await authed(
     `/workspaces/${workspaceId}/documents/${documentId}/comments/${commentId}`,
     { method: 'DELETE' },
   );

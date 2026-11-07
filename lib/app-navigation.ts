@@ -44,6 +44,7 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
       label: 'Communication',
       items: [
         { id: 'messages', label: 'Messages', href: '/app/messages', permissions: ['workspace:view'] },
+        { id: 'meetings', label: 'Meetings', href: '/app/meetings', permissions: ['workspace:view'] },
         { id: 'notifications', label: 'Notifications', href: '/app/notifications', permissions: ['workspace:view'] },
       ],
     },

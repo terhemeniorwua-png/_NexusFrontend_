@@ -44,6 +44,11 @@
  */
 
 import { apiRequest } from '@/lib/api';
+import { withAuthRetry } from '@/lib/with-auth-retry';
+
+function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return withAuthRetry(() => apiRequest<T>(path, { ...options, authenticated: true }));
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,7 +171,7 @@ export async function listNotifications(
   if (params.unreadOnly) search.set('unreadOnly', 'true');
   if (params.type) search.set('type', params.type);
   const qs = search.toString();
-  return apiRequest(`/notifications${qs ? `?${qs}` : ''}`);
+  return authed(`/notifications${qs ? `?${qs}` : ''}`);
 }
 
 // ─── Unread count ─────────────────────────────────────────────────────────────
@@ -176,7 +181,7 @@ export async function listNotifications(
  * Returns only the unread count (lighter than loading the full list).
  */
 export async function getUnreadCount(): Promise<{ unreadCount: number }> {
-  return apiRequest('/notifications/unread-count');
+  return authed('/notifications/unread-count');
 }
 
 // ─── Mark as read ─────────────────────────────────────────────────────────────
@@ -186,7 +191,7 @@ export async function getUnreadCount(): Promise<{ unreadCount: number }> {
  * Batch mark specific notifications as read. Min 1, max 100 ids per call.
  */
 export async function markNotificationsRead(notificationIds: string[]): Promise<void> {
-  await apiRequest('/notifications/read', {
+  await authed('/notifications/read', {
     method: 'POST',
     body: JSON.stringify({ notificationIds }),
   });
@@ -197,7 +202,7 @@ export async function markNotificationsRead(notificationIds: string[]): Promise<
  * Mark all of the current user's unread notifications as read.
  */
 export async function markAllNotificationsRead(): Promise<void> {
-  await apiRequest('/notifications/read-all', { method: 'POST' });
+  await authed('/notifications/read-all', { method: 'POST' });
 }
 
 // ─── Preferences ──────────────────────────────────────────────────────────────
@@ -210,7 +215,7 @@ export async function markAllNotificationsRead(): Promise<void> {
 export async function getNotificationPreferences(
   workspaceId: string,
 ): Promise<NotificationPreference[]> {
-  const result = await apiRequest<NotificationPreference[] | unknown>(
+  const result = await authed<NotificationPreference[] | unknown>(
     `/notifications/preferences/${workspaceId}`,
   );
   return Array.isArray(result) ? (result as NotificationPreference[]) : [];
@@ -225,7 +230,7 @@ export async function updateNotificationPreference(
   workspaceId: string,
   preference: NotificationPreference,
 ): Promise<void> {
-  await apiRequest(`/notifications/preferences/${workspaceId}`, {
+  await authed(`/notifications/preferences/${workspaceId}`, {
     method: 'PUT',
     body: JSON.stringify({ type: preference.type, inAppEnabled: preference.inAppEnabled }),
   });
@@ -245,5 +250,5 @@ export async function listActivity(
   if (params.cursor) search.set('cursor', params.cursor);
   if (params.limit) search.set('limit', String(params.limit));
   const qs = search.toString();
-  return apiRequest(`/notifications/activity/${workspaceId}${qs ? `?${qs}` : ''}`);
+  return authed(`/notifications/activity/${workspaceId}${qs ? `?${qs}` : ''}`);
 }

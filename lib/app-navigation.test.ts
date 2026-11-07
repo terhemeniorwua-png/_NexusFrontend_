@@ -60,6 +60,12 @@ describe('workspace-aware organization navigation', () => {
     expect(hrefs('INDIVIDUAL')).toContain('/app/messages');
   });
 
+  it('shows the meetings entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/meetings');
+    expect(hrefs('INSTITUTION')).toContain('/app/meetings');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/meetings');
+  });
+
   it('shows the notifications entry for all workspace types', () => {
     expect(hrefs('COMPANY')).toContain('/app/notifications');
     expect(hrefs('INSTITUTION')).toContain('/app/notifications');

@@ -35,7 +35,8 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { ApiRequestError, setAccessToken } from '@/lib/api';
+import { apiRawRequest, apiRequest, ApiRequestError, getAccessToken, setAccessToken } from '@/lib/api';
+import { withAuthRetry } from '@/lib/with-auth-retry';
 
 // Re-export setAccessToken for convenience, but keep api import minimal
 export { ApiRequestError };
@@ -130,25 +131,19 @@ export async function listFiles(
   if (params.taskId) search.set('taskId', params.taskId);
   const qs = search.toString();
 
-  const response = await fetch(
-    `${API_BASE}/workspaces/${workspaceId}/files${qs ? `?${qs}` : ''}`,
-    { credentials: 'include' },
-  );
-  if (!response.ok) throw await parseErrorResponse(response);
-  const body = await response.json() as { success: true; data: ListFilesResult };
-  return body.data;
+  return withAuthRetry(() => apiRequest<ListFilesResult>(
+    `/workspaces/${workspaceId}/files${qs ? `?${qs}` : ''}`,
+    { authenticated: true },
+  ));
 }
 
 // ─── Get storage usage ────────────────────────────────────────────────────────
 
 export async function getFileUsage(workspaceId: string): Promise<FileUsage> {
-  const response = await fetch(
-    `${API_BASE}/workspaces/${workspaceId}/files/usage`,
-    { credentials: 'include' },
-  );
-  if (!response.ok) throw await parseErrorResponse(response);
-  const body = await response.json() as { success: true; data: FileUsage };
-  return body.data;
+  return withAuthRetry(() => apiRequest<FileUsage>(
+    `/workspaces/${workspaceId}/files/usage`,
+    { authenticated: true },
+  ));
 }
 
 // ─── Upload file ──────────────────────────────────────────────────────────────
@@ -179,6 +174,8 @@ export function uploadFile(params: UploadFileParams): {
 
     xhr!.open('POST', `${API_BASE}/workspaces/${params.workspaceId}/files`);
     xhr!.withCredentials = true;
+    const token = getAccessToken();
+    if (token) xhr!.setRequestHeader('Authorization', `Bearer ${token}`);
 
     if (params.onProgress) {
       xhr!.upload.addEventListener('progress', (event) => {
@@ -240,11 +237,10 @@ export async function downloadFile(
   fileId: string,
   fileName: string,
 ): Promise<void> {
-  const response = await fetch(
-    `${API_BASE}/workspaces/${workspaceId}/files/${fileId}`,
-    { credentials: 'include' },
-  );
-  if (!response.ok) throw await parseErrorResponse(response);
+  const response = await withAuthRetry(() => apiRawRequest(
+    `/workspaces/${workspaceId}/files/${fileId}`,
+    { authenticated: true },
+  ));
 
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
@@ -262,11 +258,10 @@ export async function downloadFile(
 // ─── Delete file ──────────────────────────────────────────────────────────────
 
 export async function deleteFile(workspaceId: string, fileId: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE}/workspaces/${workspaceId}/files/${fileId}`,
-    { method: 'DELETE', credentials: 'include' },
-  );
-  if (!response.ok) throw await parseErrorResponse(response);
+  await withAuthRetry(() => apiRequest<unknown>(
+    `/workspaces/${workspaceId}/files/${fileId}`,
+    { method: 'DELETE', authenticated: true },
+  ));
 }
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────

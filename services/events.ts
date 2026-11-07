@@ -38,6 +38,11 @@
  */
 
 import { apiRequest } from '@/lib/api';
+import { withAuthRetry } from '@/lib/with-auth-retry';
+
+function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return withAuthRetry(() => apiRequest<T>(path, { ...options, authenticated: true }));
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -116,7 +121,7 @@ export async function listEvents(
   if (params.projectId) search.set('projectId', params.projectId);
   if (params.status) search.set('status', params.status);
   const qs = search.toString();
-  return apiRequest(`/workspaces/${workspaceId}/events${qs ? `?${qs}` : ''}`);
+  return authed(`/workspaces/${workspaceId}/events${qs ? `?${qs}` : ''}`);
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────
@@ -125,7 +130,7 @@ export async function createEvent(
   workspaceId: string,
   input: CreateEventInput,
 ): Promise<EventSummary> {
-  return apiRequest(`/workspaces/${workspaceId}/events`, {
+  return authed(`/workspaces/${workspaceId}/events`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -137,7 +142,7 @@ export async function getEvent(
   workspaceId: string,
   eventId: string,
 ): Promise<EventSummary> {
-  return apiRequest(`/workspaces/${workspaceId}/events/${eventId}`);
+  return authed(`/workspaces/${workspaceId}/events/${eventId}`);
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────
@@ -147,7 +152,7 @@ export async function updateEvent(
   eventId: string,
   input: UpdateEventInput,
 ): Promise<EventSummary> {
-  return apiRequest(`/workspaces/${workspaceId}/events/${eventId}`, {
+  return authed(`/workspaces/${workspaceId}/events/${eventId}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
   });
@@ -159,7 +164,7 @@ export async function cancelEvent(
   workspaceId: string,
   eventId: string,
 ): Promise<void> {
-  await apiRequest(`/workspaces/${workspaceId}/events/${eventId}/cancel`, {
+  await authed(`/workspaces/${workspaceId}/events/${eventId}/cancel`, {
     method: 'POST',
   });
 }
@@ -170,7 +175,7 @@ export async function deleteEvent(
   workspaceId: string,
   eventId: string,
 ): Promise<void> {
-  await apiRequest(`/workspaces/${workspaceId}/events/${eventId}`, {
+  await authed(`/workspaces/${workspaceId}/events/${eventId}`, {
     method: 'DELETE',
   });
 }
@@ -181,7 +186,7 @@ export async function listEventInvitations(
   workspaceId: string,
   eventId: string,
 ): Promise<EventInvitation[]> {
-  const result = await apiRequest<EventInvitation[] | unknown>(
+  const result = await authed<EventInvitation[] | unknown>(
     `/workspaces/${workspaceId}/events/${eventId}/invitations`,
   );
   return Array.isArray(result) ? (result as EventInvitation[]) : [];
@@ -192,7 +197,7 @@ export async function addEventInvitee(
   eventId: string,
   userId: string,
 ): Promise<void> {
-  await apiRequest(`/workspaces/${workspaceId}/events/${eventId}/invitations`, {
+  await authed(`/workspaces/${workspaceId}/events/${eventId}/invitations`, {
     method: 'POST',
     body: JSON.stringify({ userId }),
   });
@@ -203,7 +208,7 @@ export async function removeEventInvitee(
   eventId: string,
   userId: string,
 ): Promise<void> {
-  await apiRequest(
+  await authed(
     `/workspaces/${workspaceId}/events/${eventId}/invitations/${userId}`,
     { method: 'DELETE' },
   );
@@ -214,7 +219,7 @@ export async function respondToEventInvitation(
   eventId: string,
   status: 'ACCEPTED' | 'DECLINED' | 'TENTATIVE',
 ): Promise<void> {
-  await apiRequest(`/workspaces/${workspaceId}/events/${eventId}/respond`, {
+  await authed(`/workspaces/${workspaceId}/events/${eventId}/respond`, {
     method: 'POST',
     body: JSON.stringify({ status }),
   });

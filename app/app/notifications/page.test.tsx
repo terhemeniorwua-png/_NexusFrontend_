@@ -2,213 +2,248 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ALL_NOTIFICATION_TYPES } from '@/services/notifications';
+import NotificationsPage from './page';
 
-// ── Mocks ────────────────────────────────────────────────────────────────────
+// ── Mocks ─────────────────────────────────────────────────────────────────────
 
 const WORKSPACE_ID = 'ws-test-123';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/app/notifications' }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/app/notifications',
+}));
+vi.mock('next/link', () => ({
+  default: ({ href, children, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) =>
+    <a href={href} {...rest}>{children}</a>,
+}));
 
-const mockWorkspaceContext = {
-  activeWorkspace: { id: WORKSPACE_ID, name: 'Test Workspace', type: 'COMPANY' },
+const mockCtx = {
+  activeWorkspace: { id: WORKSPACE_ID, name: 'Test WS', type: 'COMPANY' as const },
   workspaces: [],
   user: null,
   loading: false,
   switchToWorkspace: vi.fn(),
 };
-
-vi.mock('@/providers/WorkspaceProvider', () => ({
-  useWorkspaceContext: () => mockWorkspaceContext,
-}));
+vi.mock('@/providers/WorkspaceProvider', () => ({ useWorkspaceContext: () => mockCtx }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeAllPrefsEnabled() {
-  return ALL_NOTIFICATION_TYPES.map((type) => ({ type, inAppEnabled: true }));
-}
-
-function makeOkResponse(data: unknown, status = 200) {
+function ok(data: unknown, status = 200) {
   return new Response(JSON.stringify({ success: true, data }), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
 }
-
-function makeErrorResponse(code: string, message: string, status = 400) {
+function fail(code: string, message: string, status = 400) {
   return new Response(JSON.stringify({ success: false, error: { code, message } }), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
 }
 
-async function renderPage() {
-  const { default: NotificationsPage } = await import('./page');
-  return render(<NotificationsPage />);
+function fakeNotification(overrides: Partial<{ id: string; readAt: string | null; link: string | null }> = {}) {
+  return {
+    id: 'notif-1',
+    type: 'TASK_ASSIGNED',
+    title: 'You were assigned a task',
+    body: null,
+    link: null,
+    data: {},
+    readAt: null,
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function listOk(items = [fakeNotification()], opts: { nextCursor?: string; unreadCount?: number } = {}) {
+  return ok({
+    items,
+    nextCursor: opts.nextCursor ?? null,
+    unreadCount: opts.unreadCount ?? items.filter((n) => !n.readAt).length,
+  });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('NotificationsPage', () => {
   beforeEach(() => {
-    vi.resetModules();
     vi.restoreAllMocks();
-    mockWorkspaceContext.activeWorkspace = { id: WORKSPACE_ID, name: 'Test Workspace', type: 'COMPANY' };
+    mockCtx.activeWorkspace = { id: WORKSPACE_ID, name: 'Test WS', type: 'COMPANY' };
   });
 
-  it('renders the page heading', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(makeOkResponse(makeAllPrefsEnabled()));
-    await renderPage();
+  // ── Page shell ─────────────────────────────────────────────────────────────
+
+  it('renders the page heading and the three tabs', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(listOk());
+    render(<NotificationsPage />);
     expect(screen.getByRole('heading', { name: 'Notifications', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Inbox' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Activity' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Preferences' })).toBeInTheDocument();
   });
 
-  it('shows the notification inbox unavailability notice', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(makeOkResponse(makeAllPrefsEnabled()));
-    await renderPage();
-    expect(await screen.findByText('Notification inbox is not yet available')).toBeInTheDocument();
-    expect(screen.getByText(/The backend does not currently provide a general notification list/)).toBeInTheDocument();
-    // Use getAllByText since the page mentions GET /notifications in multiple code elements
-    expect(screen.getAllByText(/GET \/notifications/).length).toBeGreaterThan(0);
+  it('shows empty state when there is no active workspace', () => {
+    mockCtx.activeWorkspace = null as unknown as typeof mockCtx.activeWorkspace;
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('should not fetch'));
+    render(<NotificationsPage />);
+    expect(screen.getByText('No workspace selected')).toBeInTheDocument();
   });
 
-  it('loads and displays notification preference groups', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(makeOkResponse(makeAllPrefsEnabled()));
-    await renderPage();
-    // All 5 groups should appear
-    expect(await screen.findByText('Tasks')).toBeInTheDocument();
-    expect(screen.getByText('Comments and mentions')).toBeInTheDocument();
-    expect(screen.getByText('Membership')).toBeInTheDocument();
-    expect(screen.getByText('Meetings')).toBeInTheDocument();
-    expect(screen.getByText('Projects')).toBeInTheDocument();
-  });
+  // ── Inbox tab ──────────────────────────────────────────────────────────────
 
-  it('calls GET /workspaces/{id}/notification-preferences on mount', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(makeOkResponse(makeAllPrefsEnabled()));
-    await renderPage();
-    await screen.findByText('Tasks');
+  it('calls GET /notifications on mount and renders notifications', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(listOk());
+    render(<NotificationsPage />);
+    expect(await screen.findByText('You were assigned a task')).toBeInTheDocument();
+    // URL may include ?limit=25 query param
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/backend/workspaces/${WORKSPACE_ID}/notification-preferences`,
+      expect.stringContaining('/api/backend/notifications'),
       expect.any(Object),
     );
   });
 
-  it('shows accessible loading skeletons while fetching', async () => {
-    // Never resolves during this test - held pending
-    let resolver!: (v: Response) => void;
-    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise((res) => { resolver = res; }));
-    await renderPage();
-    expect(screen.getByLabelText('Loading notification preferences')).toBeInTheDocument();
-    // Cleanup
-    resolver(makeOkResponse(makeAllPrefsEnabled()));
+  it('shows "All caught up" when unreadCount is 0', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      listOk([fakeNotification({ readAt: new Date().toISOString() })], { unreadCount: 0 }),
+    );
+    render(<NotificationsPage />);
+    expect(await screen.findByText('All caught up')).toBeInTheDocument();
   });
 
-  it('shows an error alert with retry when loading fails', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      makeErrorResponse('FORBIDDEN', 'Active workspace membership required.', 403),
-    );
-    await renderPage();
-    expect(await screen.findByText('Could not load preferences')).toBeInTheDocument();
+  it('shows unread count and "Mark all as read" button when there are unread notifications', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(listOk([fakeNotification()], { unreadCount: 3 }));
+    render(<NotificationsPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark all as read' })).toBeInTheDocument());
+    // The count 3 appears in the toolbar
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('shows loading skeletons while fetching', () => {
+    let resolve!: (r: Response) => void;
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise((res) => { resolve = res; }));
+    render(<NotificationsPage />);
+    expect(screen.getByLabelText('Loading notifications')).toBeInTheDocument();
+    resolve(listOk());
+  });
+
+  it('shows an error alert with Retry when listing fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(fail('INTERNAL_ERROR', 'Server error', 500));
+    render(<NotificationsPage />);
+    // The error message is surfaced from the backend response via ApiRequestError.message
+    expect(await screen.findByText('Server error')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
-  it('toggles a single preference and enables the save button', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(makeOkResponse(makeAllPrefsEnabled()));
-    const user = userEvent.setup();
-    await renderPage();
-
-    // Wait for preferences to load
-    await screen.findByText('Tasks');
-
-    // Save button should be disabled initially
-    const saveButton = screen.getByRole('button', { name: 'Save preferences' });
-    expect(saveButton).toBeDisabled();
-
-    // Toggle one preference
-    const mentionCheckbox = screen.getByLabelText('Mentions');
-    await user.click(mentionCheckbox);
-    expect(saveButton).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Discard changes' })).toBeInTheDocument();
+  it('shows empty state when there are no notifications', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(listOk([], { unreadCount: 0 }));
+    render(<NotificationsPage />);
+    expect(await screen.findByText('No notifications yet')).toBeInTheDocument();
   });
 
-  it('saves preferences via PATCH and shows success alert', async () => {
-    const updatedPrefs = makeAllPrefsEnabled().map((p) =>
-      p.type === 'MENTION' ? { ...p, inAppEnabled: false } : p,
-    );
+  it('marks a single notification as read via POST /notifications/read', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(makeOkResponse(makeAllPrefsEnabled()))
-      .mockResolvedValueOnce(makeOkResponse(updatedPrefs));
+      .mockImplementation(async (_url: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === 'POST') return ok({ ok: true });
+        return listOk([fakeNotification({ id: 'notif-99' })]);
+      });
     const user = userEvent.setup();
-    await renderPage();
+    render(<NotificationsPage />);
+    await screen.findByText('You were assigned a task');
+    await user.click(screen.getByRole('button', { name: 'Mark as read' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/backend/notifications/read',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ notificationIds: ['notif-99'] }),
+      }),
+    ));
+  });
 
+  it('opens confirm dialog and marks all as read via POST /notifications/read-all', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockImplementation(async (_url: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === 'POST') return ok({ ok: true });
+        return listOk([fakeNotification()], { unreadCount: 1 });
+      });
+    const user = userEvent.setup();
+    render(<NotificationsPage />);
+    await screen.findByText('You were assigned a task');
+    await user.click(screen.getByRole('button', { name: 'Mark all as read' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    // Click the confirm button inside the dialog
+    await user.click(screen.getAllByRole('button', { name: 'Mark all as read' })[1]);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/backend/notifications/read-all',
+      expect.objectContaining({ method: 'POST' }),
+    ));
+  });
+
+  it('notification/message count separation: page has no reference to message unread counts', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(listOk([], { unreadCount: 0 }));
+    render(<NotificationsPage />);
+    await screen.findByText('No notifications yet');
+    expect(screen.queryByText(/unread messages/i)).not.toBeInTheDocument();
+  });
+
+  // ── Preferences tab ────────────────────────────────────────────────────────
+
+  it('loads preferences from GET /notifications/preferences/:workspaceId', async () => {
+    const prefs = ALL_NOTIFICATION_TYPES.map((type) => ({ type, inAppEnabled: true }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: RequestInfo | URL) => {
+      if (String(url).includes('/preferences/')) return ok(prefs);
+      return ok({ items: [], nextCursor: null, unreadCount: 0 });
+    });
+    const user = userEvent.setup();
+    render(<NotificationsPage />);
+    await user.click(screen.getByRole('tab', { name: 'Preferences' }));
     await screen.findByText('Tasks');
-    await user.click(screen.getByLabelText('Mentions'));
-    await user.click(screen.getByRole('button', { name: 'Save preferences' }));
-
-    expect(await screen.findByText('Notification preferences saved.')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      `/api/backend/workspaces/${WORKSPACE_ID}/notification-preferences`,
-      expect.objectContaining({ method: 'PATCH' }),
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/backend/notifications/preferences/${WORKSPACE_ID}`,
+      expect.any(Object),
     );
   });
 
-  it('shows a save error alert when PATCH fails', async () => {
-    vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(makeOkResponse(makeAllPrefsEnabled()))
-      .mockResolvedValueOnce(makeErrorResponse('FORBIDDEN', 'Active workspace membership required.', 403));
+  it('saves a preference via PUT /notifications/preferences/:workspaceId', async () => {
+    const prefs = ALL_NOTIFICATION_TYPES.map((type) => ({ type, inAppEnabled: true }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes('/preferences/') && init?.method === 'PUT') return ok({ ok: true });
+      if (u.includes('/preferences/')) return ok(prefs);
+      return ok({ items: [], nextCursor: null, unreadCount: 0 });
+    });
     const user = userEvent.setup();
-    await renderPage();
-
+    render(<NotificationsPage />);
+    await user.click(screen.getByRole('tab', { name: 'Preferences' }));
     await screen.findByText('Tasks');
-    await user.click(screen.getByLabelText('Mentions'));
-    await user.click(screen.getByRole('button', { name: 'Save preferences' }));
-
-    expect(await screen.findByText('Could not save preferences')).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Task assigned to me'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      `/api/backend/notifications/preferences/${WORKSPACE_ID}`,
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ type: 'TASK_ASSIGNED', inAppEnabled: false }),
+      }),
+    ));
   });
 
-  it('discarding changes reloads preferences from the backend', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(makeOkResponse(makeAllPrefsEnabled()));
+  // ── Activity tab ───────────────────────────────────────────────────────────
+
+  it('loads activity from GET /notifications/activity/:workspaceId', async () => {
+    const activity = {
+      items: [{ id: 'a1', action: 'TASK_CREATED', actorId: 'u1', targetType: 'Task', targetId: 't1', metadata: null, createdAt: new Date().toISOString() }],
+      nextCursor: null,
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: RequestInfo | URL) => {
+      if (String(url).includes('/activity/')) return ok(activity);
+      return ok({ items: [], nextCursor: null, unreadCount: 0 });
+    });
     const user = userEvent.setup();
-    await renderPage();
-
-    await screen.findByText('Tasks');
-    await user.click(screen.getByLabelText('Mentions'));
-    expect(screen.getByRole('button', { name: 'Discard changes' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Discard changes' }));
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-  });
-
-  it('renders empty state when there is no active workspace', async () => {
-    mockWorkspaceContext.activeWorkspace = null as unknown as typeof mockWorkspaceContext.activeWorkspace;
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('should not fetch'));
-    await renderPage();
-    expect(screen.getByText('No workspace selected')).toBeInTheDocument();
-  });
-
-  it('the group toggle header enables or disables all types in the group', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(makeOkResponse(makeAllPrefsEnabled()));
-    const user = userEvent.setup();
-    await renderPage();
-
-    await screen.findByText('Tasks');
-    // Uncheck the Tasks group (all currently checked)
-    await user.click(screen.getByLabelText('Tasks'));
-
-    // All task-related checkboxes should now be unchecked
-    expect(screen.getByLabelText('Task assigned to me')).not.toBeChecked();
-    expect(screen.getByLabelText('Task reassigned')).not.toBeChecked();
-    expect(screen.getByLabelText('Task approved')).not.toBeChecked();
-
-    // Save button should now be enabled
-    expect(screen.getByRole('button', { name: 'Save preferences' })).toBeEnabled();
-  });
-
-  it('does not mix message unread counts with notification state', async () => {
-    // This test documents the separation invariant: the notifications page
-    // has no connection to message unread counts or socket message events.
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(makeOkResponse(makeAllPrefsEnabled()));
-    await renderPage();
-    await screen.findByText('Tasks');
-    // No "messages" or "unread messages" text on the notifications page
-    expect(screen.queryByText(/unread messages/i)).not.toBeInTheDocument();
+    render(<NotificationsPage />);
+    await user.click(screen.getByRole('tab', { name: 'Activity' }));
+    await screen.findByText('TASK CREATED');
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/api/backend/notifications/activity/${WORKSPACE_ID}`),
+      expect.any(Object),
+    );
   });
 });

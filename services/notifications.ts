@@ -1,41 +1,53 @@
 /**
  * services/notifications.ts
  *
- * Notification preferences service.
+ * In-app notification service.
  *
- * Backend contract (confirmed in openapi.yaml and API.md):
- *   GET  /workspaces/{workspaceId}/notification-preferences
- *   PATCH /workspaces/{workspaceId}/notification-preferences
+ * All routes are mounted at /api/v1/notifications in the backend
+ * (src/modules/notifications/notification.routes.ts), forwarded through
+ * /api/backend/notifications/* by the same-origin proxy.
  *
- * These preferences control in-app notification delivery only. They do not
- * affect email delivery or message unread state. Message unread counts and
- * general notification unread counts must remain independent at all times.
+ * ─── Real backend contract (verified 2026-11-07) ──────────────────────────
  *
- * ──────────────────────────────────────────────────────────────────────────
- * BACKEND GAPS (as of 2026-11-07):
+ * GET  /notifications               list + unreadCount in response
+ *   query: cursor?, limit?, unreadOnly?, type?
+ *   response: { items: NotificationSummary[], nextCursor: string|null, unreadCount: number }
  *
- * The general notification feed/inbox is not implemented in the backend.
- * The following APIs do not exist and must not be invented:
- *   - GET  /notifications            (notification list / inbox)
- *   - POST /notifications/:id/read   (mark individual as read)
- *   - POST /notifications/read-all   (mark all as read)
- *   - GET  /notifications/unread-count
+ * GET  /notifications/unread-count
+ *   response: { unreadCount: number }
  *
- * Socket.IO does not emit notification events in the current backend.
+ * POST /notifications/read
+ *   body: { notificationIds: string[] }   (batch mark-read, min 1 max 100)
+ *   response: { ok: true }
  *
- * Do not connect frontend controls to these absent APIs. Document this as a
- * backend dependency whenever the notification feed UI is referenced.
- * ──────────────────────────────────────────────────────────────────────────
+ * POST /notifications/read-all
+ *   response: { ok: true }
+ *
+ * GET  /notifications/preferences/:workspaceId
+ *   response: Array<{ type: string, inAppEnabled: boolean }>
+ *
+ * PUT  /notifications/preferences/:workspaceId   (note: PUT not PATCH)
+ *   body: { type: NotificationType, inAppEnabled: boolean }  (one type per call)
+ *   response: { ok: true }
+ *
+ * GET  /notifications/activity/:workspaceId
+ *   query: cursor?, limit?
+ *   response: { items: ActivityEntry[], nextCursor: string|null }
+ *
+ * ─── Socket.IO ────────────────────────────────────────────────────────────
+ * The backend does not currently emit notification-specific socket events.
+ * The socket-server only emits: typing:start, typing:stop, presence:online,
+ * presence:offline, message:new.  No notification:new event exists.
+ *
+ * When the backend adds a notification push event, connect it here.
+ * ─────────────────────────────────────────────────────────────────────────
  */
 
 import { apiRequest } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/**
- * All in-app notification types supported by the backend.
- * Source: NotificationType enum in openapi.yaml (18 values).
- */
+/** All 18 notification types supported by the backend. */
 export type NotificationType =
   | 'MENTION'
   | 'TASK_ASSIGNED'
@@ -56,7 +68,6 @@ export type NotificationType =
   | 'MEETING_CANCELLED'
   | 'PROJECT_UPDATE';
 
-/** All 18 notification type values in display order. */
 export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   'MENTION',
   'TASK_ASSIGNED',
@@ -78,7 +89,6 @@ export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   'PROJECT_UPDATE',
 ];
 
-/** Human-readable labels for each notification type. */
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   MENTION: 'Mentions',
   TASK_ASSIGNED: 'Task assigned to me',
@@ -100,85 +110,140 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   PROJECT_UPDATE: 'Project updates',
 };
 
-/** Group labels for logical presentation in the preferences UI. */
 export const NOTIFICATION_TYPE_GROUPS: { label: string; types: NotificationType[] }[] = [
-  {
-    label: 'Tasks',
-    types: ['TASK_ASSIGNED', 'TASK_REASSIGNED', 'TASK_SUBMITTED', 'TASK_APPROVED', 'CHANGES_REQUESTED'],
-  },
-  {
-    label: 'Comments and mentions',
-    types: ['MENTION', 'COMMENT_REPLY'],
-  },
-  {
-    label: 'Membership',
-    types: [
-      'MEMBERSHIP_CHANGED',
-      'MEMBERSHIP_SUSPENDED',
-      'MEMBERSHIP_RESTORED',
-      'INVITATION_ACCEPTED',
-      'JOIN_REQUEST_RECEIVED',
-      'JOIN_REQUEST_APPROVED',
-      'JOIN_REQUEST_REJECTED',
-    ],
-  },
-  {
-    label: 'Meetings',
-    types: ['MEETING_INVITE', 'MEETING_RESCHEDULED', 'MEETING_CANCELLED'],
-  },
-  {
-    label: 'Projects',
-    types: ['PROJECT_UPDATE'],
-  },
+  { label: 'Tasks', types: ['TASK_ASSIGNED', 'TASK_REASSIGNED', 'TASK_SUBMITTED', 'TASK_APPROVED', 'CHANGES_REQUESTED'] },
+  { label: 'Comments and mentions', types: ['MENTION', 'COMMENT_REPLY'] },
+  { label: 'Membership', types: ['MEMBERSHIP_CHANGED', 'MEMBERSHIP_SUSPENDED', 'MEMBERSHIP_RESTORED', 'INVITATION_ACCEPTED', 'JOIN_REQUEST_RECEIVED', 'JOIN_REQUEST_APPROVED', 'JOIN_REQUEST_REJECTED'] },
+  { label: 'Meetings', types: ['MEETING_INVITE', 'MEETING_RESCHEDULED', 'MEETING_CANCELLED'] },
+  { label: 'Projects', types: ['PROJECT_UPDATE'] },
 ];
+
+export interface NotificationSummary {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  data: Record<string, unknown> | null;
+  readAt: string | null;
+  createdAt: string;
+}
 
 export interface NotificationPreference {
   type: NotificationType;
   inAppEnabled: boolean;
 }
 
-// ─── Service functions ────────────────────────────────────────────────────────
+export interface ActivityEntry {
+  id: string;
+  action: string;
+  actorId: string | null;
+  targetType: string;
+  targetId: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface ListNotificationsParams {
+  cursor?: string;
+  limit?: number;
+  unreadOnly?: boolean;
+  type?: NotificationType;
+}
+
+// ─── Notification list ────────────────────────────────────────────────────────
 
 /**
- * GET /workspaces/{workspaceId}/notification-preferences
- *
- * Returns the caller's preferences for the workspace, including defaults for
- * any types not yet explicitly set. All types default to enabled.
+ * GET /notifications
+ * Returns paginated notifications plus the current unread count.
+ */
+export async function listNotifications(
+  params: ListNotificationsParams = {},
+): Promise<{ items: NotificationSummary[]; nextCursor: string | null; unreadCount: number }> {
+  const search = new URLSearchParams();
+  if (params.cursor) search.set('cursor', params.cursor);
+  if (params.limit) search.set('limit', String(params.limit));
+  if (params.unreadOnly) search.set('unreadOnly', 'true');
+  if (params.type) search.set('type', params.type);
+  const qs = search.toString();
+  return apiRequest(`/notifications${qs ? `?${qs}` : ''}`);
+}
+
+// ─── Unread count ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /notifications/unread-count
+ * Returns only the unread count (lighter than loading the full list).
+ */
+export async function getUnreadCount(): Promise<{ unreadCount: number }> {
+  return apiRequest('/notifications/unread-count');
+}
+
+// ─── Mark as read ─────────────────────────────────────────────────────────────
+
+/**
+ * POST /notifications/read
+ * Batch mark specific notifications as read. Min 1, max 100 ids per call.
+ */
+export async function markNotificationsRead(notificationIds: string[]): Promise<void> {
+  await apiRequest('/notifications/read', {
+    method: 'POST',
+    body: JSON.stringify({ notificationIds }),
+  });
+}
+
+/**
+ * POST /notifications/read-all
+ * Mark all of the current user's unread notifications as read.
+ */
+export async function markAllNotificationsRead(): Promise<void> {
+  await apiRequest('/notifications/read-all', { method: 'POST' });
+}
+
+// ─── Preferences ──────────────────────────────────────────────────────────────
+
+/**
+ * GET /notifications/preferences/:workspaceId
+ * Returns the caller's preferences for the workspace.
+ * All types default to inAppEnabled: true when not explicitly set.
  */
 export async function getNotificationPreferences(
   workspaceId: string,
 ): Promise<NotificationPreference[]> {
-  const response = await apiRequest<NotificationPreference[] | Record<string, unknown> | null>(
-    `/workspaces/${workspaceId}/notification-preferences`,
+  const result = await apiRequest<NotificationPreference[] | unknown>(
+    `/notifications/preferences/${workspaceId}`,
   );
-  if (Array.isArray(response)) return response;
-  if (response !== null && typeof response === 'object' && 'preferences' in response && Array.isArray(response.preferences)) {
-    return response.preferences as NotificationPreference[];
-  }
-  return [];
+  return Array.isArray(result) ? (result as NotificationPreference[]) : [];
 }
 
 /**
- * PATCH /workspaces/{workspaceId}/notification-preferences
- *
- * Updates selected notification type preferences for the caller in this
- * workspace. Only the supplied types are changed; others remain unchanged.
- * Each notification type may appear at most once in the update.
+ * PUT /notifications/preferences/:workspaceId
+ * Update a single notification type preference for the workspace.
+ * The backend accepts one { type, inAppEnabled } per request.
  */
-export async function updateNotificationPreferences(
+export async function updateNotificationPreference(
   workspaceId: string,
-  preferences: NotificationPreference[],
-): Promise<NotificationPreference[]> {
-  const response = await apiRequest<NotificationPreference[] | Record<string, unknown> | null>(
-    `/workspaces/${workspaceId}/notification-preferences`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({ preferences }),
-    },
-  );
-  if (Array.isArray(response)) return response;
-  if (response !== null && typeof response === 'object' && 'preferences' in response && Array.isArray(response.preferences)) {
-    return response.preferences as NotificationPreference[];
-  }
-  return [];
+  preference: NotificationPreference,
+): Promise<void> {
+  await apiRequest(`/notifications/preferences/${workspaceId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ type: preference.type, inAppEnabled: preference.inAppEnabled }),
+  });
+}
+
+// ─── Activity feed ────────────────────────────────────────────────────────────
+
+/**
+ * GET /notifications/activity/:workspaceId
+ * Returns cursor-paginated workspace audit activity.
+ */
+export async function listActivity(
+  workspaceId: string,
+  params: { cursor?: string; limit?: number } = {},
+): Promise<{ items: ActivityEntry[]; nextCursor: string | null }> {
+  const search = new URLSearchParams();
+  if (params.cursor) search.set('cursor', params.cursor);
+  if (params.limit) search.set('limit', String(params.limit));
+  const qs = search.toString();
+  return apiRequest(`/notifications/activity/${workspaceId}${qs ? `?${qs}` : ''}`);
 }

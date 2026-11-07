@@ -174,8 +174,13 @@ describe('MeetingDetailPage', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(await screen.findByRole('dialog', { name: 'Delete meeting' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete meeting' });
+    expect(dialog).toBeInTheDocument();
+
+    // Click the destructive confirm button inside the dialog
+    const allDeleteBtns = screen.getAllByRole('button', { name: 'Delete' });
+    const confirmBtn = allDeleteBtns.find((btn) => btn.closest('[role="dialog"]'));
+    await user.click(confirmBtn!);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(`/meetings/${MTG_ID}`),

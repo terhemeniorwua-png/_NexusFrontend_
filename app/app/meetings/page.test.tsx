@@ -177,10 +177,17 @@ describe('MeetingsPage', () => {
     render(<MeetingsPage />);
     expect(await screen.findByText('Weekly Sync')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    // Click the per-card Delete button
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
+    await user.click(deleteButtons[0]);
     // ConfirmDialog should appear
-    expect(await screen.findByRole('dialog', { name: 'Delete meeting' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete meeting' });
+    expect(dialog).toBeInTheDocument();
+    // Click the destructive confirm button inside the dialog
+    const confirmButton = screen.getAllByRole('button', { name: 'Delete' }).find(
+      (btn) => btn.closest('[role="dialog"]'),
+    );
+    await user.click(confirmButton!);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining(`/meetings/mtg-1`),

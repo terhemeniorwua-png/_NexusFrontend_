@@ -258,7 +258,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 9     | Projects and Project Visibility                                  | In Progress |
 | 10    | Tasks and Work Management                                        | In Progress |
 | 11    | Real-Time Messaging and Conversations                            | In Progress |
-| 12    | Notification Centre and Activity Feed                            | Not Started |
+| 12    | Notification Centre and Activity Feed                            | In Progress |
 | 13    | File Management and Nexus Drive                                  | Not Started |
 | 14    | Document Collaboration                                           | Not Started |
 | 15    | Calendar and Scheduling                                          | Not Started |
@@ -1655,6 +1655,74 @@ General notification examples include:
 - General notification centre.
 - Activity feed.
 - Independent message and notification unread states.
+
+### Phase 12 Status — In Progress (2026-11-07)
+
+Branch: `feature/phase-12-notifications`.
+
+#### Backend contract audit
+
+| API | Status |
+|---|---|
+| `GET /workspaces/{workspaceId}/notification-preferences` | ✅ Available — confirmed in `openapi.yaml` |
+| `PATCH /workspaces/{workspaceId}/notification-preferences` | ✅ Available — confirmed in `openapi.yaml` |
+| `GET /notifications` (notification inbox/list) | ❌ Not registered — backend gap |
+| `POST /notifications/:id/read` (mark as read) | ❌ Not registered — backend gap |
+| `POST /notifications/read-all` (mark all as read) | ❌ Not registered — backend gap |
+| `GET /notifications/unread-count` | ❌ Not registered — backend gap |
+| Socket.IO notification events | ❌ Not registered — backend gap |
+
+The backend provides 18 `NotificationType` values: `MENTION`, `TASK_ASSIGNED`, `TASK_REASSIGNED`, `TASK_SUBMITTED`, `TASK_APPROVED`, `CHANGES_REQUESTED`, `COMMENT_REPLY`, `MEMBERSHIP_CHANGED`, `MEMBERSHIP_SUSPENDED`, `MEMBERSHIP_RESTORED`, `INVITATION_ACCEPTED`, `JOIN_REQUEST_RECEIVED`, `JOIN_REQUEST_APPROVED`, `JOIN_REQUEST_REJECTED`, `MEETING_INVITE`, `MEETING_RESCHEDULED`, `MEETING_CANCELLED`, `PROJECT_UPDATE`. All default to `inAppEnabled: true`.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Notification preferences UI | Implemented | Grouped by Tasks / Comments and mentions / Membership / Meetings / Projects. Toggle individual or entire group. Save/discard/retry flow with loading, success, and error states. |
+| Notification inbox/feed | Labeled unavailable | Clearly documented backend gap on the page. No fake/mock data used. |
+| Unread notification count | `notificationUnreadCount=0` | No backend unread-count API exists. Value stays 0 and is separate from `messageUnreadCount`. |
+| Notifications topbar bell | Wired | `notificationsHref="/app/notifications"` added to `AuthenticatedShell`. `notificationUnreadCount=0` passed independently from `messageUnreadCount`. |
+| Navigation entry | Implemented | `/app/notifications` added to `lib/app-navigation.ts` under Communication, visible for all workspace types. |
+| Notification/message separation | Maintained | `notificationUnreadCount` and `messageUnreadCount` remain independent props. Notifications page has no connection to message state or socket message events. |
+| Workspace-switch safety | Implemented | `latestLoad` ref + `loadedWorkspaceId` guard. Uses the project's established `Promise.resolve().then()` pattern in `useEffect`. |
+| Loading/empty/error states | Implemented | Skeleton loaders on load, EmptyState for no-workspace, Alert with Retry on load error, Alert on save error, success Alert on save. |
+| AccessState for 403 | Handled | Load error on 403 displays the error alert with retry (shared pattern). |
+
+#### Files created
+
+- `services/notifications.ts` — notification preferences service with 18 `NotificationType` values, human-readable labels, and 5 display groups
+- `services/__tests__/notifications.test.ts` — 12 service contract tests
+- `app/app/notifications/page.tsx` — notification centre page (preferences editor + backend-gap notice)
+- `app/app/notifications/page.test.tsx` — 13 page tests
+
+#### Files modified
+
+- `components/layout/AuthenticatedShell.tsx` — added `messagesHref`, `notificationsHref`, and `notificationUnreadCount=0`
+- `lib/app-navigation.ts` — added Notifications entry under Communication section
+- `lib/app-navigation.test.ts` — added notifications nav entry test
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 59 files, 426 tests |
+| `npm run build` | Passed — `/app/notifications` route generated |
+
+#### Remaining gaps (backend dependencies)
+
+Phase 12 remains **In Progress** until the backend implements:
+
+- `GET /notifications` — general notification list/inbox with pagination
+- `POST /notifications/:id/read` — mark individual notification as read
+- `POST /notifications/read-all` — mark all as read
+- `GET /notifications/unread-count` — unread count for the notification bell
+- Socket.IO notification push events
+
+When these APIs exist, the notification feed section, unread badge, and real-time updates can be connected without changing the preferences implementation.
+
+Live backend verification and manual responsive review remain unverified.
 
 ## Phase 13 — File Management and Nexus Drive
 

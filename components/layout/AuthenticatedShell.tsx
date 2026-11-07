@@ -64,6 +64,9 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
         { id: 'workspaces', label: 'Manage workspaces', href: '/app/workspaces' },
       ]}
       onSignOut={() => { void handleSignOut(); }}
+      messagesHref="/app/messages"
+      notificationsHref="/app/notifications"
+      notificationUnreadCount={0}
     >
       {signOutError && (
         <div className="mx-auto w-full max-w-5xl px-5 pt-6 sm:px-8">

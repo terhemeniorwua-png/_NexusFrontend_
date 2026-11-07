@@ -262,7 +262,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 13    | File Management and Nexus Drive                                  | In Progress |
 | 14    | Document Collaboration                                           | In Progress |
 | 15    | Calendar and Scheduling                                          | In Progress |
-| 16    | Meetings and Calling                                             | Not Started |
+| 16    | Meetings and Calling                                             | In Progress |
 | 17    | Forms and Surveys                                                | Not Started |
 | 18    | Subscription, Billing, and Plan Management                       | Not Started |
 | 19    | Global Search and Full Document Search                           | Not Started |
@@ -2057,6 +2057,83 @@ Build the meeting experience using the existing managed calling SDK.
 - Meeting room interface.
 - Calling SDK integration.
 - Meeting history.
+
+### Phase 16 Status — In Progress (2026-11-08)
+
+Branch: `feature/phase-16-meetings`.
+
+#### Backend contract (verified 2026-11-07)
+
+All routes mounted at `/api/v1/workspaces/:workspaceId/meetings` — already forwarded by the proxy since `workspaces` is in `ALLOWED_API_PREFIXES`.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/workspaces/:wsId/meetings` | list — `{items, nextCursor}` — query: `cursor?`, `limit?`, `status?`, `projectId?` |
+| `POST` | `/workspaces/:wsId/meetings` | create — `MeetingSummary` (201) — body: `{title, description?, scheduledAt?, projectId?, calendarEventId?, participantIds?}` |
+| `GET` | `/workspaces/:wsId/meetings/:meetingId` | get single — `MeetingSummary` |
+| `PATCH` | `/workspaces/:wsId/meetings/:meetingId` | update — `MeetingSummary` — body: `{title?, description?, scheduledAt?, status?}` |
+| `DELETE` | `/workspaces/:wsId/meetings/:meetingId` | soft-delete — `{ok: true}` |
+| `POST` | `/workspaces/:wsId/meetings/:meetingId/join` | join — `{ok: true}` |
+| `POST` | `/workspaces/:wsId/meetings/:meetingId/leave` | leave — `{ok: true}` |
+| `GET` | `/workspaces/:wsId/meetings/:meetingId/participants` | list participants — `Array<{userId, status, joinedAt, leftAt}>` |
+| `POST` | `/workspaces/:wsId/meetings/:meetingId/participants` | add participant (201) — body: `{userId}` |
+| `DELETE` | `/workspaces/:wsId/meetings/:meetingId/participants/:userId` | remove participant — `{ok: true}` |
+
+MeetingSummary shape: `{id, workspaceId, projectId, createdById, title, description, status (SCHEDULED|LIVE|ENDED|CANCELLED), scheduledAt, startedAt, endedAt, createdAt, updatedAt, participantCount}`.
+Participant status values: INVITED, JOINED, LEFT, DECLINED. Participant response includes userId but not name.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Meeting list with status filter | Implemented | `app/app/meetings/page.tsx` — cursor-paginated list with SCHEDULED/LIVE/ENDED/CANCELLED filter |
+| Meeting scheduling | Implemented | Create form with title, description, scheduled datetime. Instant-start checkbox to create a LIVE meeting |
+| Meeting detail | Implemented | `app/app/meetings/[meetingId]/page.tsx` — title, status, dates, description, participant count |
+| Meeting editing | Implemented | Edit modal (creator only) — title, description, scheduledAt, status |
+| Meeting deletion | Implemented | ConfirmDialog destructive delete (creator only) — navigates to list after deletion |
+| Meeting join/leave | Implemented | Join/Leave buttons — calls POST .../join and POST .../leave; refreshes participants |
+| Participant list | Implemented | Loads GET .../participants on detail page; shows userId prefix + JOINED/LEFT/INVITED/DECLINED badge |
+| Add participant | Implemented | Creator-only form with user ID input — POST .../participants |
+| Remove participant | Implemented | Creator-only per-row button — ConfirmDialog → DELETE .../participants/:userId |
+| Live meeting indicator | Implemented | "🔴 This meeting is live" card when status is LIVE; "🔴 Join live" button label |
+| Navigation entry | Implemented | Meetings under Communication section in lib/app-navigation.ts, all workspace types |
+| Loading, empty, error, AccessState | Implemented | Full state coverage on both list and detail pages |
+| Workspace-switch safety | Implemented | latestLoad ref + seq guard on list; workspace change redirects from detail to /app/meetings |
+
+#### Files created
+
+- `services/meetings.ts` — typed meeting API service (all operations and types)
+- `services/__tests__/meetings.test.ts` — 14 service contract tests
+- `app/app/meetings/page.tsx` — meetings list with status filter and create modal
+- `app/app/meetings/[meetingId]/page.tsx` — meeting detail with participants panel
+- `app/app/meetings/page.test.tsx` — 12 page tests
+- `app/app/meetings/[meetingId]/page.test.tsx` — 10 detail page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Meetings entry under Communication section
+- `lib/app-navigation.test.ts` — added meetings nav test
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 68 files, 561 tests |
+| `npm run build` | Passed — /app/meetings and /app/meetings/[meetingId] routes generated |
+
+#### Remaining gaps
+
+Phase 16 remains **In Progress** due to:
+
+- **Calling SDK integration**: The backend has no calling/media SDK contract. The detail page shows a note explaining this. Approved SDK integration (video/audio, screen sharing, meeting chat) requires a backend-provided calling provider contract.
+- **Participant names**: The backend `listParticipants` response returns `userId` only (no name). Participant names would require a separate user-lookup or an augmented backend response.
+- **Meeting history**: No separate meeting history endpoint beyond the filtered list. History view is the list with status=ENDED filter.
+- **Project-linked meetings**: The create form does not include a project picker; `projectId` is available in the API but the UI picker requires a project search/select component.
+- **Meeting invitations vs participant model**: The backend uses a participant model (join/leave/add/remove), not a separate invitation-accept model. Pre-meeting invitation email notifications are sent server-side.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
 
 ## Phase 17 — Forms and Surveys
 

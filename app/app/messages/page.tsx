@@ -37,7 +37,7 @@ import {
   getUnreadCount,
   type MessageSummary,
 } from '@/services/messages';
-import { listTeams, listDepartments } from '@/services/organization-structure';
+import { listTeams, listDepartments, type Department } from '@/services/organization-structure';
 
 // ---------------------------------------------------------------------------
 // Validation schemas

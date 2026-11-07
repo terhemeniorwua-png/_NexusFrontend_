@@ -60,3 +60,16 @@ export function clearGoogleOAuthIntent(): void {
     // Clearing session storage is best-effort in restricted browser contexts.
   }
 }
+
+export function saveGoogleOAuthIntent(intent: GoogleOAuthIntent): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(GOOGLE_OAUTH_INTENT_KEY, JSON.stringify({
+      mode: intent.mode,
+      ...(intent.accountType ? { accountType: intent.accountType } : {}),
+      ...(safeRedirectPath(intent.redirectPath) ? { redirectPath: safeRedirectPath(intent.redirectPath) } : {}),
+    }));
+  } catch {
+    // Authentication can continue if browser session storage is unavailable.
+  }
+}

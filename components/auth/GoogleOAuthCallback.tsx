@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/Alert';
@@ -66,39 +66,42 @@ async function postLoginPath(accountType?: AuthAccountType, redirectPath?: strin
   return '/app';
 }
 
+
+
 export function GoogleOAuthCallback({ code, error }: { code?: string; error?: string }) {
   const router = useRouter();
-  const [status, setStatus] = useState<CallbackStatus>('loading');
-  const [message, setMessage] = useState('Completing Google sign-in…');
+
+  // Errors known from the URL are derived during render, so no setState is needed inside the effect.
+  const immediateError = error
+    ? oauthErrorMessage(error)
+    : !code
+      ? 'The Google sign-in response was incomplete. Please try again.'
+      : null;
+
+  const [status, setStatus] = useState<CallbackStatus>(immediateError ? 'error' : 'loading');
+  const [message, setMessage] = useState(immediateError ?? 'Completing Google sign-in…');
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [proof, setProof] = useState('');
   const [busy, setBusy] = useState(false);
 
-  async function finishLogin(): Promise<void> {
+  const finishLogin = useCallback(async (): Promise<void> => {
     const intent = readGoogleOAuthIntent();
     const destination = await postLoginPath(intent?.accountType, intent?.redirectPath);
     clearGoogleOAuthIntent();
     router.replace(destination);
-  }
+  }, [router]);
 
   useEffect(() => {
     // Remove the short-lived exchange code before making any further request.
     window.history.replaceState(window.history.state, '', '/auth/google/callback');
-    let active = true;
 
-    if (error) {
+    if (immediateError || !code) {
       clearGoogleOAuthIntent();
-      setMessage(oauthErrorMessage(error));
-      setStatus('error');
-      return () => { active = false; };
+      return;
     }
-    if (!code) {
-      clearGoogleOAuthIntent();
-      setMessage('The Google sign-in response was incomplete. Please try again.');
-      setStatus('error');
-      return () => { active = false; };
-    }
+
+    let active = true;
 
     void exchangeGoogleLoginCode(code).then(async (result) => {
       if (!active) return;
@@ -117,8 +120,7 @@ export function GoogleOAuthCallback({ code, error }: { code?: string; error?: st
     });
 
     return () => { active = false; };
-  }, [code, error, router]);
-
+  }, [code, immediateError, finishLogin]);
   async function handleTwoFactorSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!challengeToken) return;

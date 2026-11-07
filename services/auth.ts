@@ -35,6 +35,34 @@ export interface AuthMessage {
   message: string;
 }
 
+export interface VerifyEmailRequest {
+  email: string;
+  code: string;
+}
+
+export interface EmailResendRequest {
+  email: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  code: string;
+  newPassword: string;
+}
+
+export interface VerifyEmailResponse {
+  user?: AuthUser;
+  message?: string;
+}
+
+export interface CodeFlowResponse {
+  message: string;
+}
+
 let refreshInFlight: Promise<AuthResponse> | null = null;
 let googleExchangeInFlight: { code: string; promise: Promise<GoogleExchangeResponse> } | null = null;
 
@@ -99,22 +127,51 @@ export async function reactivateAccount(input: {
   });
 }
 
+export async function verifyEmailWithCode(input: VerifyEmailRequest): Promise<VerifyEmailResponse> {
+  return apiRequest<VerifyEmailResponse>('/auth/email/verify', {
+    method: 'POST',
+    body: JSON.stringify({ email: input.email, code: input.code }),
+  });
+}
+
+export async function resendVerificationCode(email: string): Promise<CodeFlowResponse> {
+  return apiRequest<CodeFlowResponse>('/auth/email/resend', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function requestPasswordResetCode(email: string): Promise<CodeFlowResponse> {
+  return apiRequest<CodeFlowResponse>('/auth/password/forgot', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPasswordWithCode(input: ResetPasswordRequest): Promise<CodeFlowResponse> {
+  return apiRequest<CodeFlowResponse>('/auth/password/reset', {
+    method: 'POST',
+    body: JSON.stringify({ email: input.email, code: input.code, newPassword: input.newPassword }),
+  });
+}
+
+// Backward-compatible aliases while the old token-based pages are being migrated.
 export async function verifyEmail(token: string): Promise<{ user: AuthUser }> {
-  return apiRequest('/auth/verify-email', {
+  return apiRequest<{ user: AuthUser }>('/auth/verify-email', {
     method: 'POST',
     body: JSON.stringify({ token }),
   });
 }
 
 export async function resendVerification(email: string): Promise<AuthMessage> {
-  return apiRequest('/auth/resend-verification', {
+  return apiRequest<AuthMessage>('/auth/resend-verification', {
     method: 'POST',
     body: JSON.stringify({ email }),
   });
 }
 
 export async function requestPasswordReset(email: string): Promise<AuthMessage> {
-  return apiRequest('/auth/password/forgot', {
+  return apiRequest<AuthMessage>('/auth/password/forgot', {
     method: 'POST',
     body: JSON.stringify({ email }),
   });
@@ -124,9 +181,9 @@ export async function resetPassword(input: {
   token: string;
   password: string;
 }): Promise<AuthMessage> {
-  return apiRequest('/auth/password/reset', {
+  return apiRequest<AuthMessage>('/auth/password/reset', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ token: input.token, password: input.password }),
   });
 }
 

@@ -259,7 +259,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 10    | Tasks and Work Management                                        | In Progress |
 | 11    | Real-Time Messaging and Conversations                            | In Progress |
 | 12    | Notification Centre and Activity Feed                            | In Progress |
-| 13    | File Management and Nexus Drive                                  | Not Started |
+| 13    | File Management and Nexus Drive                                  | In Progress |
 | 14    | Document Collaboration                                           | Not Started |
 | 15    | Calendar and Scheduling                                          | Not Started |
 | 16    | Meetings and Calling                                             | Not Started |
@@ -1754,6 +1754,70 @@ Build file and document management interfaces.
 - Nexus Drive interface.
 - File upload and management.
 - File preview and sharing.
+
+### Phase 13 Status — In Progress (2026-11-07)
+
+Branch: `feature/phase-13-files`. Commit: `558a5f3`.
+
+#### Backend contract (verified 2026-11-07)
+
+All routes mounted at `/api/v1/workspaces/:workspaceId/files` — already forwarded by the proxy since `workspaces` is in `ALLOWED_API_PREFIXES`.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/workspaces/:workspaceId/files` | list — `{items: FileSummary[], nextCursor, totalBytes}` — query: `cursor`, `limit`, `projectId?`, `taskId?` |
+| `GET` | `/workspaces/:workspaceId/files/usage` | `{totalBytes, fileCount}` |
+| `POST` | `/workspaces/:workspaceId/files` | multipart/form-data, field `file` + optional `projectId`, `taskId`; max 50 MB |
+| `GET` | `/workspaces/:workspaceId/files/:fileId` | raw bytes download (not JSON) |
+| `DELETE` | `/workspaces/:workspaceId/files/:fileId` | uploader, project manager, or workspace owner/admin only |
+
+Allowed MIME types: PDF, Office documents, plain text, Markdown, CSV, JSON, images (JPEG/PNG/GIF/WebP/SVG), ZIP, MP4, WebM, MP3, OGG.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| File listing | Implemented | `GET /workspaces/:id/files` — cursor-paginated, with Load more button |
+| Storage usage | Implemented | `GET /workspaces/:id/files/usage` — usage bar with bytes + file count |
+| File upload | Implemented | XHR-based with real-time progress bar and cancel; drag-and-drop + click; client-side validation (size, MIME type) before upload |
+| File download | Implemented | `GET .../files/:fileId` — raw bytes fetched, `URL.createObjectURL` triggers browser save dialog; object URL revoked after 10 s |
+| File delete | Implemented | `DELETE .../files/:fileId` — ConfirmDialog (destructive), optimistic list update, error recovery |
+| Loading/empty/error states | Implemented | Skeleton loaders, EmptyState, Alert + Retry |
+| Workspace-switch safety | Implemented | `latestLoad` ref + seq guard; list and usage reload on workspace change |
+| Navigation entry | Implemented | `/app/files` under Work section, all workspace types |
+
+#### Files created
+
+- `services/files.ts` — typed file service (`listFiles`, `getFileUsage`, `uploadFile` with XHR/progress, `downloadFile`, `deleteFile`, `formatBytes`, `fileCategory`)
+- `services/__tests__/files.test.ts` — 24 service tests
+- `app/app/files/page.tsx` — Nexus Drive page
+- `app/app/files/page.test.tsx` — 11 page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Files entry under Work section
+- `lib/app-navigation.test.ts` — added files nav test
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 61 files, 471 tests |
+| `npm run build` | Passed — `/app/files` route generated |
+
+#### Remaining gaps
+
+Phase 13 remains **In Progress** due to:
+
+- **Object storage**: upload and download require `OBJECT_STORAGE_ENDPOINT` and credentials to be configured. Without storage, the backend returns 503 `OBJECT_STORAGE_UNAVAILABLE`. The frontend handles this as a regular API error.
+- **File search**: no `search` query parameter registered in `listFilesQuerySchema`. Would require a backend addition.
+- **File preview**: no preview endpoint. Preview could be added using the raw download response when the MIME type supports browser rendering.
+- **Sharing and permissions per file**: no sharing endpoint beyond workspace/project-level access.
+- **Version history**: not in backend contract.
+- **Live backend verification**: tests use mocked responses.
+- **Manual responsive review**: not performed.
 
 ## Phase 14 — Document Collaboration
 

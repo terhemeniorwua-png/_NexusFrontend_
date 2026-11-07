@@ -36,6 +36,12 @@ describe('workspace-aware organization navigation', () => {
     expect(hrefs('INDIVIDUAL')).toContain('/app/projects');
   });
 
+  it('shows the files entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/files');
+    expect(hrefs('INSTITUTION')).toContain('/app/files');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/files');
+  });
+
   it('shows the messages entry for all workspace types', () => {
     expect(hrefs('COMPANY')).toContain('/app/messages');
     expect(hrefs('INSTITUTION')).toContain('/app/messages');

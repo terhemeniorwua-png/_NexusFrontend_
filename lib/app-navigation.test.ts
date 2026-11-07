@@ -35,4 +35,10 @@ describe('workspace-aware organization navigation', () => {
     expect(hrefs('INSTITUTION')).toContain('/app/projects');
     expect(hrefs('INDIVIDUAL')).toContain('/app/projects');
   });
+
+  it('shows the messages entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/messages');
+    expect(hrefs('INSTITUTION')).toContain('/app/messages');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/messages');
+  });
 });

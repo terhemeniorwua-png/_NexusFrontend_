@@ -22,9 +22,11 @@ async function forwardRequest(
     return Response.json({ success: false, error: { code: 'API_NOT_CONFIGURED', message: 'The Nexus API is not configured.' } }, { status: 503 });
   }
 
+  let requestPath: string[] = [];
   let upstreamUrl: URL;
   try {
     const { path } = await context.params;
+    requestPath = path;
     const prefix = path[0] ?? '';
     if (!(ALLOWED_API_PREFIXES as readonly string[]).includes(prefix)
       || path.some((segment) => !SEGMENT_PATTERN.test(segment))) {
@@ -57,11 +59,36 @@ async function forwardRequest(
     return Response.json({ success: false, error: { code: 'API_UNAVAILABLE', message: 'Unable to reach Nexus. Check your connection and try again.' } }, { status: 502 });
   }
 
+  const isGoogleInitiation = requestPath.length === 2 && requestPath[0] === 'auth' && requestPath[1] === 'google';
+  const upstreamLocation = upstream.headers.get('location');
+  if (isGoogleInitiation && upstream.status >= 300 && upstream.status < 400) {
+    try {
+      const googleUrl = upstreamLocation ? new URL(upstreamLocation) : null;
+      if (!googleUrl || googleUrl.protocol !== 'https:' || googleUrl.hostname !== 'accounts.google.com') {
+        throw new Error('Invalid Google authorization redirect');
+      }
+    } catch {
+      return Response.redirect(new URL('/auth/google/callback?error=OAUTH_FAILED', request.nextUrl.origin), 303);
+    }
+  } else if (isGoogleInitiation && !upstream.ok) {
+    let errorCode = 'OAUTH_FAILED';
+    try {
+      const payload = await upstream.clone().json() as { error?: { code?: string } };
+      if (payload.error?.code === 'GOOGLE_AUTH_UNAVAILABLE' || payload.error?.code === 'LOGIN_RATE_LIMITED') {
+        errorCode = payload.error.code;
+      }
+    } catch {
+      // A malformed upstream error uses the generic callback message.
+    }
+    return Response.redirect(new URL(`/auth/google/callback?error=${errorCode}`, request.nextUrl.origin), 303);
+  }
+
   const responseHeaders = new Headers();
   for (const name of RESPONSE_HEADERS) {
     const value = upstream.headers.get(name);
     if (value) responseHeaders.set(name, value);
   }
+  if (isGoogleInitiation && upstreamLocation) responseHeaders.set('location', upstreamLocation);
   for (const cookie of upstream.headers.getSetCookie()) {
     responseHeaders.append('set-cookie', cookie);
   }

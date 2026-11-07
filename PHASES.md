@@ -257,7 +257,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 8     | Departments, Teams, and Groups                                   | In Progress |
 | 9     | Projects and Project Visibility                                  | In Progress |
 | 10    | Tasks and Work Management                                        | In Progress |
-| 11    | Real-Time Messaging and Conversations                            | Not Started |
+| 11    | Real-Time Messaging and Conversations                            | In Progress |
 | 12    | Notification Centre and Activity Feed                            | Not Started |
 | 13    | File Management and Nexus Drive                                  | Not Started |
 | 14    | Document Collaboration                                           | Not Started |
@@ -302,7 +302,7 @@ Backend phase numbers below refer to the adjacent backend roadmap/API documentat
 | FE-8 Teams, departments, and groups UI | BE-7 organization structure | `/workspaces/{workspaceId}/teams/*`, `/departments/*`, `/institution-groups/*`; project association at `/projects/{projectId}/organizational-access`. Department roster listing and team activity APIs are absent. |
 | FE-9 Projects and visibility UI | BE-8 Projects and visibility | `/workspaces/{workspaceId}/projects*`, project members, activity, milestones, archive/restore and ownership transfer. This is BE-8 project work, distinct from FE-8 Teams UI. |
 | FE-10 Tasks | BE-8 Projects / task module | Task API fully registered at `/workspaces/{workspaceId}/projects/{projectId}/tasks` with CRUD, assignees, dependencies, comments, archive/restore, complete/reopen. All routes verified in `src/modules/tasks/task.routes.ts` and `src/routes/index.ts`. |
-| FE-11 Messaging and conversations | BE-7 Channel access metadata only | `/workspaces/{workspaceId}/channels*` covers channel metadata/access only. Message, conversation, thread, reaction, and real-time delivery APIs are absent. |
+| FE-11 Messaging and conversations | BE-7 Channels + messaging modules | `/workspaces/{workspaceId}/channels*` for channel CRUD/archive/members. `/workspaces/{workspaceId}/channels/{channelId}/messages*` for send/edit/delete/replies/pin/unpin/reactions/markRead/unreadCount. Socket.IO at `/socket.io` with events `workspace:join`, `workspace:leave`, `channel:join`, `channel:leave`, `typing:start`, `typing:stop`, `presence:online`, `presence:offline`, `message:new`. All verified in `src/modules/channels/`, `src/modules/messaging/`, and `src/realtime/socket-server.ts`. |
 | FE-12 Notifications and activity feed | Partial workspace preferences; project activity | Notification preferences and project audit activity exist. General notification list/read/feed APIs are absent. |
 | FE-13 File management | Organization profile media only | Company/institution logo upload/read/delete endpoints exist. General file/folder/attachment upload, download, sharing, and version APIs are absent. |
 | FE-14 Document collaboration | No document module/API registered | Document content, comments, sharing, and version APIs are absent. |
@@ -418,7 +418,7 @@ The following contracts must be verified against the backend before dependent ph
 | Project, task, and visibility contracts                            | Phase 9–10     | Projects and visibility confirmed at `/workspaces/{workspaceId}/projects*`; no task API is registered.                                               |
 | Pagination, filtering, and sorting                                 | Phase 3 onward | Confirmed per endpoint where documented (including discovery, billing, invitations, privacy requests, channels, projects, and activity); not a global contract. |
 | Error envelope                                                     | Phase 3        | Confirmed: `{ success: false, error: { code, message, details?, requestId } }`                                                                       |
-| Real-time connection, auth method, event names, and payloads        | Phase 11, 25   | Not documented in API reference/OpenAPI; requires an approved client transport contract.                                                             |
+| Real-time connection, auth method, event names, and payloads        | Phase 11, 25   | Confirmed in `src/realtime/socket-server.ts`: bearer access token in handshake auth, workspace rooms `workspace:{id}`, channel rooms `channel:{id}`, events `workspace:join/leave`, `channel:join/leave`, `typing:start/stop`, `presence:online/offline`, `message:new`. Socket.IO path `/socket.io`. |
 | File upload/download and signed URL contract                       | Phase 13       | Backend API inspected 2026-11-05: general file/presigned upload contracts absent; only authenticated raw-byte organization-logo proxy routes exist. See `docs/FRONTEND_STORAGE_INTEGRATION.md`. |
 | AI request, streaming, and action-approval contract                | Phase 22–24    | Not registered in the application API/OpenAPI.                                                                                                       |
 
@@ -1500,6 +1500,114 @@ Build Nexus messaging interfaces.
 - Conversation management.
 - Channel management.
 - Messaging state and connection handling.
+
+### Phase 11 Status — In Progress (2026-11-07)
+
+Branch: `feature/phase-11-messaging`. Commit: `42a1331`.
+
+#### Contract correction
+
+The previous contract map entry for FE-11 incorrectly stated the message API was absent. The backend has complete channel and messaging modules, plus a Socket.IO server with documented events.
+
+#### Installation
+
+`socket.io-client@4.8.4` installed (matches backend `socket.io@4.8.4`). Package version pinned exactly.
+
+#### Implementation evidence
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Real-time connection management | Implemented | `lib/socket.ts` singleton with token handshake, reconnection, destroySocket on logout |
+| Socket Provider and hook | Implemented | `providers/SocketProvider.tsx` provides socket instance + connection status; `hooks/useSocket.ts` provides `useSocketEvent` and `useTypingIndicator` |
+| Channel list | Implemented | Left sidebar in `app/app/messages/page.tsx` — loads all accessible channels, search filter, unread count badges, type badges |
+| Channel creation | Implemented | Modal with Zod validation (name, type, description). TEAM/DEPARTMENT/PROJECT show parent pickers. |
+| Channel archive and delete | Implemented | Archive and Delete buttons in channel header with ConfirmDialog |
+| Message list | Implemented | Message thread in right panel — loads messages, shows author, timestamp, edit indicator, pinned badge, reply count |
+| Message send | Implemented | Composer with Enter-to-send (Shift+Enter for newline), typing indicator emitted on input |
+| Message edit | Implemented | Inline edit form (author only) via editMessage service |
+| Message delete | Implemented | Delete button (author only) with ConfirmDialog |
+| Pin / unpin | Implemented | Toggle pin/unpin via pinMessage/unpinMessage. Pinned messages shown in header section |
+| Replies | Implemented | Click reply count to expand replies inline via getReplies |
+| Reactions | Implemented | Thumbs-up button calls addReaction (👍). Extensible for more emoji |
+| Typing indicators | Implemented | Socket `typing:start`/`typing:stop` emitted on input; received events show "X people are typing…" |
+| Read indicators / unread count | Implemented | Unread count fetched per channel; cleared on channel selection. Badge shown in sidebar |
+| Channel join/leave via socket | Implemented | `channel:join`/`channel:leave` emitted on channel selection/switch |
+| Real-time new messages | Implemented | `message:new` socket event appended to message list |
+| Connection status indicator | Implemented | Color dot in sidebar header (green=connected, yellow=reconnecting, red=disconnected) |
+| Loading, empty, error, AccessState | Implemented | All states on both channel list and message thread |
+| Workspace-switch safety | Implemented | Workspace change resets selected channel, messages, and unread counts |
+| Navigation entry | Implemented | Messages under Communication section in app-navigation.ts, visible for all workspace types |
+| Messages/notifications separation | Implemented | Message unread counts are tracked separately in local state; no connection to general notification bell |
+
+#### Backend routes consumed
+
+- `GET /workspaces/{workspaceId}/channels` — list accessible channels
+- `POST /workspaces/{workspaceId}/channels` — create channel
+- `GET /workspaces/{workspaceId}/channels/{channelId}` — get channel
+- `PATCH /workspaces/{workspaceId}/channels/{channelId}` — update channel
+- `POST /workspaces/{workspaceId}/channels/{channelId}/archive` — archive
+- `DELETE /workspaces/{workspaceId}/channels/{channelId}` — delete
+- `POST /workspaces/{workspaceId}/channels/{channelId}/members` — add member (private channels)
+- `DELETE /workspaces/{workspaceId}/channels/{channelId}/members/{userId}` — remove member
+- `GET /workspaces/{workspaceId}/channels/{channelId}/messages` — list messages
+- `POST /workspaces/{workspaceId}/channels/{channelId}/messages` — send message
+- `GET .../messages/{messageId}/replies` — get replies
+- `PATCH .../messages/{messageId}` — edit message
+- `DELETE .../messages/{messageId}` — delete message
+- `POST .../messages/{messageId}/pin` — pin
+- `POST .../messages/{messageId}/unpin` — unpin
+- `POST .../messages/{messageId}/reactions` — add reaction
+- `DELETE .../messages/{messageId}/reactions?emoji=` — remove reaction
+- `POST .../messages/{messageId}/read` — mark read
+- `GET .../channels/{channelId}/unread-count` — unread count
+
+#### Socket.IO events (verified in `src/realtime/socket-server.ts`)
+
+- Client emits: `workspace:join`, `workspace:leave`, `channel:join`, `channel:leave`, `typing:start`, `typing:stop`, `presence:online`
+- Client receives: `typing:start`, `typing:stop`, `presence:online`, `presence:offline`, `message:new`
+
+#### Files created
+
+- `lib/socket.ts` — singleton Socket.IO client
+- `providers/SocketProvider.tsx` — React context providing socket + connection status
+- `hooks/useSocket.ts` — `useSocketEvent`, `useTypingIndicator` hooks
+- `services/channels.ts` — channel API service
+- `services/messages.ts` — message API service
+- `services/__tests__/channels.test.ts` — 10 contract tests
+- `services/__tests__/messages.test.ts` — 13 contract tests
+- `app/app/messages/page.tsx` — messaging page
+- `app/app/messages/page.test.tsx` — 7 page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Messages entry under Communication section
+- `lib/app-navigation.test.ts` — added messages entry test
+- `app/app/layout.tsx` — added SocketProvider
+- `package.json` / `package-lock.json` — added socket.io-client@4.8.4
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` (Phase 11 files) | Passed — 0 errors |
+| `npx eslint` (Phase 11 files) | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | 55/57 files pass, 381/402 tests pass. 2 pre-existing failures in externally-modified `AuthForm.test.tsx` and `google-oauth.test.ts` — not caused by Phase 11 changes |
+| `npm run build` | Passed — `/app/messages` route generated |
+
+#### Remaining gaps
+
+Phase 11 remains **In Progress** due to:
+
+- **Direct messages**: DM between users requires a separate conversation model or private channel creation — backend supports PRIVATE channels which approximate this, but a dedicated DM flow is not implemented.
+- **Group conversations**: Not separately implemented beyond PRIVATE channels.
+- **@mentions**: No mention resolution or notification contract in backend; not implemented.
+- **File attachments**: No file/attachment upload contract for messages; blocked by Phase 13.
+- **Message search**: No backend search endpoint registered for messages.
+- **Saved messages**: No backend saved-message model registered.
+- **Conversation settings UI**: Channel settings page not built (separate from create).
+- **Private channel member management in messages page**: `addChannelMember`/`removeChannelMember` services exist but the UI within the messages page is not wired.
+- **Live backend verification**: All tests use mocked API responses; no live Socket.IO session was verified.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
 
 ## Phase 12 — Notification Centre and Activity Feed
 

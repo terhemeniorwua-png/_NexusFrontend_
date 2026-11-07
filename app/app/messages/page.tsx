@@ -197,7 +197,7 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!showCreate || !activeWorkspace) return;
     listTeams(activeWorkspace.id).then(setTeams).catch(() => {});
-    listDepartments(activeWorkspace.id).then(setDepartments).catch(() => {});
+    (activeWorkspace.type === 'INSTITUTION' ? listDepartments(activeWorkspace.id) : Promise.resolve([] as Department[])).then(setDepartments).catch(() => {});
   }, [showCreate, activeWorkspace]);
 
   // ---------------------------------------------------------------------------

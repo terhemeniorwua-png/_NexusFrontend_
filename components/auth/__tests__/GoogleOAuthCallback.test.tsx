@@ -50,7 +50,7 @@ describe('Google OAuth callback', () => {
 
     await waitFor(() => expect(mocks.router.replace).toHaveBeenCalledWith('/app/workspaces?type=COMPANY'));
     expect(mocks.exchange).toHaveBeenCalledWith('short-lived-code');
-    expect(historySpy).toHaveBeenCalledWith(expect.anything(), '', '/auth/google/callback');
+    expect(historySpy).toHaveBeenCalledWith(null, '', '/auth/google/callback');
     expect(window.sessionStorage.getItem('nexus-google-oauth-intent')).toBeNull();
   });
 
@@ -72,7 +72,7 @@ describe('Google OAuth callback', () => {
     const user = userEvent.setup();
 
     render(<GoogleOAuthCallback code="short-lived-code" />);
-    await user.type(await screen.findByLabelText('Authentication code'), '123456');
+    await user.type(await screen.findByLabelText(/Authentication code/), '123456');
     await user.click(screen.getByRole('button', { name: 'Verify and continue' }));
 
     await waitFor(() => expect(mocks.router.replace).toHaveBeenCalledWith('/app'));

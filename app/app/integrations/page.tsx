@@ -17,6 +17,8 @@ import {
   listIntegrations,
   disconnectIntegration,
   getSlackAuthorizeUrl,
+  getGoogleDriveAuthorizeUrl,
+  getDropboxAuthorizeUrl,
   type IntegrationProvider,
   type IntegrationStatus,
   type IntegrationSummary,
@@ -35,6 +37,13 @@ const PROVIDER_META: Record<IntegrationProvider, { name: string; icon: string; d
   GITLAB:            { name: 'GitLab',                  icon: '🦊', description: 'Link GitLab repositories and merge requests.', category: 'Development' },
   GOOGLE_CALENDAR:   { name: 'Google Calendar',         icon: '📅', description: 'Sync events with Google Calendar.', category: 'Calendar' },
   OUTLOOK_CALENDAR:  { name: 'Outlook Calendar',        icon: '🗓️', description: 'Sync events with Outlook Calendar.', category: 'Calendar' },
+};
+
+/** Providers that have a working OAuth flow on the backend. */
+const AUTHORIZE_URL_FETCHERS: Partial<Record<IntegrationProvider, (workspaceId: string) => Promise<{ url: string }>>> = {
+  SLACK: getSlackAuthorizeUrl,
+  GOOGLE_DRIVE: getGoogleDriveAuthorizeUrl,
+  DROPBOX: getDropboxAuthorizeUrl,
 };
 
 function statusVariant(status: IntegrationStatus): 'default' | 'success' | 'warning' | 'error' {
@@ -95,12 +104,14 @@ function IntegrationCard({ integration, onDisconnect }: IntegrationCardProps) {
 
 interface AvailableCardProps {
   provider: IntegrationProvider;
-  onSlackConnect: () => void;
-  connectingSlack: boolean;
+  onConnect: (provider: IntegrationProvider) => void;
+  connecting: boolean;
+  disabled: boolean;
 }
 
-function AvailableCard({ provider, onSlackConnect, connectingSlack }: AvailableCardProps) {
+function AvailableCard({ provider, onConnect, connecting, disabled }: AvailableCardProps) {
   const meta = PROVIDER_META[provider];
+  const canConnect = provider in AUTHORIZE_URL_FETCHERS;
 
   return (
     <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
@@ -112,13 +123,13 @@ function AvailableCard({ provider, onSlackConnect, connectingSlack }: AvailableC
           <Badge variant="outline" className="mt-1">{meta.category}</Badge>
         </div>
       </div>
-      {provider === 'SLACK' ? (
+      {canConnect ? (
         <Button
           size="sm"
           className="shrink-0"
-          onClick={onSlackConnect}
-          loading={connectingSlack}
-          disabled={connectingSlack}
+          onClick={() => onConnect(provider)}
+          loading={connecting}
+          disabled={disabled}
         >
           Connect
         </Button>
@@ -148,8 +159,8 @@ export default function IntegrationsPage() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
 
-  const [connectingSlack, setConnectingSlack] = useState(false);
-  const [slackError, setSlackError] = useState<string | null>(null);
+  const [connectingProvider, setConnectingProvider] = useState<IntegrationProvider | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const latestLoad = useRef(0);
 
@@ -195,16 +206,21 @@ export default function IntegrationsPage() {
     }
   }
 
-  async function handleSlackConnect() {
-    if (!workspaceId || connectingSlack) return;
-    setConnectingSlack(true);
-    setSlackError(null);
+  async function handleConnect(provider: IntegrationProvider) {
+    const fetchUrl = AUTHORIZE_URL_FETCHERS[provider];
+    if (!fetchUrl || !workspaceId || connectingProvider) return;
+    setConnectingProvider(provider);
+    setConnectError(null);
     try {
-      const { url } = await getSlackAuthorizeUrl(workspaceId);
+      const { url } = await fetchUrl(workspaceId);
       window.location.href = url;
     } catch (err) {
-      setSlackError(err instanceof ApiRequestError ? err.message : 'Could not start Slack authorization.');
-      setConnectingSlack(false);
+      setConnectError(
+        err instanceof ApiRequestError
+          ? err.message
+          : `Could not start ${PROVIDER_META[provider].name} authorization.`,
+      );
+      setConnectingProvider(null);
     }
   }
 
@@ -250,7 +266,7 @@ export default function IntegrationsPage() {
         </Alert>
       )}
 
-      {slackError && <Alert variant="error" className="mb-4">{slackError}</Alert>}
+      {connectError && <Alert variant="error" className="mb-4">{connectError}</Alert>}
       {disconnectError && <Alert variant="error" className="mb-4">{disconnectError}</Alert>}
 
       {loading ? (
@@ -293,8 +309,9 @@ export default function IntegrationsPage() {
                   <AvailableCard
                     key={provider}
                     provider={provider}
-                    onSlackConnect={() => { void handleSlackConnect(); }}
-                    connectingSlack={connectingSlack}
+                    onConnect={(p) => { void handleConnect(p); }}
+                    connecting={connectingProvider === provider}
+                    disabled={connectingProvider !== null}
                   />
                 ))}
               </div>

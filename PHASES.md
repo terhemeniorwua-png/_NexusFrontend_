@@ -263,11 +263,11 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 14    | Document Collaboration                                           | In Progress |
 | 15    | Calendar and Scheduling                                          | In Progress |
 | 16    | Meetings and Calling                                             | In Progress |
-| 17    | Forms and Surveys                                                | Not Started |
-| 18    | Subscription, Billing, and Plan Management                       | Not Started |
-| 19    | Global Search and Full Document Search                           | Not Started |
-| 20    | Integrations Management                                          | Not Started |
-| 21    | Automation and Workflow Builder                                  | Not Started |
+| 17    | Forms and Surveys                                                | In Progress |
+| 18    | Subscription, Billing, and Plan Management                       | In Progress |
+| 19    | Global Search and Full Document Search                           | In Progress |
+| 20    | Integrations Management                                          | In Progress |
+| 21    | Automation and Workflow Builder                                  | In Progress |
 | 22    | Nexus AI Assistant                                               | Not Started |
 | 23    | Nexus Write                                                      | Not Started |
 | 24    | AI Action Approval and Execution Interfaces                      | Not Started |
@@ -2164,6 +2164,80 @@ Build form creation, publishing, and response management.
 - Response management.
 - Survey results interface.
 
+### Phase 17 Status — In Progress (2026-11-08)
+
+Branch: `feature/phase-17-forms`.
+
+#### Backend contract (verified 2026-11-08)
+
+All routes at `/api/v1/workspaces/:workspaceId/forms` — forwarded through the proxy via the `workspaces` prefix.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/workspaces/:wsId/forms` | list — `{items, nextCursor}` — query: `cursor?`, `limit?`, `status?` |
+| `POST` | `/workspaces/:wsId/forms` | create — `FormDetail` (201) — body: `{title, description?, isPublic?}` |
+| `GET` | `/workspaces/:wsId/forms/:formId` | get single with fields and response count — `FormDetail` |
+| `PATCH` | `/workspaces/:wsId/forms/:formId` | update — `FormDetail` — body: `{title?, description?, isPublic?, status?}` |
+| `DELETE` | `/workspaces/:wsId/forms/:formId` | soft-delete — `{ok: true}` |
+| `POST` | `/workspaces/:wsId/forms/:formId/fields` | add field (201) — body: `{label, type, required?, options?, placeholder?, position?}` |
+| `POST` | `/workspaces/:wsId/forms/:formId/responses` | submit response (201) — body: `{answers: [{fieldId, value}]}` |
+| `GET` | `/workspaces/:wsId/forms/:formId/responses` | list responses — `{items, nextCursor}` |
+
+Field types: TEXT, TEXTAREA, NUMBER, EMAIL, SELECT, MULTISELECT, RADIO, CHECKBOX, DATE, RATING, SCALE.
+Form statuses: DRAFT, PUBLISHED, CLOSED, ARCHIVED.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Form listing with status filter | Implemented | `app/app/forms/page.tsx` — cursor-paginated list with DRAFT/PUBLISHED/CLOSED/ARCHIVED filter |
+| Form creation | Implemented | Modal with title, description, isPublic toggle |
+| Publish form | Implemented | Per-card Publish button (DRAFT only) with ConfirmDialog → PATCH status=PUBLISHED |
+| Archive form | Implemented | Per-card Archive button (PUBLISHED/CLOSED) with ConfirmDialog → PATCH status=ARCHIVED |
+| Delete form | Implemented | Per-card Delete button (non-PUBLISHED) with ConfirmDialog |
+| Form detail with fields tab | Implemented | `app/app/forms/[formId]/page.tsx` — shows field list with type, required, options |
+| Field builder | Implemented | Add field modal (DRAFT only, creator) — all 11 field types, required toggle, options textarea, placeholder |
+| Responses tab | Implemented | Lists responses with answer values per field label |
+| Settings tab | Implemented | Edit title, description, status, isPublic; danger-zone delete |
+| Navigation entry | Implemented | Forms under Work section in lib/app-navigation.ts, all workspace types |
+| Loading, empty, error, AccessState | Implemented | Full state coverage on both list and detail pages |
+| Workspace-switch safety | Implemented | latestLoad ref + seq guard on list; workspace change redirects from detail to /app/forms |
+
+#### Files created
+
+- `services/forms.ts` — typed forms service (all operations, withAuthRetry, relative paths)
+- `services/__tests__/forms.test.ts` — 14 service contract tests
+- `app/app/forms/page.tsx` — forms list with status filter, create/publish/archive/delete
+- `app/app/forms/[formId]/page.tsx` — form detail with fields, responses, and settings
+- `app/app/forms/page.test.tsx` — 12 page tests
+- `app/app/forms/[formId]/page.test.tsx` — 11 detail page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Forms entry under Work section
+- `lib/app-navigation.test.ts` — added forms nav test
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 71 files, 595 tests |
+| `npm run build` | Passed — /app/forms and /app/forms/[formId] routes generated |
+
+#### Remaining gaps
+
+Phase 17 remains **In Progress** due to:
+
+- **Form preview**: No form preview/render UI (rendering the form as a respondent would see it) is implemented. The field list in the detail page shows the builder view only.
+- **Response submission UI**: The submitFormResponse service function exists but no in-app response submission form is built. Respondents would need the public URL to submit.
+- **Form access controls**: No per-form access-control endpoint is registered in the backend.
+- **Survey results/summaries**: No aggregate statistics endpoint; responses are listed individually.
+- **Field editing/removal**: Fields can only be added (no edit or delete endpoint is registered in the backend).
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
+
 ## Phase 18 — Subscription, Billing, and Plan Management
 
 ### Objectives
@@ -2250,6 +2324,72 @@ Build a global search experience across authorised Nexus resources.
 - Search result interfaces.
 - Search filters and navigation.
 
+### Phase 19 Status — In Progress (2026-11-08)
+
+Branch: `feature/phase-19-search`.
+
+#### Backend contract (verified 2026-11-08)
+
+Route at `/api/v1/search` (mounted as `/search`, NOT under `/workspaces`). Added `search` to `ALLOWED_API_PREFIXES` in the backend proxy.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/search` | query: `q` (required, 1-200 chars), `category?` (projects/tasks/documents/files/channels/meetings/all), `workspaceId?` |
+| Response | `SearchResult[]` | Up to 25 results for 'all', 10 per category. Not paginated. |
+
+`SearchResult`: `{id, type, title, description, workspaceId, createdAt}`. Types: project, task, document, file, channel, meeting.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Global search modal | Implemented | `components/search/GlobalSearch.tsx` — overlay dialog with backdrop, category tabs, result list |
+| Ctrl+K / Cmd+K shortcut | Implemented | `hooks/useGlobalSearch.ts` — toggles modal; shortcut registered globally in AuthenticatedShell |
+| Search button in topbar | Implemented | `AuthenticatedShell` passes `onOpenSearch={openSearch}` to AppShell; Topbar already supports this prop |
+| Category filter | Implemented | all/projects/tasks/documents/files/channels/meetings tab buttons |
+| Workspace context filtering | Implemented | `workspaceId` passed to search service to scope results to active workspace |
+| Results list with type badges | Implemented | Type icon + title + description + type badge per result; links to relevant page |
+| Loading state | Implemented | Spinner in search input while fetching |
+| Empty state | Implemented | "No results for X" when search returns nothing |
+| Error state | Implemented | Error text below input when search fails |
+| Hint state | Implemented | "Type at least 2 characters" before first search |
+| Debounced search | Implemented | 300 ms debounce on input change |
+| Backend permission respect | Implemented | Backend filters results by workspace membership and project visibility |
+
+#### Files created
+
+- `services/search.ts` — typed search service with withAuthRetry
+- `services/__tests__/search.test.ts` — 5 service contract tests
+- `components/search/GlobalSearch.tsx` — global search modal component
+- `components/search/__tests__/GlobalSearch.test.tsx` — 9 component tests
+- `hooks/useGlobalSearch.ts` — open/close state + Ctrl+K shortcut hook
+
+#### Files modified
+
+- `app/api/backend/[...path]/route.ts` — added `search` to ALLOWED_API_PREFIXES
+- `components/layout/AuthenticatedShell.tsx` — added GlobalSearch modal + useGlobalSearch hook
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 73 files, 609 tests |
+| `npm run build` | Passed — all routes generated |
+
+#### Remaining gaps
+
+Phase 19 remains **In Progress** due to:
+
+- **Recent searches**: Not implemented — would require local storage or a backend "recent searches" endpoint (not registered).
+- **Search suggestions**: No suggestions API. Auto-complete would need a backend suggestions endpoint.
+- **People/workspaces/teams search**: The backend search service covers projects, tasks, documents, files, channels, and meetings only. People, workspace, team, and announcement search are not in the backend contract.
+- **Full document search**: Documents are searched by title only in the backend. Full content search is not implemented.
+- **Result previews**: Detailed previews (e.g., showing task status, file size) require richer backend responses.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
+
 ## Phase 20 — Integrations Management
 
 ### Objectives
@@ -2297,6 +2437,69 @@ Build the integration management experience.
 - Connection management.
 - Integration settings.
 
+### Phase 20 Status — In Progress (2026-11-08)
+
+Branch: `feature/phase-20-integrations`.
+
+#### Backend contract (verified 2026-11-08)
+
+Routes at `/api/v1/integrations` — `integrations` prefix was already in `ALLOWED_API_PREFIXES`.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/integrations` | list — `IntegrationSummary[]` — query: `workspaceId?` |
+| `DELETE` | `/integrations/:integrationId` | disconnect — `{ok: true}` |
+| `GET` | `/integrations/slack/authorize` | get Slack OAuth URL — query: `workspaceId` |
+
+Providers: GOOGLE_DRIVE, ONEDRIVE, DROPBOX, GMAIL, OUTLOOK, SLACK, GITHUB, GITLAB, GOOGLE_CALENDAR, OUTLOOK_CALENDAR.
+SLACK must connect via OAuth flow only.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Connected integrations list | Implemented | Shows connected integrations with provider name, status badge, external email, scopes |
+| Disconnect integration | Implemented | ConfirmDialog → DELETE — removes from list |
+| Available integrations directory | Implemented | Shows all unconnected providers with name, description, category |
+| Slack OAuth start | Implemented | "Connect" button calls /integrations/slack/authorize, redirects browser to Slack |
+| Other providers | Shown as "Coming soon" | OAuth flow for other providers not yet registered in backend |
+| Personal vs workspace separation | Implemented | List passes workspaceId to backend to filter; personal integrations have workspaceId=null |
+| Security note | Implemented | Footer note: tokens encrypted server-side; disconnecting doesn't delete provider data |
+| Navigation entry | Implemented | Integrations under Account section in lib/app-navigation.ts |
+| Loading, empty, error, AccessState | Implemented | Full state coverage |
+
+#### Files created
+
+- `services/integrations.ts` — typed integrations service
+- `services/__tests__/integrations.test.ts` — 5 service contract tests
+- `app/app/integrations/page.tsx` — integrations directory page
+- `app/app/integrations/page.test.tsx` — 11 page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Integrations entry under Account section
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 75 files, 624 tests |
+| `npm run build` | Passed — /app/integrations route generated |
+
+#### Remaining gaps
+
+Phase 20 remains **In Progress** due to:
+
+- **OAuth for non-Slack providers**: Google Drive, OneDrive, GitHub, etc. require backend OAuth routes that are not yet registered. Cards show "Coming soon".
+- **Integration settings**: No per-integration settings endpoint (scopes, workspace assignment, reconnect) is registered.
+- **Sync status**: No sync status endpoint registered.
+- **Microsoft Teams**: Not in the backend provider enum.
+- **Webhooks and automation**: Separate from integration management; covered in Phase 21.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
+
 ## Phase 21 — Automation and Workflow Builder
 
 ### Objectives
@@ -2322,6 +2525,76 @@ Build interfaces for managing automated workflows.
 - Automation dashboard.
 - Workflow builder.
 - Automation execution history.
+
+### Phase 21 Status — In Progress (2026-11-08)
+
+Branch: `feature/phase-21-automation`.
+
+#### Backend contract (verified 2026-11-08)
+
+Routes at `/api/v1/workspaces/:workspaceId/automations` — forwarded through proxy via the `workspaces` prefix.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/workspaces/:wsId/automations` | list — `Automation[]` |
+| `POST` | `/workspaces/:wsId/automations` | create (201) — `{name, trigger, action, actionConfig, condition?, enabled?, maxRetries?}` |
+| `GET` | `/workspaces/:wsId/automations/:autoId` | get single with last 10 runs |
+| `PATCH` | `/workspaces/:wsId/automations/:autoId` | update — `{name?, enabled?}` |
+| `DELETE` | `/workspaces/:wsId/automations/:autoId` | soft-delete — `{ok: true}` |
+
+Triggers: EVENT_TASK_CREATED, EVENT_TASK_COMPLETED, EVENT_MEMBER_JOINED, SCHEDULED_DAILY, SCHEDULED_WEEKLY.
+Actions: SEND_NOTIFICATION, CREATE_TASK, SEND_WEBHOOK.
+Requires UpdateWorkspace capability to create/edit/delete; ViewWorkspace to list.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Automation listing | Implemented | `app/app/automations/page.tsx` — list with trigger/action labels, enabled badge |
+| Automation creation | Implemented | Create modal with name, trigger select, action select, dynamic actionConfig fields, enabled checkbox |
+| Trigger selection | Implemented | 5 triggers displayed in dropdown |
+| Action selection | Implemented | 3 actions with dynamic config fields per action type |
+| Enable/disable (activation) | Implemented | Toggle button on list cards and detail page — PATCH enabled |
+| Automation detail with run history | Implemented | `app/app/automations/[automationId]/page.tsx` — config display + last 10 runs |
+| Run history status | Implemented | SUCCEEDED/FAILED/SKIPPED badges with error details |
+| Rename automation | Implemented | Modal with name field |
+| Delete automation | Implemented | ConfirmDialog destructive |
+| Navigation entry | Implemented | Automations under Work section in lib/app-navigation.ts |
+| Loading, empty, error, AccessState | Implemented | Full state coverage |
+| Workspace-switch safety | Implemented | latestLoad ref on list; workspace change redirects from detail |
+
+#### Files created
+
+- `services/automations.ts` — typed automation service
+- `services/__tests__/automations.test.ts` — 5 service contract tests
+- `app/app/automations/page.tsx` — automation list with create modal
+- `app/app/automations/[automationId]/page.tsx` — detail with run history
+- `app/app/automations/page.test.tsx` — 10 page tests
+- `app/app/automations/[automationId]/page.test.tsx` — 8 detail page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Automations entry under Work section
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 79 files, 666 tests |
+| `npm run build` | Passed — /app/automations and /app/automations/[automationId] routes generated |
+
+#### Remaining gaps
+
+Phase 21 remains **In Progress** due to:
+
+- **Condition builder UI**: The backend accepts `condition` as a `Record<string, string>` but the create form does not expose a condition editor. Conditions are not set through the UI.
+- **Full workflow builder**: The current UI is a simple create form rather than a visual drag-and-drop workflow editor.
+- **Execution history per run**: Only SUCCEEDED/FAILED/SKIPPED status is shown; no per-run input/output payload detail is available in the backend response.
+- **Webhook logs**: SEND_WEBHOOK action has no dedicated response tracking endpoint.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
 
 ## Phase 22 — Nexus AI Assistant
 

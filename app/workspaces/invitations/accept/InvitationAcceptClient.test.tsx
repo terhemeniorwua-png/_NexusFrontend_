@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiRequestError } from '@/lib/api';
+import { saveInvitationIntent, type InvitationIntent } from '@/lib/invitation-intent';
 import { InvitationAcceptClient } from './InvitationAcceptClient';
 
 const mocks = vi.hoisted(() => ({
@@ -15,7 +16,15 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a>,
+  default: ({
+    href,
+    children,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
 }));
 vi.mock('next/navigation', () => ({
   useRouter: () => mocks.router,
@@ -32,7 +41,7 @@ vi.mock('@/services/invitations', () => ({
   declineInvitation: mocks.declineInvitation,
 }));
 
-const invitation = {
+const preview = {
   workspace: { id: 'workspace-1', name: 'Nexus Studio', slug: 'nexus-studio' },
   invitedBy: { id: 'user-1', name: 'Grace' },
   role: 'MEMBER' as const,
@@ -43,6 +52,19 @@ const invitation = {
   boundToAccount: true,
 };
 
+const savedIntent: InvitationIntent = {
+  token: 'token_-123',
+  workspaceId: 'workspace-1',
+  workspaceName: 'Nexus Studio',
+  workspaceSlug: 'nexus-studio',
+  invitedByName: 'Grace',
+  maskedEmail: 'a***@example.com',
+  boundToAccount: true,
+  expiresAt: '2026-11-06T00:00:00.000Z',
+  role: 'MEMBER',
+  organizationRole: 'COMPANY_COLLABORATOR',
+};
+
 function clearCookies() {
   for (const entry of document.cookie.split(';')) {
     const name = entry.split('=')[0]?.trim();
@@ -50,16 +72,20 @@ function clearCookies() {
   }
 }
 
-describe('invitation acceptance', () => {
+describe('InvitationAcceptClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearCookies();
+    window.sessionStorage.clear();
+    window.localStorage.clear();
     mocks.searchParams = new URLSearchParams('token=token_-123');
     mocks.getAccessToken.mockReturnValue(null);
-    mocks.previewInvitation.mockResolvedValue(invitation);
+    mocks.previewInvitation.mockResolvedValue(preview);
   });
 
-  it('asks anonymous visitors to sign in while preserving the invitation link', async () => {
+  // ── Anonymous visitor ────────────────────────────────────────────────────
+
+  it('asks anonymous visitors to sign in while preserving the invitation token', async () => {
     render(<InvitationAcceptClient />);
 
     expect(await screen.findByRole('heading', { name: 'Join Nexus Studio' })).toBeInTheDocument();
@@ -68,12 +94,21 @@ describe('invitation acceptance', () => {
 
     const signIn = await screen.findByRole('link', { name: 'Sign in to accept' });
     expect(signIn.getAttribute('href')).toBe(
-      '/sign-in?redirect=%2Fworkspaces%2Finvitations%2Faccept%3Ftoken%3Dtoken_-123',
+      '/sign-in?redirect=%2Fworkspaces%2Finvitations%2Faccept%3Ftoken%3Dtoken_-123%26from%3Dauth',
     );
     expect(mocks.refreshSession).not.toHaveBeenCalled();
   });
 
-  it('accepts the invitation, remembers the workspace, and offers to open it', async () => {
+  it('includes a sign-up link that uses from=register so the account-created notice can show', async () => {
+    render(<InvitationAcceptClient />);
+
+    const signUp = await screen.findByRole('link', { name: 'Create an account' });
+    expect(signUp.getAttribute('href')).toContain('from%3Dregister');
+  });
+
+  // ── Authenticated — inline accept/decline ────────────────────────────────
+
+  it('accepts the invitation, sets the active workspace, and navigates to /app', async () => {
     mocks.getAccessToken.mockReturnValue('access-token');
     mocks.acceptInvitation.mockResolvedValue({
       id: 'invitation-1',
@@ -87,32 +122,85 @@ describe('invitation acceptance', () => {
     await user.click(await screen.findByRole('button', { name: 'Accept invitation' }));
 
     await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledWith('token_-123'));
-    expect(mocks.refreshSession).not.toHaveBeenCalled();
-    expect(await screen.findByText('You are now a member of Nexus Studio.')).toBeInTheDocument();
-    expect(window.localStorage.getItem('nexus-active-workspace')).toBe('workspace-1');
-
-    await user.click(screen.getByRole('button', { name: 'Open workspace' }));
     expect(mocks.router.push).toHaveBeenCalledWith('/app');
+    expect(window.localStorage.getItem('nexus-active-workspace')).toBe('workspace-1');
   });
 
-  it('declines only after confirmation', async () => {
+  it('declines only after confirmation and then navigates to /app', async () => {
     mocks.getAccessToken.mockReturnValue('access-token');
-    mocks.declineInvitation.mockResolvedValue({ workspaceId: 'workspace-1', workspaceName: 'Nexus Studio' });
+    mocks.declineInvitation.mockResolvedValue({
+      workspaceId: 'workspace-1',
+      workspaceName: 'Nexus Studio',
+    });
     const user = userEvent.setup();
     render(<InvitationAcceptClient />);
 
     await user.click(await screen.findByRole('button', { name: 'Decline' }));
+    // Confirmation dialog appears — decline hasn't been called yet
     expect(mocks.declineInvitation).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Decline invitation' }));
 
     await waitFor(() => expect(mocks.declineInvitation).toHaveBeenCalledWith('token_-123'));
-    expect(mocks.refreshSession).not.toHaveBeenCalled();
-    expect(await screen.findByText('You declined the invitation to Nexus Studio.')).toBeInTheDocument();
+    expect(mocks.router.push).toHaveBeenCalledWith('/app');
   });
 
+  // ── Post-auth dialog (from=auth / from=register) ─────────────────────────
+
+  it('opens the confirmation dialog immediately when from=auth and a saved intent exists', async () => {
+    mocks.searchParams = new URLSearchParams('token=token_-123&from=auth');
+    mocks.getAccessToken.mockReturnValue('access-token');
+    saveInvitationIntent(savedIntent);
+
+    render(<InvitationAcceptClient />);
+
+    // The dialog should appear without needing to click anything.
+    // Use the dialog element itself to avoid ambiguity with the page h1.
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.querySelector('h2')).toHaveTextContent('Join Nexus Studio');
+  });
+
+  it('opens the dialog with the account-created notice when from=register', async () => {
+    mocks.searchParams = new URLSearchParams('token=token_-123&from=register');
+    mocks.getAccessToken.mockReturnValue('access-token');
+    saveInvitationIntent(savedIntent);
+
+    render(<InvitationAcceptClient />);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveTextContent(/Account created/i);
+  });
+
+  it('does not open the dialog when from=auth but no saved intent exists', async () => {
+    mocks.searchParams = new URLSearchParams('token=token_-123&from=auth');
+    mocks.getAccessToken.mockReturnValue('access-token');
+    // No saveInvitationIntent() call
+
+    render(<InvitationAcceptClient />);
+
+    await screen.findByRole('heading', { name: 'Join Nexus Studio' }); // page loaded
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('does not open the dialog when intent token does not match URL token', async () => {
+    mocks.searchParams = new URLSearchParams('token=token_-123&from=auth');
+    mocks.getAccessToken.mockReturnValue('access-token');
+    saveInvitationIntent({ ...savedIntent, token: 'different_token' });
+
+    render(<InvitationAcceptClient />);
+
+    await screen.findByRole('heading', { name: 'Join Nexus Studio' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  // ── Error states ─────────────────────────────────────────────────────────
+
   it('shows the backend explanation for an unusable invitation', async () => {
-    mocks.previewInvitation.mockRejectedValue(new ApiRequestError('This invitation link has expired', 410, 'INVITATION_EXPIRED'));
+    mocks.previewInvitation.mockRejectedValue(
+      new ApiRequestError('This invitation link has expired', 410, 'INVITATION_EXPIRED'),
+    );
     render(<InvitationAcceptClient />);
 
     expect(await screen.findByText('This invitation is not available')).toBeInTheDocument();
@@ -122,7 +210,7 @@ describe('invitation acceptance', () => {
 
   it('does not offer acceptance for an invitation whose backend status is expired', async () => {
     mocks.getAccessToken.mockReturnValue('access-token');
-    mocks.previewInvitation.mockResolvedValue({ ...invitation, status: 'EXPIRED' });
+    mocks.previewInvitation.mockResolvedValue({ ...preview, status: 'EXPIRED' });
     render(<InvitationAcceptClient />);
 
     expect(await screen.findByRole('heading', { name: 'Join Nexus Studio' })).toBeInTheDocument();
@@ -137,6 +225,8 @@ describe('invitation acceptance', () => {
     expect(await screen.findByText('This invitation is not available')).toBeInTheDocument();
     expect(mocks.previewInvitation).not.toHaveBeenCalled();
   });
+
+  // ── Session restoration ──────────────────────────────────────────────────
 
   it('restores a session before showing authenticated controls', async () => {
     document.cookie = 'nexus_csrf=csrf';

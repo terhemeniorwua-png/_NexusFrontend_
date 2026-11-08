@@ -8,7 +8,7 @@ const RESPONSE_HEADERS = ['cache-control', 'content-type', 'x-request-id'] as co
  * proxy. Every prefix is a module the frontend actually consumes; anything
  * else is rejected so the proxy cannot become an open relay.
  */
-const ALLOWED_API_PREFIXES = ['auth', 'users', 'workspaces', 'invitations', 'billing', 'notifications', 'integrations', 'search', 'privacy-requests'] as const;
+const ALLOWED_API_PREFIXES = ['auth', 'users', 'workspaces', 'invitations', 'billing', 'notifications', 'integrations', 'search', 'ai', 'privacy-requests'] as const;
 
 /** Path segments must be URL-safe; invitation and join-code tokens are base64url. */
 const SEGMENT_PATTERN = /^[a-zA-Z0-9_-]+$/;

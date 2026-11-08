@@ -263,7 +263,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 14    | Document Collaboration                                           | In Progress |
 | 15    | Calendar and Scheduling                                          | In Progress |
 | 16    | Meetings and Calling                                             | In Progress |
-| 17    | Forms and Surveys                                                | Not Started |
+| 17    | Forms and Surveys                                                | In Progress |
 | 18    | Subscription, Billing, and Plan Management                       | Not Started |
 | 19    | Global Search and Full Document Search                           | Not Started |
 | 20    | Integrations Management                                          | Not Started |
@@ -2163,6 +2163,80 @@ Build form creation, publishing, and response management.
 - Published forms.
 - Response management.
 - Survey results interface.
+
+### Phase 17 Status — In Progress (2026-11-08)
+
+Branch: `feature/phase-17-forms`.
+
+#### Backend contract (verified 2026-11-08)
+
+All routes at `/api/v1/workspaces/:workspaceId/forms` — forwarded through the proxy via the `workspaces` prefix.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/workspaces/:wsId/forms` | list — `{items, nextCursor}` — query: `cursor?`, `limit?`, `status?` |
+| `POST` | `/workspaces/:wsId/forms` | create — `FormDetail` (201) — body: `{title, description?, isPublic?}` |
+| `GET` | `/workspaces/:wsId/forms/:formId` | get single with fields and response count — `FormDetail` |
+| `PATCH` | `/workspaces/:wsId/forms/:formId` | update — `FormDetail` — body: `{title?, description?, isPublic?, status?}` |
+| `DELETE` | `/workspaces/:wsId/forms/:formId` | soft-delete — `{ok: true}` |
+| `POST` | `/workspaces/:wsId/forms/:formId/fields` | add field (201) — body: `{label, type, required?, options?, placeholder?, position?}` |
+| `POST` | `/workspaces/:wsId/forms/:formId/responses` | submit response (201) — body: `{answers: [{fieldId, value}]}` |
+| `GET` | `/workspaces/:wsId/forms/:formId/responses` | list responses — `{items, nextCursor}` |
+
+Field types: TEXT, TEXTAREA, NUMBER, EMAIL, SELECT, MULTISELECT, RADIO, CHECKBOX, DATE, RATING, SCALE.
+Form statuses: DRAFT, PUBLISHED, CLOSED, ARCHIVED.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Form listing with status filter | Implemented | `app/app/forms/page.tsx` — cursor-paginated list with DRAFT/PUBLISHED/CLOSED/ARCHIVED filter |
+| Form creation | Implemented | Modal with title, description, isPublic toggle |
+| Publish form | Implemented | Per-card Publish button (DRAFT only) with ConfirmDialog → PATCH status=PUBLISHED |
+| Archive form | Implemented | Per-card Archive button (PUBLISHED/CLOSED) with ConfirmDialog → PATCH status=ARCHIVED |
+| Delete form | Implemented | Per-card Delete button (non-PUBLISHED) with ConfirmDialog |
+| Form detail with fields tab | Implemented | `app/app/forms/[formId]/page.tsx` — shows field list with type, required, options |
+| Field builder | Implemented | Add field modal (DRAFT only, creator) — all 11 field types, required toggle, options textarea, placeholder |
+| Responses tab | Implemented | Lists responses with answer values per field label |
+| Settings tab | Implemented | Edit title, description, status, isPublic; danger-zone delete |
+| Navigation entry | Implemented | Forms under Work section in lib/app-navigation.ts, all workspace types |
+| Loading, empty, error, AccessState | Implemented | Full state coverage on both list and detail pages |
+| Workspace-switch safety | Implemented | latestLoad ref + seq guard on list; workspace change redirects from detail to /app/forms |
+
+#### Files created
+
+- `services/forms.ts` — typed forms service (all operations, withAuthRetry, relative paths)
+- `services/__tests__/forms.test.ts` — 14 service contract tests
+- `app/app/forms/page.tsx` — forms list with status filter, create/publish/archive/delete
+- `app/app/forms/[formId]/page.tsx` — form detail with fields, responses, and settings
+- `app/app/forms/page.test.tsx` — 12 page tests
+- `app/app/forms/[formId]/page.test.tsx` — 11 detail page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Forms entry under Work section
+- `lib/app-navigation.test.ts` — added forms nav test
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 71 files, 595 tests |
+| `npm run build` | Passed — /app/forms and /app/forms/[formId] routes generated |
+
+#### Remaining gaps
+
+Phase 17 remains **In Progress** due to:
+
+- **Form preview**: No form preview/render UI (rendering the form as a respondent would see it) is implemented. The field list in the detail page shows the builder view only.
+- **Response submission UI**: The submitFormResponse service function exists but no in-app response submission form is built. Respondents would need the public URL to submit.
+- **Form access controls**: No per-form access-control endpoint is registered in the backend.
+- **Survey results/summaries**: No aggregate statistics endpoint; responses are listed individually.
+- **Field editing/removal**: Fields can only be added (no edit or delete endpoint is registered in the backend).
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
 
 ## Phase 18 — Subscription, Billing, and Plan Management
 

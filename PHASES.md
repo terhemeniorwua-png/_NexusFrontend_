@@ -264,8 +264,8 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 15    | Calendar and Scheduling                                          | In Progress |
 | 16    | Meetings and Calling                                             | In Progress |
 | 17    | Forms and Surveys                                                | In Progress |
-| 18    | Subscription, Billing, and Plan Management                       | Not Started |
-| 19    | Global Search and Full Document Search                           | Not Started |
+| 18    | Subscription, Billing, and Plan Management                       | In Progress |
+| 19    | Global Search and Full Document Search                           | In Progress |
 | 20    | Integrations Management                                          | Not Started |
 | 21    | Automation and Workflow Builder                                  | Not Started |
 | 22    | Nexus AI Assistant                                               | Not Started |
@@ -2323,6 +2323,72 @@ Build a global search experience across authorised Nexus resources.
 - Global search.
 - Search result interfaces.
 - Search filters and navigation.
+
+### Phase 19 Status — In Progress (2026-11-08)
+
+Branch: `feature/phase-19-search`.
+
+#### Backend contract (verified 2026-11-08)
+
+Route at `/api/v1/search` (mounted as `/search`, NOT under `/workspaces`). Added `search` to `ALLOWED_API_PREFIXES` in the backend proxy.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/search` | query: `q` (required, 1-200 chars), `category?` (projects/tasks/documents/files/channels/meetings/all), `workspaceId?` |
+| Response | `SearchResult[]` | Up to 25 results for 'all', 10 per category. Not paginated. |
+
+`SearchResult`: `{id, type, title, description, workspaceId, createdAt}`. Types: project, task, document, file, channel, meeting.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Global search modal | Implemented | `components/search/GlobalSearch.tsx` — overlay dialog with backdrop, category tabs, result list |
+| Ctrl+K / Cmd+K shortcut | Implemented | `hooks/useGlobalSearch.ts` — toggles modal; shortcut registered globally in AuthenticatedShell |
+| Search button in topbar | Implemented | `AuthenticatedShell` passes `onOpenSearch={openSearch}` to AppShell; Topbar already supports this prop |
+| Category filter | Implemented | all/projects/tasks/documents/files/channels/meetings tab buttons |
+| Workspace context filtering | Implemented | `workspaceId` passed to search service to scope results to active workspace |
+| Results list with type badges | Implemented | Type icon + title + description + type badge per result; links to relevant page |
+| Loading state | Implemented | Spinner in search input while fetching |
+| Empty state | Implemented | "No results for X" when search returns nothing |
+| Error state | Implemented | Error text below input when search fails |
+| Hint state | Implemented | "Type at least 2 characters" before first search |
+| Debounced search | Implemented | 300 ms debounce on input change |
+| Backend permission respect | Implemented | Backend filters results by workspace membership and project visibility |
+
+#### Files created
+
+- `services/search.ts` — typed search service with withAuthRetry
+- `services/__tests__/search.test.ts` — 5 service contract tests
+- `components/search/GlobalSearch.tsx` — global search modal component
+- `components/search/__tests__/GlobalSearch.test.tsx` — 9 component tests
+- `hooks/useGlobalSearch.ts` — open/close state + Ctrl+K shortcut hook
+
+#### Files modified
+
+- `app/api/backend/[...path]/route.ts` — added `search` to ALLOWED_API_PREFIXES
+- `components/layout/AuthenticatedShell.tsx` — added GlobalSearch modal + useGlobalSearch hook
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 73 files, 609 tests |
+| `npm run build` | Passed — all routes generated |
+
+#### Remaining gaps
+
+Phase 19 remains **In Progress** due to:
+
+- **Recent searches**: Not implemented — would require local storage or a backend "recent searches" endpoint (not registered).
+- **Search suggestions**: No suggestions API. Auto-complete would need a backend suggestions endpoint.
+- **People/workspaces/teams search**: The backend search service covers projects, tasks, documents, files, channels, and meetings only. People, workspace, team, and announcement search are not in the backend contract.
+- **Full document search**: Documents are searched by title only in the backend. Full content search is not implemented.
+- **Result previews**: Detailed previews (e.g., showing task status, file size) require richer backend responses.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
 
 ## Phase 20 — Integrations Management
 

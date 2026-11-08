@@ -54,7 +54,8 @@ describe('invitation intent storage', () => {
   });
 
   it('defaults missing role to MEMBER and organizationRole to null', () => {
-    const { role: _role, organizationRole: _organizationRole, ...rest } = intent;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { role, organizationRole, ...rest } = intent;
     saveInvitationIntent({ ...rest, role: '', organizationRole: null });
     const result = readInvitationIntent();
     expect(result?.role).toBe('');

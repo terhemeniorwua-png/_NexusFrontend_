@@ -266,7 +266,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 17    | Forms and Surveys                                                | In Progress |
 | 18    | Subscription, Billing, and Plan Management                       | In Progress |
 | 19    | Global Search and Full Document Search                           | In Progress |
-| 20    | Integrations Management                                          | Not Started |
+| 20    | Integrations Management                                          | In Progress |
 | 21    | Automation and Workflow Builder                                  | Not Started |
 | 22    | Nexus AI Assistant                                               | Not Started |
 | 23    | Nexus Write                                                      | Not Started |
@@ -2436,6 +2436,69 @@ Build the integration management experience.
 - Integrations directory.
 - Connection management.
 - Integration settings.
+
+### Phase 20 Status — In Progress (2026-11-08)
+
+Branch: `feature/phase-20-integrations`.
+
+#### Backend contract (verified 2026-11-08)
+
+Routes at `/api/v1/integrations` — `integrations` prefix was already in `ALLOWED_API_PREFIXES`.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/integrations` | list — `IntegrationSummary[]` — query: `workspaceId?` |
+| `DELETE` | `/integrations/:integrationId` | disconnect — `{ok: true}` |
+| `GET` | `/integrations/slack/authorize` | get Slack OAuth URL — query: `workspaceId` |
+
+Providers: GOOGLE_DRIVE, ONEDRIVE, DROPBOX, GMAIL, OUTLOOK, SLACK, GITHUB, GITLAB, GOOGLE_CALENDAR, OUTLOOK_CALENDAR.
+SLACK must connect via OAuth flow only.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Connected integrations list | Implemented | Shows connected integrations with provider name, status badge, external email, scopes |
+| Disconnect integration | Implemented | ConfirmDialog → DELETE — removes from list |
+| Available integrations directory | Implemented | Shows all unconnected providers with name, description, category |
+| Slack OAuth start | Implemented | "Connect" button calls /integrations/slack/authorize, redirects browser to Slack |
+| Other providers | Shown as "Coming soon" | OAuth flow for other providers not yet registered in backend |
+| Personal vs workspace separation | Implemented | List passes workspaceId to backend to filter; personal integrations have workspaceId=null |
+| Security note | Implemented | Footer note: tokens encrypted server-side; disconnecting doesn't delete provider data |
+| Navigation entry | Implemented | Integrations under Account section in lib/app-navigation.ts |
+| Loading, empty, error, AccessState | Implemented | Full state coverage |
+
+#### Files created
+
+- `services/integrations.ts` — typed integrations service
+- `services/__tests__/integrations.test.ts` — 5 service contract tests
+- `app/app/integrations/page.tsx` — integrations directory page
+- `app/app/integrations/page.test.tsx` — 11 page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Integrations entry under Account section
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 75 files, 624 tests |
+| `npm run build` | Passed — /app/integrations route generated |
+
+#### Remaining gaps
+
+Phase 20 remains **In Progress** due to:
+
+- **OAuth for non-Slack providers**: Google Drive, OneDrive, GitHub, etc. require backend OAuth routes that are not yet registered. Cards show "Coming soon".
+- **Integration settings**: No per-integration settings endpoint (scopes, workspace assignment, reconnect) is registered.
+- **Sync status**: No sync status endpoint registered.
+- **Microsoft Teams**: Not in the backend provider enum.
+- **Webhooks and automation**: Separate from integration management; covered in Phase 21.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
 
 ## Phase 21 — Automation and Workflow Builder
 

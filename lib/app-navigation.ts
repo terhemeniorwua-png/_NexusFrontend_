@@ -67,6 +67,7 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
       id: 'account',
       label: 'Account',
       items: [
+        { id: 'integrations', label: 'Integrations', href: '/app/integrations' },
         { id: 'invitations', label: 'Invitations', href: '/app/invitations' },
         { id: 'billing', label: 'Billing', href: '/app/billing' },
         { id: 'profile', label: 'Profile', href: '/app/profile' },

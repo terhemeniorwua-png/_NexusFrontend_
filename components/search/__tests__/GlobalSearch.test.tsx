@@ -13,13 +13,6 @@ vi.mock('@/services/search', () => ({
 import { globalSearch } from '@/services/search';
 const mockSearch = vi.mocked(globalSearch);
 
-function ok(data: unknown, status = 200) {
-  return new Response(JSON.stringify({ success: true, data }), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 function fakeResult(overrides: Partial<{ id: string; type: string; title: string }> = {}) {
   return {
     id: 'r-1',

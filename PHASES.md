@@ -267,7 +267,7 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 18    | Subscription, Billing, and Plan Management                       | In Progress |
 | 19    | Global Search and Full Document Search                           | In Progress |
 | 20    | Integrations Management                                          | In Progress |
-| 21    | Automation and Workflow Builder                                  | Not Started |
+| 21    | Automation and Workflow Builder                                  | In Progress |
 | 22    | Nexus AI Assistant                                               | Not Started |
 | 23    | Nexus Write                                                      | Not Started |
 | 24    | AI Action Approval and Execution Interfaces                      | Not Started |
@@ -2525,6 +2525,76 @@ Build interfaces for managing automated workflows.
 - Automation dashboard.
 - Workflow builder.
 - Automation execution history.
+
+### Phase 21 Status — In Progress (2026-11-08)
+
+Branch: `feature/phase-21-automation`.
+
+#### Backend contract (verified 2026-11-08)
+
+Routes at `/api/v1/workspaces/:workspaceId/automations` — forwarded through proxy via the `workspaces` prefix.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/workspaces/:wsId/automations` | list — `Automation[]` |
+| `POST` | `/workspaces/:wsId/automations` | create (201) — `{name, trigger, action, actionConfig, condition?, enabled?, maxRetries?}` |
+| `GET` | `/workspaces/:wsId/automations/:autoId` | get single with last 10 runs |
+| `PATCH` | `/workspaces/:wsId/automations/:autoId` | update — `{name?, enabled?}` |
+| `DELETE` | `/workspaces/:wsId/automations/:autoId` | soft-delete — `{ok: true}` |
+
+Triggers: EVENT_TASK_CREATED, EVENT_TASK_COMPLETED, EVENT_MEMBER_JOINED, SCHEDULED_DAILY, SCHEDULED_WEEKLY.
+Actions: SEND_NOTIFICATION, CREATE_TASK, SEND_WEBHOOK.
+Requires UpdateWorkspace capability to create/edit/delete; ViewWorkspace to list.
+
+#### Implementation evidence
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Automation listing | Implemented | `app/app/automations/page.tsx` — list with trigger/action labels, enabled badge |
+| Automation creation | Implemented | Create modal with name, trigger select, action select, dynamic actionConfig fields, enabled checkbox |
+| Trigger selection | Implemented | 5 triggers displayed in dropdown |
+| Action selection | Implemented | 3 actions with dynamic config fields per action type |
+| Enable/disable (activation) | Implemented | Toggle button on list cards and detail page — PATCH enabled |
+| Automation detail with run history | Implemented | `app/app/automations/[automationId]/page.tsx` — config display + last 10 runs |
+| Run history status | Implemented | SUCCEEDED/FAILED/SKIPPED badges with error details |
+| Rename automation | Implemented | Modal with name field |
+| Delete automation | Implemented | ConfirmDialog destructive |
+| Navigation entry | Implemented | Automations under Work section in lib/app-navigation.ts |
+| Loading, empty, error, AccessState | Implemented | Full state coverage |
+| Workspace-switch safety | Implemented | latestLoad ref on list; workspace change redirects from detail |
+
+#### Files created
+
+- `services/automations.ts` — typed automation service
+- `services/__tests__/automations.test.ts` — 5 service contract tests
+- `app/app/automations/page.tsx` — automation list with create modal
+- `app/app/automations/[automationId]/page.tsx` — detail with run history
+- `app/app/automations/page.test.tsx` — 10 page tests
+- `app/app/automations/[automationId]/page.test.tsx` — 8 detail page tests
+
+#### Files modified
+
+- `lib/app-navigation.ts` — added Automations entry under Work section
+
+#### Validation
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — 79 files, 666 tests |
+| `npm run build` | Passed — /app/automations and /app/automations/[automationId] routes generated |
+
+#### Remaining gaps
+
+Phase 21 remains **In Progress** due to:
+
+- **Condition builder UI**: The backend accepts `condition` as a `Record<string, string>` but the create form does not expose a condition editor. Conditions are not set through the UI.
+- **Full workflow builder**: The current UI is a simple create form rather than a visual drag-and-drop workflow editor.
+- **Execution history per run**: Only SUCCEEDED/FAILED/SKIPPED status is shown; no per-run input/output payload detail is available in the backend response.
+- **Webhook logs**: SEND_WEBHOOK action has no dedicated response tracking endpoint.
+- **Live backend verification**: All tests use mocked API responses.
+- **Manual responsive review**: Not performed; awaiting user confirmation.
 
 ## Phase 22 — Nexus AI Assistant
 

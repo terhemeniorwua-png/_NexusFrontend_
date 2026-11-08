@@ -19,6 +19,7 @@ import {
   getSlackAuthorizeUrl,
   getGoogleDriveAuthorizeUrl,
   getDropboxAuthorizeUrl,
+  getGmailAuthorizeUrl,
   type IntegrationProvider,
   type IntegrationStatus,
   type IntegrationSummary,
@@ -44,6 +45,7 @@ const AUTHORIZE_URL_FETCHERS: Partial<Record<IntegrationProvider, (workspaceId: 
   SLACK: getSlackAuthorizeUrl,
   GOOGLE_DRIVE: getGoogleDriveAuthorizeUrl,
   DROPBOX: getDropboxAuthorizeUrl,
+  GMAIL: getGmailAuthorizeUrl,
 };
 
 function statusVariant(status: IntegrationStatus): 'default' | 'success' | 'warning' | 'error' {
@@ -161,6 +163,7 @@ export default function IntegrationsPage() {
 
   const [connectingProvider, setConnectingProvider] = useState<IntegrationProvider | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const latestLoad = useRef(0);
 
@@ -191,6 +194,21 @@ export default function IntegrationsPage() {
     void Promise.resolve().then(() => active ? load(workspaceId) : undefined);
     return () => { active = false; };
   }, [workspaceId, user?.id, load]);
+
+  // Result of an OAuth round trip: the backend redirects here with ?integration=<provider>&status=<result>.
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const params = new URLSearchParams(window.location.search);
+      const integration = params.get('integration');
+      const status = params.get('status');
+      if (!integration || !status) return;
+      const name = PROVIDER_META[integration.toUpperCase() as IntegrationProvider]?.name ?? 'Integration';
+      if (status === 'connected') setNotice({ type: 'success', text: `${name} connected.` });
+      else if (status === 'denied') setNotice({ type: 'error', text: `${name} authorization was cancelled.` });
+      else setNotice({ type: 'error', text: `Could not connect ${name}. Please try again.` });
+      window.history.replaceState(null, '', window.location.pathname);
+    });
+  }, []);
 
   async function handleDisconnect() {
     if (!disconnectTarget || disconnecting) return;
@@ -266,6 +284,7 @@ export default function IntegrationsPage() {
         </Alert>
       )}
 
+      {notice && <Alert variant={notice.type} className="mb-4">{notice.text}</Alert>}
       {connectError && <Alert variant="error" className="mb-4">{connectError}</Alert>}
       {disconnectError && <Alert variant="error" className="mb-4">{disconnectError}</Alert>}
 

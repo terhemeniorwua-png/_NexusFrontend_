@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   router: { push: vi.fn(), replace: vi.fn() },
   pathname: '/app',
   signOut: vi.fn(),
+  getUserProfile: vi.fn(),
+  setAvatarUrl: vi.fn(),
   context: {
     user: { id: 'user-1', name: 'Ada', email: 'ada@example.com' } as { id: string; name: string; email: string } | null,
     workspaces: [] as Array<Record<string, unknown>>,
@@ -25,7 +27,10 @@ vi.mock('next/navigation', () => ({
   usePathname: () => mocks.pathname,
 }));
 vi.mock('@/providers/WorkspaceProvider', () => ({ useWorkspaceContext: () => mocks.context }));
+vi.mock('@/providers/AvatarUrlProvider', () => ({ useAvatarUrl: () => ({ avatarUrl: null, setAvatarUrl: mocks.setAvatarUrl }) }));
 vi.mock('@/services/auth', () => ({ signOut: mocks.signOut }));
+vi.mock('@/services/profile', () => ({ getUserProfile: mocks.getUserProfile }));
+vi.mock('@/services/notifications', () => ({ getUnreadCount: vi.fn().mockResolvedValue({ unreadCount: 0 }) }));
 
 const company: Record<string, unknown> = {
   id: 'workspace-company',
@@ -65,6 +70,10 @@ describe('AuthenticatedShell', () => {
     mocks.context.activeWorkspace = company;
     mocks.context.loading = false;
     mocks.signOut.mockResolvedValue(undefined);
+    mocks.getUserProfile.mockResolvedValue({
+      user: { id: 'user-1', email: 'ada@example.com', name: 'Ada', status: 'ACTIVE', emailVerifiedAt: null, createdAt: '' },
+      profile: { bio: null, jobTitle: null, avatarUrl: null, timeZone: 'UTC', locale: 'en' },
+    });
     window.localStorage.clear();
   });
 

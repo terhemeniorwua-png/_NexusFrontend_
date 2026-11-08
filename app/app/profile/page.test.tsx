@@ -4,25 +4,51 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProfilePage from './page';
 import { getUserProfile, updateUserProfile } from '@/services/profile';
 
-const { mockRouter } = vi.hoisted(() => ({ mockRouter: { replace: vi.fn() } }));
+const { mockRouter, mockSetAvatarUrl } = vi.hoisted(() => ({
+  mockRouter: { replace: vi.fn() },
+  mockSetAvatarUrl: vi.fn(),
+}));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a>,
+  default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) =>
+    <a href={href} {...props}>{children}</a>,
 }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => mockRouter }));
+
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>();
   return { ...actual, getAccessToken: vi.fn(() => 'access-token') };
 });
+
 vi.mock('@/services/auth', () => ({ refreshSession: vi.fn() }));
+
 vi.mock('@/components/profile/AccountSecurity', () => ({ AccountSecurity: () => null }));
+
+// Stub AvatarUpload so profile page tests don't need full upload machinery.
+vi.mock('@/components/profile/AvatarUpload', () => ({
+  AvatarUpload: ({ avatarUrl, name }: { avatarUrl: string | null; name: string }) => (
+    <div data-testid="avatar-upload" data-avatar-url={avatarUrl ?? ''} data-name={name} />
+  ),
+}));
+
 vi.mock('@/services/profile', () => ({
   getUserProfile: vi.fn(),
   updateUserProfile: vi.fn(),
 }));
+
 vi.mock('@/providers/WorkspaceProvider', () => ({
-  useWorkspaceContext: () => ({ user: profile.user, loading: false, error: null, retry: vi.fn() }),
+  useWorkspaceContext: () => ({
+    user: profile.user,
+    loading: false,
+    error: null,
+    retry: vi.fn(),
+  }),
+}));
+
+// Use a stable hoisted mock for setAvatarUrl so it doesn't cause effect re-runs.
+vi.mock('@/providers/AvatarUrlProvider', () => ({
+  useAvatarUrl: () => ({ avatarUrl: null, setAvatarUrl: mockSetAvatarUrl }),
 }));
 
 const profile = {
@@ -54,12 +80,21 @@ describe('ProfilePage', () => {
     render(<ProfilePage />);
 
     expect(await screen.findByRole('textbox', { name: 'Full name' })).toHaveValue('Ada Lovelace');
-    expect(await screen.findByRole('textbox', { name: 'Email address' })).toHaveValue('ada@example.com');
+    expect(screen.getByRole('textbox', { name: 'Email address' })).toHaveValue('ada@example.com');
     expect(screen.getByRole('textbox', { name: 'Email address' })).toHaveAttribute('readonly');
     expect(getUserProfile).toHaveBeenCalledOnce();
   });
 
-  it('saves profile changes through the established profile API contract', async () => {
+  it('renders the AvatarUpload component instead of a URL input', async () => {
+    render(<ProfilePage />);
+
+    await screen.findByRole('textbox', { name: 'Full name' }); // wait for load
+    expect(screen.getByTestId('avatar-upload')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/avatar.*url/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/avatar image url/i)).not.toBeInTheDocument();
+  });
+
+  it('saves profile changes without including avatarUrl in the PATCH payload', async () => {
     const user = userEvent.setup();
     render(<ProfilePage />);
 
@@ -72,10 +107,13 @@ describe('ProfilePage', () => {
       name: 'Ada Byron',
       bio: null,
       jobTitle: 'Mathematician',
-      avatarUrl: null,
       timeZone: 'Africa/Lagos',
       locale: 'en',
     });
+    // avatarUrl must NOT be present in the payload.
+    const call = vi.mocked(updateUserProfile).mock.calls[0]?.[0];
+    expect(call).not.toHaveProperty('avatarUrl');
+
     expect(await screen.findByText('Your profile has been saved.')).toBeInTheDocument();
   });
 

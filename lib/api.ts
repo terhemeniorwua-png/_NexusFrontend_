@@ -50,7 +50,10 @@ export async function apiRequest<T>(
 
   const { authenticated = false, headers: inputHeaders, ...requestOptions } = options;
   const headers = new Headers(inputHeaders);
-  if (requestOptions.body && !headers.has('Content-Type')) {
+  // Only set the default JSON content-type when the body is a plain string or
+  // Buffer. When it is a FormData the browser must set the content-type itself
+  // (with the correct multipart boundary), so we must not override it.
+  if (requestOptions.body && !(requestOptions.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
   if (authenticated && accessToken) {

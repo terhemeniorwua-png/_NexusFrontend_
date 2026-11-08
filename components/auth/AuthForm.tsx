@@ -432,7 +432,13 @@ export function AuthForm({ mode, initialEmail = '', accountType, redirectPath, d
         saveStoredAuthEmail(registration.user.email);
         setComplete(true);
         setNotice('Check your email for the 6-digit verification code.');
-        router.push(`/verify-email?email=${encodeURIComponent(registration.user.email)}`);
+        // Preserve the redirect through the verify-email step so that the user
+        // lands on the correct destination (e.g. invitation accept page) after
+        // verifying their email and signing in.
+        const verifyPath = redirectPath
+          ? `/verify-email?email=${encodeURIComponent(registration.user.email)}&redirect=${encodeURIComponent(redirectPath)}`
+          : `/verify-email?email=${encodeURIComponent(registration.user.email)}`;
+        router.push(verifyPath);
       }
     } catch (requestError) {
       setError(friendlyError(requestError));

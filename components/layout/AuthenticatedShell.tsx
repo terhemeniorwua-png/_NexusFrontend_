@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/Alert';
 import { AppShell } from '@/components/layout/AppShell';
+import { GlobalSearch } from '@/components/search/GlobalSearch';
 import { buildAppNavigation, workspaceKindFor } from '@/lib/app-navigation';
 import { workspacePermissionKeys } from '@/lib/permissions';
+import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { signOut } from '@/services/auth';
 import { getUnreadCount } from '@/services/notifications';
@@ -39,6 +41,7 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { open: searchOpen, openSearch, closeSearch } = useGlobalSearch();
 
   useEffect(() => {
     if (!user) return;
@@ -95,6 +98,7 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
         { id: 'workspaces', label: 'Manage workspaces', href: '/app/workspaces' },
       ]}
       onSignOut={() => { void handleSignOut(); }}
+      onOpenSearch={openSearch}
       messagesHref="/app/messages"
       notificationsHref="/app/notifications"
       notificationUnreadCount={notificationUnreadCount}
@@ -105,6 +109,12 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
         </div>
       )}
       {children}
+
+      <GlobalSearch
+        workspaceId={activeWorkspace?.id}
+        open={searchOpen}
+        onClose={closeSearch}
+      />
     </AppShell>
   );
 }

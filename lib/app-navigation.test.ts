@@ -48,6 +48,12 @@ describe('workspace-aware organization navigation', () => {
     expect(hrefs('INDIVIDUAL')).toContain('/app/documents');
   });
 
+  it('shows the forms entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/forms');
+    expect(hrefs('INSTITUTION')).toContain('/app/forms');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/forms');
+  });
+
   it('shows the calendar entry for all workspace types', () => {
     expect(hrefs('COMPANY')).toContain('/app/calendar');
     expect(hrefs('INSTITUTION')).toContain('/app/calendar');

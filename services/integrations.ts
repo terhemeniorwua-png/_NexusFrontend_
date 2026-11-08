@@ -14,7 +14,8 @@
  * POST   /integrations           connect — IntegrationSummary (201)
  *   body: { provider, workspaceId?, accessToken, refreshToken?,
  *           tokenExpiresAt?, scopes?, externalUserId?, externalEmail? }
- *   NOTE: SLACK must go through the OAuth flow (/integrations/slack/authorize)
+ *   NOTE: SLACK, GOOGLE_DRIVE and DROPBOX must go through their OAuth flows
+ *         (/integrations/slack|google-drive|dropbox/authorize)
  *
  * DELETE /integrations/:integrationId   disconnect — {ok: true}
  *
@@ -85,5 +86,19 @@ export async function disconnectIntegration(integrationId: string): Promise<{ ok
 export async function getSlackAuthorizeUrl(workspaceId: string): Promise<{ url: string }> {
   return authed<{ url: string }>(
     `/integrations/slack/authorize?workspaceId=${encodeURIComponent(workspaceId)}`,
+  );
+}
+
+/** Get the Google Drive OAuth authorization URL (workspace-level, manager required). */
+export async function getGoogleDriveAuthorizeUrl(workspaceId: string): Promise<{ url: string }> {
+  return authed<{ url: string }>(
+    `/integrations/google-drive/authorize?workspaceId=${encodeURIComponent(workspaceId)}`,
+  );
+}
+
+/** Get the Dropbox OAuth authorization URL (workspace-level, manager required). */
+export async function getDropboxAuthorizeUrl(workspaceId: string): Promise<{ url: string }> {
+  return authed<{ url: string }>(
+    `/integrations/dropbox/authorize?workspaceId=${encodeURIComponent(workspaceId)}`,
   );
 }

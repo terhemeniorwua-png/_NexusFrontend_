@@ -3,7 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { disconnectIntegration, getDropboxAuthorizeUrl, getGoogleDriveAuthorizeUrl, getSlackAuthorizeUrl, listIntegrations } from '../integrations';
+import { disconnectIntegration, getDropboxAuthorizeUrl, getGmailAuthorizeUrl, getGoogleDriveAuthorizeUrl, getSlackAuthorizeUrl, listIntegrations } from '../integrations';
 
 function ok(data: unknown, status = 200) {
   return new Response(JSON.stringify({ success: true, data }), {
@@ -99,6 +99,21 @@ describe('getDropboxAuthorizeUrl', () => {
     await getDropboxAuthorizeUrl('ws-abc');
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/integrations/dropbox/authorize?workspaceId=ws-abc'),
+      expect.any(Object),
+    );
+  });
+});
+
+describe('getGmailAuthorizeUrl', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('calls GET /integrations/gmail/authorize', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      ok({ url: 'https://accounts.google.com/o/oauth2/v2/auth?...' }),
+    );
+    await getGmailAuthorizeUrl();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/integrations/gmail/authorize'),
       expect.any(Object),
     );
   });

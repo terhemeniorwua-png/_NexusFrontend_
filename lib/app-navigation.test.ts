@@ -77,4 +77,22 @@ describe('workspace-aware organization navigation', () => {
     expect(hrefs('INSTITUTION')).toContain('/app/notifications');
     expect(hrefs('INDIVIDUAL')).toContain('/app/notifications');
   });
+
+  it('shows the AI assistant entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/ai');
+    expect(hrefs('INSTITUTION')).toContain('/app/ai');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/ai');
+  });
+
+  it('shows the Nexus Write entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/ai-write');
+    expect(hrefs('INSTITUTION')).toContain('/app/ai-write');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/ai-write');
+  });
+
+  it('shows the AI actions entry for all workspace types', () => {
+    expect(hrefs('COMPANY')).toContain('/app/ai-actions');
+    expect(hrefs('INSTITUTION')).toContain('/app/ai-actions');
+    expect(hrefs('INDIVIDUAL')).toContain('/app/ai-actions');
+  });
 });

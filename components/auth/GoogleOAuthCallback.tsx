@@ -21,7 +21,7 @@ function oauthErrorMessage(error: string): string {
   if (error === 'GOOGLE_AUTH_UNAVAILABLE') return 'Google sign-in is temporarily unavailable. Please try again later.';
   if (error === 'GOOGLE_ACCOUNT_LINK_REQUIRED') return 'A Nexus account already uses this email. Sign in to that account first; Google accounts are not linked automatically.';
   if (error === 'LOGIN_RATE_LIMITED') return 'Too many Google sign-in attempts. Please wait a few minutes and try again.';
-  return 'We could not complete Google sign-in. Please try again.';
+  return `We could not complete Google sign-in (${error}). Please try again.`;
 }
 
 function requestErrorMessage(error: unknown): string {

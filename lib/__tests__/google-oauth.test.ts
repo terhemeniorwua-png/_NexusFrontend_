@@ -4,9 +4,12 @@ import { beginGoogleOAuth, clearGoogleOAuthIntent, readGoogleOAuthIntent } from 
 describe('Google OAuth browser intent', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    // OAuth must start on the backend origin so the state cookie is written to
+    // the host Google redirects back to.
+    process.env.NEXT_PUBLIC_BACKEND_ORIGIN = 'https://backend.example.test';
   });
 
-  it('stores only non-secret onboarding context and navigates to the backend proxy', () => {
+  it('stores only non-secret onboarding context and navigates to the backend origin', () => {
     const navigate = vi.fn();
 
     beginGoogleOAuth({
@@ -15,7 +18,7 @@ describe('Google OAuth browser intent', () => {
       redirectPath: '/app/projects?welcome=true',
     }, navigate);
 
-    expect(navigate).toHaveBeenCalledWith('/api/backend/auth/google');
+    expect(navigate).toHaveBeenCalledWith('https://backend.example.test/api/v1/auth/google');
     expect(readGoogleOAuthIntent()).toEqual({
       mode: 'sign-up',
       accountType: 'business',

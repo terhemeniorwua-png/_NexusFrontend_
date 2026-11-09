@@ -21,6 +21,7 @@ import {
   getDropboxAuthorizeUrl,
   getGmailAuthorizeUrl,
   getGithubAuthorizeUrl,
+  getGoogleCalendarAuthorizeUrl,
   type IntegrationProvider,
   type IntegrationStatus,
   type IntegrationSummary,
@@ -48,6 +49,7 @@ const AUTHORIZE_URL_FETCHERS: Partial<Record<IntegrationProvider, (workspaceId: 
   DROPBOX: getDropboxAuthorizeUrl,
   GMAIL: getGmailAuthorizeUrl,
   GITHUB: getGithubAuthorizeUrl,
+  GOOGLE_CALENDAR: getGoogleCalendarAuthorizeUrl,
 };
 
 function statusVariant(status: IntegrationStatus): 'default' | 'success' | 'warning' | 'error' {

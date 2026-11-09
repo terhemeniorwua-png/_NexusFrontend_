@@ -5,9 +5,10 @@
  *
  * Phase 24 — AI Action Approval and Execution Interfaces.
  *
- * This page demonstrates the AI action approval workflow. In production,
- * proposed actions would arrive through the AI assistant conversation
- * interface and be displayed here for explicit user approval before execution.
+ * Proposals are supplied by the backend AI response (see
+ * `AiQueryResponse.proposedActions`) and held in the ephemeral
+ * `lib/ai-action-proposals` store. Nothing is hardcoded: when the AI service
+ * has not proposed anything, the page shows an honest empty state.
  *
  * Backend contract (verified):
  * POST /ai/actions/approve
@@ -16,7 +17,8 @@
  *   response: { actionType, executed, message }
  */
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useState, useSyncExternalStore } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -27,19 +29,15 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { ApiRequestError } from '@/lib/api';
+import {
+  effectiveAiActionStatus,
+  getAiActionProposals,
+  subscribeToAiActionProposals,
+  updateAiActionProposal,
+  type AiActionStatus,
+  type ProposedAiAction,
+} from '@/lib/ai-action-proposals';
 import { approveAiAction } from '@/services/ai';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ProposedAction {
-  id: string;
-  actionType: string;
-  description: string;
-  payload: Record<string, unknown>;
-  proposedAt: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
-  executionResult?: { executed: boolean; message: string };
-}
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
   CREATE_TASK: 'Create a task',
@@ -47,98 +45,42 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   CREATE_PROJECT: 'Create a project',
   ASSIGN_TASK: 'Assign a task',
   CREATE_EVENT: 'Create a calendar event',
+  UPDATE_EVENT: 'Update a calendar event',
 };
 
-function isExpired(proposedAt: string): boolean {
-  return Date.now() - new Date(proposedAt).getTime() > 5 * 60 * 1000;
-}
-
-function getStatusVariant(status: ProposedAction['status']): 'default' | 'success' | 'warning' | 'error' {
+function statusVariant(status: AiActionStatus): 'default' | 'success' | 'warning' | 'error' {
   switch (status) {
-    case 'APPROVED': return 'success';
-    case 'REJECTED': return 'error';
-    case 'EXPIRED': return 'warning';
-    default: return 'default';
+    case 'APPROVED':
+      return 'success';
+    case 'REJECTED':
+      return 'error';
+    case 'EXPIRED':
+      return 'warning';
+    default:
+      return 'default';
   }
 }
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AIActionsPage() {
   const { activeWorkspace } = useWorkspaceContext();
   const workspaceId = activeWorkspace?.id ?? '';
 
-  // In production, these would come from the AI assistant conversation context.
-  // This demo shows the interface with example proposed actions.
-  const [actions, setActions] = useState<ProposedAction[]>([
-    {
-      id: 'demo-1',
-      actionType: 'CREATE_TASK',
-      description: 'Create a task "Review Q4 report" in the current project',
-      payload: { title: 'Review Q4 report', priority: 'HIGH' },
-      proposedAt: new Date().toISOString(),
-      status: 'PENDING',
-    },
-    {
-      id: 'demo-2',
-      actionType: 'CREATE_EVENT',
-      description: 'Schedule a team retrospective meeting for next Monday at 10am',
-      payload: {
-        title: 'Team Retrospective',
-        scheduledAt: 'next Monday 10:00',
-      },
-      proposedAt: new Date(Date.now() - 6 * 60 * 1000).toISOString(), // expired
-      status: 'PENDING',
-    },
-  ]);
+  const proposals = useSyncExternalStore(
+    subscribeToAiActionProposals,
+    getAiActionProposals,
+    getAiActionProposals,
+  );
 
-  const [approveTarget, setApproveTarget] = useState<ProposedAction | null>(null);
-  const [approving, setApproving] = useState(false);
-  const [approveError, setApproveError] = useState<string | null>(null);
-
-  // Update expired statuses
-  const displayActions = actions.map((a) => ({
-    ...a,
-    status: a.status === 'PENDING' && isExpired(a.proposedAt)
-      ? ('EXPIRED' as const)
-      : a.status,
+  const workspaceProposals = proposals.filter(
+    (proposal) => proposal.workspaceId === workspaceId,
+  );
+  const displayActions = workspaceProposals.map((proposal) => ({
+    ...proposal,
+    effectiveStatus: effectiveAiActionStatus(proposal),
   }));
-
-  async function handleApprove() {
-    if (!approveTarget || approving) return;
-    setApproving(true);
-    setApproveError(null);
-
-    try {
-      const result = await approveAiAction({
-        workspaceId,
-        actionType: approveTarget.actionType,
-        payload: approveTarget.payload,
-        approvedAt: new Date().toISOString(),
-      });
-      setActions((prev) => prev.map((a) =>
-        a.id === approveTarget.id
-          ? { ...a, status: 'APPROVED', executionResult: result }
-          : a,
-      ));
-      setApproveTarget(null);
-    } catch (err) {
-      setApproveError(
-        err instanceof ApiRequestError ? err.message : 'Approval failed. Please try again.',
-      );
-      setApproving(false);
-    } finally {
-      setApproving(false);
-    }
-  }
-
-  function handleReject(action: ProposedAction) {
-    setActions((prev) => prev.map((a) =>
-      a.id === action.id ? { ...a, status: 'REJECTED' } : a,
-    ));
-  }
-
-  const pendingCount = displayActions.filter((a) => a.status === 'PENDING').length;
+  const pendingCount = displayActions.filter(
+    (action) => action.effectiveStatus === 'PENDING',
+  ).length;
 
   return (
     <PageContainer>
@@ -147,15 +89,13 @@ export default function AIActionsPage() {
         description="Review and approve AI-proposed actions before they are executed."
       />
 
-      {/* Architecture note */}
       <Alert variant="warning" className="mb-4">
-        <strong>Preview mode:</strong> AI-proposed actions are displayed here for explicit user
-        approval. The backend validates permissions and executes only after confirmed approval.
-        The Python AI service is not yet connected — this interface shows example proposals.
+        <strong>Preview mode:</strong> AI-proposed actions appear here for explicit user approval.
+        The backend validates permissions and executes only after confirmed approval. The Python AI
+        service is not yet connected, so no proposals will arrive until it starts returning them.
       </Alert>
 
-      {/* Important rules notice */}
-      <Card className="mb-6 p-4 border-[var(--color-primary)] bg-[var(--color-primary-soft)]">
+      <Card className="mb-6 border-[var(--color-primary)] bg-[var(--color-primary-soft)] p-4">
         <h2 className="mb-2 font-semibold text-[var(--color-primary)]">How AI action approval works</h2>
         <ul className="space-y-1 text-sm text-[var(--color-text-secondary)]">
           <li>• AI never silently performs mutations to your workspace data.</li>
@@ -166,10 +106,20 @@ export default function AIActionsPage() {
         </ul>
       </Card>
 
-      {displayActions.length === 0 ? (
+      {!workspaceId ? (
+        <EmptyState
+          title="Choose a workspace"
+          description="Select a workspace to review AI actions proposed in that workspace."
+        />
+      ) : displayActions.length === 0 ? (
         <EmptyState
           title="No pending actions"
           description="When the AI assistant proposes actions, they will appear here for your review."
+          action={
+            <Link className="text-[var(--color-primary)] underline" href="/app/ai">
+              Open the AI assistant
+            </Link>
+          }
         />
       ) : (
         <div className="space-y-4">
@@ -180,82 +130,141 @@ export default function AIActionsPage() {
           )}
 
           {displayActions.map((action) => (
-            <Card key={action.id} className="p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-[var(--color-text-primary)]">
-                      {ACTION_TYPE_LABELS[action.actionType] ?? action.actionType}
-                    </span>
-                    <Badge variant={getStatusVariant(action.status)}>{action.status}</Badge>
-                  </div>
-
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                    {action.description}
-                  </p>
-
-                  {/* Payload */}
-                  <div className="mt-2">
-                    <p className="text-xs font-medium text-[var(--color-text-muted)]">Proposed changes:</p>
-                    <pre className="mt-1 rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] p-2 text-xs text-[var(--color-text-primary)] overflow-auto">
-                      {JSON.stringify(action.payload, null, 2)}
-                    </pre>
-                  </div>
-
-                  {/* Execution result */}
-                  {action.executionResult && (
-                    <div className="mt-2">
-                      <Alert variant={action.executionResult.executed ? 'success' : 'warning'}>
-                        {action.executionResult.message}
-                      </Alert>
-                    </div>
-                  )}
-
-                  {/* Expired note */}
-                  {action.status === 'EXPIRED' && (
-                    <p className="mt-2 text-xs text-[var(--color-warning)]">
-                      This action proposal has expired (5-minute approval window). The AI assistant
-                      would need to propose it again.
-                    </p>
-                  )}
-                </div>
-
-                {action.status === 'PENDING' && (
-                  <div className="flex shrink-0 gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => { setApproveTarget(action); setApproveError(null); }}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleReject(action)}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </Card>
+            <ProposalCard
+              key={action.id}
+              action={action}
+              workspaceId={workspaceId}
+            />
           ))}
         </div>
       )}
+    </PageContainer>
+  );
+}
 
-      {approveError && (
-        <Alert variant="error" className="mt-4">{approveError}</Alert>
+function ProposalCard({
+  action,
+  workspaceId,
+}: {
+  action: ProposedAiAction & { effectiveStatus: AiActionStatus };
+  workspaceId: string;
+}) {
+  return (
+    <Card className="p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-[var(--color-text-primary)]">
+              {ACTION_TYPE_LABELS[action.actionType] ?? action.actionType}
+            </span>
+            <Badge variant={statusVariant(action.effectiveStatus)}>
+              {action.effectiveStatus}
+            </Badge>
+          </div>
+
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            {action.description}
+          </p>
+
+          <div className="mt-2">
+            <p className="text-xs font-medium text-[var(--color-text-muted)]">Proposed changes:</p>
+            <pre className="mt-1 overflow-auto rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] p-2 text-xs text-[var(--color-text-primary)]">
+              {JSON.stringify(action.payload, null, 2)}
+            </pre>
+          </div>
+
+          {action.executionResult && (
+            <div className="mt-2">
+              <Alert variant={action.executionResult.executed ? 'success' : 'warning'}>
+                {action.executionResult.message}
+              </Alert>
+            </div>
+          )}
+
+          {action.effectiveStatus === 'EXPIRED' && (
+            <p className="mt-2 text-xs text-[var(--color-warning)]">
+              This action proposal has expired (5-minute approval window). The AI assistant would
+              need to propose it again.
+            </p>
+          )}
+        </div>
+
+        {action.effectiveStatus === 'PENDING' && (
+          <ProposalActions action={action} workspaceId={workspaceId} />
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ProposalActions({
+  action,
+  workspaceId,
+}: {
+  action: ProposedAiAction;
+  workspaceId: string;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleApprove() {
+    if (approving) return;
+    setApproving(true);
+    setError(null);
+
+    try {
+      const result = await approveAiAction({
+        workspaceId,
+        actionType: action.actionType,
+        payload: action.payload,
+        approvedAt: new Date().toISOString(),
+      });
+      updateAiActionProposal(action.id, {
+        status: 'APPROVED',
+        executionResult: { executed: result.executed, message: result.message },
+      });
+      setConfirmOpen(false);
+    } catch (cause) {
+      setError(
+        cause instanceof ApiRequestError
+          ? cause.message
+          : 'Approval failed. Please try again.',
+      );
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  function handleReject() {
+    updateAiActionProposal(action.id, { status: 'REJECTED' });
+  }
+
+  return (
+    <div className="flex shrink-0 flex-col items-stretch gap-2">
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => { setError(null); setConfirmOpen(true); }}>
+          Approve
+        </Button>
+        <Button size="sm" variant="secondary" onClick={handleReject}>
+          Reject
+        </Button>
+      </div>
+      {error && (
+        <Alert variant="error" className="max-w-xs">
+          {error}
+        </Alert>
       )}
 
       <ConfirmDialog
-        open={!!approveTarget}
+        open={confirmOpen}
         title="Approve AI action"
-        description={`Approve "${approveTarget ? (ACTION_TYPE_LABELS[approveTarget.actionType] ?? approveTarget.actionType) : ''}"? The backend will validate your permissions and execute this action.`}
+        description={`Approve "${ACTION_TYPE_LABELS[action.actionType] ?? action.actionType}"? The backend will validate your permissions and execute this action.`}
         confirmLabel="Approve and execute"
         onConfirm={() => { void handleApprove(); }}
-        onClose={() => { setApproveTarget(null); setApproveError(null); }}
+        onClose={() => { setConfirmOpen(false); setError(null); }}
         loading={approving}
       />
-    </PageContainer>
+    </div>
   );
 }

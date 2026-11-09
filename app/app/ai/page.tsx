@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -11,6 +12,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Textarea } from '@/components/ui/Textarea';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { ApiRequestError } from '@/lib/api';
+import { addAiActionProposals, type ProposedAiAction } from '@/lib/ai-action-proposals';
 import { queryAI, type AiQueryResponse } from '@/services/ai';
 
 // ─── Message types ────────────────────────────────────────────────────────────
@@ -38,6 +40,7 @@ export default function AIAssistantPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [proposedCount, setProposedCount] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   async function handleSend() {
@@ -60,6 +63,22 @@ export default function AIAssistantPage() {
         serviceMessage: response.answer === null ? response.message : undefined,
       };
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // Queue any actions the backend proposed. The approval surface lives at
+      // /app/ai-actions and never executes anything without explicit approval.
+      if (workspaceId && response.proposedActions?.length) {
+        const proposals: ProposedAiAction[] = response.proposedActions.map((action) => ({
+          id: action.id,
+          workspaceId,
+          actionType: action.actionType,
+          description: action.description,
+          payload: action.payload,
+          proposedAt: action.proposedAt,
+          status: 'PENDING',
+        }));
+        addAiActionProposals(proposals);
+        setProposedCount((count) => count + proposals.length);
+      }
     } catch (err) {
       const errText = err instanceof ApiRequestError ? err.message : 'Request failed. Please try again.';
       setError(errText);
@@ -72,7 +91,11 @@ export default function AIAssistantPage() {
     } finally {
       setLoading(false);
       setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // Guard for environments (and test DOMs) where scrollIntoView is not
+        // implemented; scrolling is a progressive enhancement only.
+        if (typeof bottomRef.current?.scrollIntoView === 'function') {
+          bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
       }, 50);
     }
   }
@@ -97,6 +120,15 @@ export default function AIAssistantPage() {
         Responses will acknowledge your query but cannot provide real answers until the Python AI
         service is configured.
       </Alert>
+
+      {proposedCount > 0 && (
+        <Alert variant="info" className="mb-4">
+          {proposedCount} AI-proposed action{proposedCount !== 1 ? 's' : ''} awaiting your review.{' '}
+          <Link className="font-medium underline" href="/app/ai-actions">
+            Review AI actions
+          </Link>
+        </Alert>
+      )}
 
       <div className="flex flex-col gap-4">
         {/* Conversation */}

@@ -48,11 +48,25 @@ export interface AnalyzeTextResponse {
   message: string;
 }
 
+/**
+ * An AI-proposed mutation returned with an assistant response. The backend AI
+ * contract does not return this field yet; it is optional so the approval
+ * surface works unchanged when the Python service starts proposing actions.
+ */
+export interface AiProposedAction {
+  id: string;
+  actionType: string;
+  description: string;
+  payload: Record<string, unknown>;
+  proposedAt: string;
+}
+
 export interface AiQueryResponse {
   query: string;
   answer: string | null;
   references: Array<{ id: string; type: string; title: string }>;
   message: string;
+  proposedActions?: AiProposedAction[];
 }
 
 export interface AiActionApprovalInput {

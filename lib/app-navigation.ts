@@ -51,6 +51,15 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
       ],
     },
     {
+      id: 'ai',
+      label: 'AI',
+      items: [
+        { id: 'ai-assistant', label: 'AI Assistant', href: '/app/ai', permissions: ['workspace:view'] },
+        { id: 'ai-write', label: 'Nexus Write', href: '/app/ai-write' },
+        { id: 'ai-actions', label: 'AI Actions', href: '/app/ai-actions', permissions: ['workspace:view'] },
+      ],
+    },
+    {
       id: 'people',
       label: 'People and access',
       items: [

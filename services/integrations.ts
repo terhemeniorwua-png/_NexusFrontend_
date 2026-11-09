@@ -107,3 +107,8 @@ export async function getDropboxAuthorizeUrl(workspaceId: string): Promise<{ url
 export async function getGmailAuthorizeUrl(): Promise<{ url: string }> {
   return authed<{ url: string }>('/integrations/gmail/authorize');
 }
+
+/** Get the GitHub OAuth authorization URL (personal connection, no workspace role needed). */
+export async function getGithubAuthorizeUrl(): Promise<{ url: string }> {
+  return authed<{ url: string }>('/integrations/github/authorize');
+}

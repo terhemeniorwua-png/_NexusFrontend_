@@ -28,7 +28,10 @@ export function beginGoogleOAuth(
       // Authentication can continue if browser session storage is unavailable.
     }
   }
-  navigate('/api/backend/auth/google');
+  // Start on the backend's own origin so the state cookie is set on the same
+  // host Google redirects back to (a proxied start would store it on the frontend host).
+  const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN ?? 'https://nexusbackend-1-0ffo.onrender.com';
+  navigate(`${backendOrigin.replace(/\/+$/, '')}/api/v1/auth/google`);
 }
 
 export function readGoogleOAuthIntent(): GoogleOAuthIntent | null {

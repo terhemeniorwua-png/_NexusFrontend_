@@ -20,6 +20,7 @@ import {
   getGoogleDriveAuthorizeUrl,
   getDropboxAuthorizeUrl,
   getGmailAuthorizeUrl,
+  getGithubAuthorizeUrl,
   type IntegrationProvider,
   type IntegrationStatus,
   type IntegrationSummary,
@@ -46,6 +47,7 @@ const AUTHORIZE_URL_FETCHERS: Partial<Record<IntegrationProvider, (workspaceId: 
   GOOGLE_DRIVE: getGoogleDriveAuthorizeUrl,
   DROPBOX: getDropboxAuthorizeUrl,
   GMAIL: getGmailAuthorizeUrl,
+  GITHUB: getGithubAuthorizeUrl,
 };
 
 function statusVariant(status: IntegrationStatus): 'default' | 'success' | 'warning' | 'error' {

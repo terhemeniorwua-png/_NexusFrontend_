@@ -185,7 +185,7 @@ export function createTask(
 ): Promise<TaskSummary> {
   return request<TaskSummary>(basePath(workspaceId, projectId), {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify(normalizeTaskInput(input)),
   });
 }
 
@@ -197,7 +197,7 @@ export function updateTask(
 ): Promise<TaskSummary> {
   return request<TaskSummary>(taskPath(workspaceId, projectId, taskId), {
     method: 'PATCH',
-    body: JSON.stringify(input),
+    body: JSON.stringify(normalizeTaskInput(input)),
   });
 }
 
@@ -370,4 +370,21 @@ export function deleteComment(
     taskPath(workspaceId, projectId, taskId, `/comments/${encodeURIComponent(commentId)}`),
     { method: 'DELETE' },
   );
+}
+
+// Backend requires ISO datetimes with offset; date pickers send YYYY-MM-DD.
+function toIsoDate(v: unknown) {
+  if (typeof v !== 'string') return v;
+  if (v === '') return undefined;
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00.000Z`).toISOString() : v;
+}
+
+function normalizeTaskInput<T extends Record<string, any>>(input: T): T {
+  const out: Record<string, any> = { ...input };
+  if ('startDate' in out) out.startDate = toIsoDate(out.startDate);
+  if ('dueDate' in out) out.dueDate = toIsoDate(out.dueDate);
+  if (typeof out.labels === 'string') {
+    out.labels = out.labels.split(',').map((x: string) => x.trim()).filter(Boolean);
+  }
+  return out as T;
 }

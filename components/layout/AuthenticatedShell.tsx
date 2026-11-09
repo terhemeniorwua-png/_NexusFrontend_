@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/Alert';
 import { AppShell } from '@/components/layout/AppShell';
@@ -9,6 +9,7 @@ import { buildAppNavigation, workspaceKindFor } from '@/lib/app-navigation';
 import { workspacePermissionKeys } from '@/lib/permissions';
 import { useAvatarUrl } from '@/providers/AvatarUrlProvider';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
+import { useRealtimeRefresh } from '@/providers/SocketProvider';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { signOut } from '@/services/auth';
 import { getUnreadCount } from '@/services/notifications';
@@ -71,29 +72,38 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
     return () => { active = false; };
   }, [user, setAvatarUrl]);
 
+  const fetchUnread = useCallback(async () => {
+    if (document.hidden) return;
+    try {
+      const { unreadCount } = await getUnreadCount();
+      setNotificationUnreadCount(unreadCount);
+    } catch {
+      // Non-fatal — stale count shown until next successful poll.
+    }
+  }, []);
+
   useEffect(() => {
     if (!user) return;
 
     let active = true;
 
-    async function fetchUnread() {
-      if (!active || document.hidden) return;
-      try {
-        const { unreadCount } = await getUnreadCount();
-        if (active) setNotificationUnreadCount(unreadCount);
-      } catch {
-        // Non-fatal — stale count shown until next successful poll.
-      }
+    async function poll() {
+      if (!active) return;
+      await fetchUnread();
     }
 
-    void fetchUnread();
-    pollTimer.current = setInterval(() => { void fetchUnread(); }, UNREAD_POLL_INTERVAL);
+    void poll();
+    pollTimer.current = setInterval(() => { void poll(); }, UNREAD_POLL_INTERVAL);
 
     return () => {
       active = false;
       if (pollTimer.current) clearInterval(pollTimer.current);
     };
-  }, [user]);
+  }, [user, fetchUnread]);
+
+  // A reconnect can miss notifications; refresh the bell once the socket is
+  // healthy again. This keeps the counter fresh without adding another poll.
+  useRealtimeRefresh(() => { void fetchUnread(); });
 
   async function handleSignOut() {
     setSignOutError(null);

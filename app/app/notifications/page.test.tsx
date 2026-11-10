@@ -11,6 +11,7 @@ const WORKSPACE_ID = 'ws-test-123';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   usePathname: () => '/app/notifications',
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) =>
@@ -68,6 +69,7 @@ function listOk(items = [fakeNotification()], opts: { nextCursor?: string; unrea
 describe('NotificationsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    window.history.replaceState({}, '', '/');
     mockCtx.activeWorkspace = { id: WORKSPACE_ID, name: 'Test WS', type: 'COMPANY' };
   });
 
@@ -80,6 +82,13 @@ describe('NotificationsPage', () => {
     expect(screen.getByRole('tab', { name: 'Inbox' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Activity' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Preferences' })).toBeInTheDocument();
+  });
+
+  it('opens the preferences tab from a ?tab=preferences deep link', async () => {
+    window.history.replaceState({}, '', '/app/notifications?tab=preferences');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([]));
+    render(<NotificationsPage />);
+    expect(await screen.findByText(/Choose which events trigger/)).toBeInTheDocument();
   });
 
   it('shows empty state when there is no active workspace', () => {
@@ -245,5 +254,50 @@ describe('NotificationsPage', () => {
       expect.stringContaining(`/api/backend/notifications/activity/${WORKSPACE_ID}`),
       expect.any(Object),
     );
+  });
+
+  it('groups activity by day and filters it client-side', async () => {
+    const now = new Date();
+    const old = new Date('2020-01-02T10:00:00.000Z');
+    const activity = {
+      items: [
+        { id: 'a1', action: 'TASK_CREATED', actorId: 'u1', targetType: 'Task', targetId: 't1', metadata: null, createdAt: now.toISOString() },
+        { id: 'a2', action: 'DOCUMENT_UPDATED', actorId: 'u2', targetType: 'Document', targetId: 'd1', metadata: null, createdAt: old.toISOString() },
+      ],
+      nextCursor: null,
+    };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: RequestInfo | URL) => {
+      if (String(url).includes('/activity/')) return ok(activity);
+      return ok({ items: [], nextCursor: null, unreadCount: 0 });
+    });
+    const user = userEvent.setup();
+    render(<NotificationsPage />);
+    await user.click(screen.getByRole('tab', { name: 'Activity' }));
+    await screen.findByText('TASK CREATED');
+    expect(screen.getByRole('heading', { name: 'Today' })).toBeInTheDocument();
+    expect(screen.getByText('DOCUMENT UPDATED')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Search activity'), 'document');
+    expect(screen.queryByText('TASK CREATED')).not.toBeInTheDocument();
+    expect(screen.getByText('DOCUMENT UPDATED')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByText('TASK CREATED')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Target type'), 'Task');
+    expect(screen.getByText('TASK CREATED')).toBeInTheDocument();
+    expect(screen.queryByText('DOCUMENT UPDATED')).not.toBeInTheDocument();
+  });
+
+  it('passes the notification type filter to the inbox request', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(listOk());
+    const user = userEvent.setup();
+    render(<NotificationsPage />);
+    await screen.findByText('You were assigned a task');
+    await user.selectOptions(screen.getByLabelText('Notification type'), 'MEETING_INVITE');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('type=MEETING_INVITE'),
+      expect.any(Object),
+    ));
   });
 });

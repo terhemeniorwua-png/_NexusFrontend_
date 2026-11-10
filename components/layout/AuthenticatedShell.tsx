@@ -138,6 +138,7 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
       }}
       userMenuItems={[
         { id: 'profile', label: 'Profile and account', href: '/app/profile' },
+        { id: 'settings', label: 'Settings', href: '/app/settings' },
         { id: 'workspaces', label: 'Manage workspaces', href: '/app/workspaces' },
       ]}
       onSignOut={() => { void handleSignOut(); }}

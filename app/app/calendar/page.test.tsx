@@ -229,4 +229,54 @@ describe('CalendarPage', () => {
     // Both clicks complete without error — basic navigation sanity
     expect(screen.getByRole('heading', { name: 'Calendar', level: 1 })).toBeInTheDocument();
   });
+
+  it('switches to the agenda view and lists events by day', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(listOk());
+    const user = userEvent.setup();
+    render(<CalendarPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Loading events')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'agenda' }));
+    expect(screen.getByRole('button', { name: 'agenda' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Team Standup')).toBeInTheDocument();
+    // Day headings are rendered as h3 in the agenda
+    expect(screen.getAllByRole('heading', { level: 3 }).length).toBeGreaterThan(0);
+  });
+
+  it('shows an empty agenda when nothing is scheduled', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(listOk([]));
+    const user = userEvent.setup();
+    render(<CalendarPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Loading events')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'agenda' }));
+    expect(screen.getByText('No upcoming events')).toBeInTheDocument();
+  });
+
+  it('lets an invitee accept a calendar invitation', async () => {
+    const invitation = {
+      userId: USER_ID,
+      status: 'INVITED',
+      createdAt: new Date().toISOString(),
+    };
+    const fetchMock = routeMock((url, init) => {
+      if (url.includes('/respond') && init?.method === 'POST') return ok({ ok: true });
+      if (url.includes('/invitations')) return ok([invitation]);
+      return ok({ items: [fakeEvent({ createdById: 'user-2' })], nextCursor: null });
+    });
+    const user = userEvent.setup();
+    render(<CalendarPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Loading events')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Team Standup' }));
+    await user.click(await screen.findByRole('button', { name: 'Accept' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/events/evt-1/respond`),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ status: 'ACCEPTED' }),
+      }),
+    ));
+  });
 });

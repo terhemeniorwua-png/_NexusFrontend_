@@ -24,15 +24,20 @@ import {
   cancelEvent,
   deleteEvent,
   listEventInvitations,
+  addEventInvitee,
+  removeEventInvitee,
+  respondToEventInvitation,
   type EventSummary,
   type EventStatus,
   type EventVisibility,
   type EventInvitation,
+  type InvitationStatus,
 } from '@/services/events';
+import { listWorkspaceMembers, type WorkspaceMember } from '@/services/workspaces';
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
 
-type ViewMode = 'month' | 'week' | 'day';
+type ViewMode = 'month' | 'week' | 'day' | 'agenda';
 
 function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -85,6 +90,13 @@ function calendarRangeFor(view: ViewMode, anchor: Date): { startAfter: string; s
   if (view === 'week') {
     const start = startOfWeek(anchor);
     const end = addDays(start, 6);
+    end.setHours(23, 59, 59);
+    return { startAfter: start.toISOString(), startBefore: end.toISOString() };
+  }
+  if (view === 'agenda') {
+    const start = new Date(anchor);
+    start.setHours(0, 0, 0, 0);
+    const end = addDays(start, 30);
     end.setHours(23, 59, 59);
     return { startAfter: start.toISOString(), startBefore: end.toISOString() };
   }
@@ -288,7 +300,7 @@ function DetailPanel({ workspaceId, event, currentUserId, onUpdated, onDeleted, 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [invitations, setInvitations] = useState<EventInvitation[]>([]);
+  const [invitations, setInvitations] = useState<Array<EventInvitation & { name?: string }>>([]);
   const [loadingInvitations, setLoadingInvitations] = useState(false);
   const [invitationError, setInvitationError] = useState<string | null>(null);
   const loadedInvitations = useRef(false);
@@ -301,7 +313,21 @@ function DetailPanel({ workspaceId, event, currentUserId, onUpdated, onDeleted, 
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [responding, setResponding] = useState<'ACCEPTED' | 'DECLINED' | 'TENTATIVE' | null>(null);
+  const [responseError, setResponseError] = useState<string | null>(null);
+
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [showInvitePicker, setShowInvitePicker] = useState(false);
+  const [selectedInvitee, setSelectedInvitee] = useState('');
+  const [addingInvitee, setAddingInvitee] = useState(false);
+  const [removingInviteeId, setRemovingInviteeId] = useState<string | null>(null);
+  const [participantError, setParticipantError] = useState<string | null>(null);
+
   const isCreator = event.createdById === currentUserId;
+  const myInvitation = invitations.find((invitation) => invitation.userId === currentUserId);
+  const availableInvitees = members.filter(
+    (member) => !invitations.some((invitation) => invitation.userId === member.userId),
+  );
 
   useEffect(() => {
     if (!loadedInvitations.current) {
@@ -378,6 +404,72 @@ function DetailPanel({ workspaceId, event, currentUserId, onUpdated, onDeleted, 
       setDeleteError(err instanceof ApiRequestError ? err.message : 'Could not delete event.');
       setDeleting(false);
       setConfirmDelete(false);
+    }
+  }
+
+  async function handleRespond(status: 'ACCEPTED' | 'DECLINED' | 'TENTATIVE') {
+    setResponding(status);
+    setResponseError(null);
+    try {
+      await respondToEventInvitation(workspaceId, event.id, status);
+      setInvitations((prev) => prev.map((invitation) =>
+        invitation.userId === currentUserId
+          ? { ...invitation, status: status as InvitationStatus }
+          : invitation,
+      ));
+    } catch (err) {
+      setResponseError(err instanceof ApiRequestError ? err.message : 'Could not save your response.');
+    } finally {
+      setResponding(null);
+    }
+  }
+
+  async function toggleInvitePicker() {
+    const next = !showInvitePicker;
+    setShowInvitePicker(next);
+    setParticipantError(null);
+    if (!next || members.length > 0) return;
+    try {
+      setMembers(await listWorkspaceMembers(workspaceId));
+    } catch (err) {
+      setParticipantError(err instanceof ApiRequestError ? err.message : 'Could not load workspace members.');
+    }
+  }
+
+  async function handleAddInvitee() {
+    if (!selectedInvitee || addingInvitee) return;
+    setAddingInvitee(true);
+    setParticipantError(null);
+    try {
+      await addEventInvitee(workspaceId, event.id, selectedInvitee);
+      const member = members.find((item) => item.userId === selectedInvitee);
+      setInvitations((prev) => [
+        ...prev,
+        {
+          userId: selectedInvitee,
+          status: 'PENDING',
+          createdAt: new Date().toISOString(),
+          name: member?.name,
+        },
+      ]);
+      setSelectedInvitee('');
+    } catch (err) {
+      setParticipantError(err instanceof ApiRequestError ? err.message : 'Could not add the participant.');
+    } finally {
+      setAddingInvitee(false);
+    }
+  }
+
+  async function handleRemoveInvitee(userId: string) {
+    setRemovingInviteeId(userId);
+    setParticipantError(null);
+    try {
+      await removeEventInvitee(workspaceId, event.id, userId);
+      setInvitations((prev) => prev.filter((invitation) => invitation.userId !== userId));
+    } catch (err) {
+      setParticipantError(err instanceof ApiRequestError ? err.message : 'Could not remove the participant.');
+    } finally {
+      setRemovingInviteeId(null);
     }
   }
 
@@ -460,7 +552,20 @@ function DetailPanel({ workspaceId, event, currentUserId, onUpdated, onDeleted, 
 
           {/* Invitations */}
           <div className="mt-4">
-            <p className="text-sm font-medium text-[var(--color-text-secondary)]">Participants</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-[var(--color-text-secondary)]">Participants</p>
+              {isCreator && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => { void toggleInvitePicker(); }}
+                  aria-expanded={showInvitePicker}
+                >
+                  {showInvitePicker ? 'Done' : 'Add participant'}
+                </Button>
+              )}
+            </div>
+
             {loadingInvitations ? (
               <div className="mt-2 space-y-1">
                 {[1, 2].map((i) => <Skeleton key={i} className="h-6 w-48" />)}
@@ -472,17 +577,102 @@ function DetailPanel({ workspaceId, event, currentUserId, onUpdated, onDeleted, 
             ) : (
               <ul className="mt-2 space-y-1" aria-label="Event participants">
                 {invitations.map((inv) => (
-                  <li key={inv.userId} className="flex items-center gap-2 text-sm">
-                    <span className="font-mono text-xs text-[var(--color-text-muted)]">{inv.userId.slice(0, 8)}…</span>
+                  <li key={inv.userId} className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-mono text-xs text-[var(--color-text-muted)]">
+                      {inv.name ?? `${inv.userId.slice(0, 8)}…`}
+                    </span>
+                    {inv.userId === currentUserId && <Badge variant="outline">You</Badge>}
                     <Badge
                       variant={inv.status === 'ACCEPTED' ? 'success' : inv.status === 'DECLINED' ? 'error' : 'warning'}
                     >
                       {inv.status}
                     </Badge>
+                    {isCreator && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => { void handleRemoveInvitee(inv.userId); }}
+                        loading={removingInviteeId === inv.userId}
+                        disabled={removingInviteeId === inv.userId}
+                        aria-label={`Remove participant ${inv.name ?? inv.userId}`}
+                      >
+                        Remove
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
+
+            {/* The current user's response controls */}
+            {myInvitation && (
+              <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+                <p className="text-xs font-medium text-[var(--color-text-secondary)]">
+                  Your response: <span className="text-[var(--color-text-primary)]">{myInvitation.status}</span>
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant={myInvitation.status === 'ACCEPTED' ? 'primary' : 'secondary'}
+                    onClick={() => { void handleRespond('ACCEPTED'); }}
+                    loading={responding === 'ACCEPTED'}
+                    disabled={responding !== null}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={myInvitation.status === 'TENTATIVE' ? 'primary' : 'secondary'}
+                    onClick={() => { void handleRespond('TENTATIVE'); }}
+                    loading={responding === 'TENTATIVE'}
+                    disabled={responding !== null}
+                  >
+                    Maybe
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={myInvitation.status === 'DECLINED' ? 'primary' : 'secondary'}
+                    onClick={() => { void handleRespond('DECLINED'); }}
+                    loading={responding === 'DECLINED'}
+                    disabled={responding !== null}
+                  >
+                    Decline
+                  </Button>
+                </div>
+                {responseError && <p className="mt-2 text-xs text-[var(--color-error)]">{responseError}</p>}
+              </div>
+            )}
+
+            {/* Creator-only invitee picker */}
+            {isCreator && showInvitePicker && (
+              <div className="mt-3 flex flex-wrap items-end gap-2">
+                <div className="min-w-[12rem] flex-1">
+                  <Select
+                    id="event-invitee"
+                    label="Add participant"
+                    value={selectedInvitee}
+                    onChange={(e) => setSelectedInvitee(e.target.value)}
+                    options={[
+                      { value: '', label: availableInvitees.length === 0 ? 'No available members' : 'Select a member' },
+                      ...availableInvitees.map((member) => ({
+                        value: member.userId,
+                        label: member.name,
+                      })),
+                    ]}
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => { void handleAddInvitee(); }}
+                  loading={addingInvitee}
+                  disabled={!selectedInvitee || addingInvitee}
+                >
+                  Add
+                </Button>
+              </div>
+            )}
+
+            {participantError && <p className="mt-2 text-xs text-[var(--color-error)]">{participantError}</p>}
           </div>
         </>
       )}
@@ -754,6 +944,92 @@ function DayView({
   );
 }
 
+// ─── Agenda view ──────────────────────────────────────────────────────────────
+
+function AgendaView({
+  events,
+  onEventClick,
+}: {
+  events: EventSummary[];
+  onEventClick: (evt: EventSummary) => void;
+}) {
+  const today = new Date();
+
+  const groups = useMemo(() => {
+    const sorted = [...events].sort(
+      (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+    );
+    const map = new Map<string, EventSummary[]>();
+    for (const evt of sorted) {
+      const key = formatDate(new Date(evt.startAt));
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(evt);
+    }
+    return [...map.entries()];
+  }, [events]);
+
+  if (groups.length === 0) {
+    return (
+      <EmptyState
+        title="No upcoming events"
+        description="Nothing is scheduled in the next 30 days."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5" aria-label="Agenda">
+      {groups.map(([dateKey, dayEvents]) => {
+        const date = new Date(`${dateKey}T00:00:00`);
+        const isToday = isSameDay(date, today);
+        return (
+          <section key={dateKey} aria-label={date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}>
+            <h3 className={[
+              'mb-2 text-sm font-semibold',
+              isToday ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-primary)]',
+            ].join(' ')}>
+              {date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              {isToday && <span className="ml-2 text-xs font-normal text-[var(--color-text-muted)]">Today</span>}
+            </h3>
+            <ul className="space-y-2">
+              {dayEvents.map((evt) => (
+                <li key={evt.id}>
+                  <button
+                    type="button"
+                    onClick={() => onEventClick(evt)}
+                    className={[
+                      'flex w-full flex-wrap items-start justify-between gap-3 rounded-[var(--radius-md)] border px-4 py-3 text-left transition-colors',
+                      evt.status === 'CANCELLED'
+                        ? 'border-[var(--color-error)] bg-[var(--color-error-soft)]'
+                        : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-secondary)]',
+                    ].join(' ')}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className={[
+                        'truncate text-sm font-medium',
+                        evt.status === 'CANCELLED' ? 'line-through text-[var(--color-error)]' : 'text-[var(--color-text-primary)]',
+                      ].join(' ')}>
+                        {evt.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                        {evt.allDay
+                          ? 'All day'
+                          : `${formatDisplayTime(evt.startAt)} – ${formatDisplayTime(evt.endAt)}`}
+                        {evt.location ? ` · ${evt.location}` : ''}
+                      </p>
+                    </div>
+                    <Badge variant={statusBadgeVariant(evt.status)}>{evt.status}</Badge>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CalendarPage() {
@@ -816,6 +1092,7 @@ export default function CalendarPage() {
     setAnchor((prev) => {
       if (view === 'month') return addMonths(prev, direction);
       if (view === 'week') return addDays(prev, direction * 7);
+      if (view === 'agenda') return addDays(prev, direction * 30);
       return addDays(prev, direction);
     });
   }
@@ -826,6 +1103,10 @@ export default function CalendarPage() {
       const ws = startOfWeek(anchor);
       const we = addDays(ws, 6);
       return `${ws.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${we.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    }
+    if (view === 'agenda') {
+      const end = addDays(anchor, 30);
+      return `${anchor.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
     }
     return anchor.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   }
@@ -927,7 +1208,7 @@ export default function CalendarPage() {
 
         {/* View switcher */}
         <div className="flex items-center gap-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-0.5">
-          {(['month', 'week', 'day'] as ViewMode[]).map((v) => (
+          {(['month', 'week', 'day', 'agenda'] as ViewMode[]).map((v) => (
             <button
               key={v}
               type="button"
@@ -991,6 +1272,12 @@ export default function CalendarPage() {
           {view === 'day' && (
             <DayView
               anchor={anchor}
+              events={events}
+              onEventClick={setSelectedEvent}
+            />
+          )}
+          {view === 'agenda' && (
+            <AgendaView
               events={events}
               onEventClick={setSelectedEvent}
             />

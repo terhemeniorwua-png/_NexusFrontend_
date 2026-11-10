@@ -25,6 +25,7 @@ import {
   updateForm,
   addFormField,
   listFormResponses,
+  submitFormResponse,
   type FormDetail,
   type FormField,
   type FormFieldInput,
@@ -286,6 +287,237 @@ function ResponsesPanel({ workspaceId, formId, fields }: ResponsesPanelProps) {
         </Button>
       )}
     </div>
+  );
+}
+
+// ─── Preview panel ────────────────────────────────────────────────────────────
+
+interface PreviewPanelProps {
+  workspaceId: string;
+  form: FormDetail;
+  onSubmitted: () => void;
+}
+
+function PreviewPanel({ workspaceId, form, onSubmitted }: PreviewPanelProps) {
+  const sortedFields = [...form.fields].sort((a, b) => a.position - b.position);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [multiValues, setMultiValues] = useState<Record<string, string[]>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const acceptingResponses = form.status === 'PUBLISHED';
+
+  function answerFor(field: FormField): string {
+    return values[field.id] ?? (multiValues[field.id] ?? []).join(', ');
+  }
+
+  function setValue(fieldId: string, value: string) {
+    setValues((prev) => ({ ...prev, [fieldId]: value }));
+    setSuccess(false);
+  }
+
+  function toggleMulti(fieldId: string, option: string, checked: boolean) {
+    setMultiValues((prev) => {
+      const current = prev[fieldId] ?? [];
+      const next = checked ? [...current, option] : current.filter((value) => value !== option);
+      return { ...prev, [fieldId]: next };
+    });
+    setSuccess(false);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (submitting || !acceptingResponses) return;
+    const missing = sortedFields.filter((field) => field.required && !answerFor(field).trim());
+    if (missing.length > 0) {
+      setError(`Complete required field${missing.length > 1 ? 's' : ''}: ${missing.map((f) => f.label).join(', ')}.`);
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      await submitFormResponse(workspaceId, form.id, {
+        answers: sortedFields
+          .map((field) => ({ fieldId: field.id, value: answerFor(field).trim() }))
+          .filter((answer) => answer.value.length > 0),
+      });
+      setValues({});
+      setMultiValues({});
+      setSuccess(true);
+      onSubmitted();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not submit the response.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (sortedFields.length === 0) {
+    return (
+      <EmptyState
+        title="Nothing to preview"
+        description="Add fields to this form to preview and test it."
+      />
+    );
+  }
+
+  return (
+    <Card className="p-5">
+      <div className="mb-4 border-b border-[var(--color-border)] pb-3">
+        <h2 className="font-semibold text-[var(--color-text-primary)]">Preview</h2>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {acceptingResponses
+            ? 'Submit a test response using the published form. It is recorded like any other response.'
+            : 'Preview the form as respondents will see it. Publishing is required before responses are accepted.'}
+        </p>
+      </div>
+
+      <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
+        {error && <Alert variant="error">{error}</Alert>}
+        {success && <Alert variant="success">Response submitted.</Alert>}
+
+        {sortedFields.map((field) => {
+          const inputId = `preview-${field.id}`;
+          const requiredMark = field.required ? ' *' : '';
+
+          if (field.type === 'TEXTAREA') {
+            return (
+              <Textarea
+                key={field.id}
+                id={inputId}
+                label={`${field.label}${requiredMark}`}
+                value={values[field.id] ?? ''}
+                placeholder={field.placeholder ?? undefined}
+                onChange={(e) => setValue(field.id, e.target.value)}
+                rows={4}
+              />
+            );
+          }
+
+          if (field.type === 'SELECT') {
+            return (
+              <Select
+                key={field.id}
+                id={inputId}
+                label={`${field.label}${requiredMark}`}
+                value={values[field.id] ?? ''}
+                onChange={(e) => setValue(field.id, e.target.value)}
+                options={[
+                  { value: '', label: field.placeholder ?? 'Select an option' },
+                  ...field.options.map((option) => ({ value: option, label: option })),
+                ]}
+              />
+            );
+          }
+
+          if (field.type === 'RADIO') {
+            return (
+              <fieldset key={field.id} className="space-y-1.5">
+                <legend className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {field.label}{requiredMark}
+                </legend>
+                {field.options.map((option) => (
+                  <label key={option} className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
+                    <input
+                      type="radio"
+                      name={inputId}
+                      value={option}
+                      checked={(values[field.id] ?? '') === option}
+                      onChange={() => setValue(field.id, option)}
+                      className="accent-[var(--color-primary)]"
+                    />
+                    {option}
+                  </label>
+                ))}
+              </fieldset>
+            );
+          }
+
+          if (field.type === 'MULTISELECT' || field.type === 'CHECKBOX') {
+            const selected = multiValues[field.id] ?? [];
+            return (
+              <fieldset key={field.id} className="space-y-1.5">
+                <legend className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {field.label}{requiredMark}
+                </legend>
+                {field.options.map((option) => (
+                  <Checkbox
+                    key={option}
+                    id={`${inputId}-${option}`}
+                    label={option}
+                    checked={selected.includes(option)}
+                    onChange={(e) => toggleMulti(field.id, option, e.target.checked)}
+                  />
+                ))}
+              </fieldset>
+            );
+          }
+
+          if (field.type === 'RATING' || field.type === 'SCALE') {
+            const max = field.type === 'RATING' ? 5 : 10;
+            return (
+              <Select
+                key={field.id}
+                id={inputId}
+                label={`${field.label}${requiredMark}`}
+                value={values[field.id] ?? ''}
+                onChange={(e) => setValue(field.id, e.target.value)}
+                options={[
+                  { value: '', label: 'Select a value' },
+                  ...Array.from({ length: max }, (_, index) => {
+                    const value = String(index + 1);
+                    return { value, label: value };
+                  }),
+                ]}
+              />
+            );
+          }
+
+          if (field.type === 'DATE') {
+            return (
+              <div key={field.id} className="flex flex-col gap-1">
+                <label htmlFor={inputId} className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {field.label}{requiredMark}
+                </label>
+                <input
+                  id={inputId}
+                  type="date"
+                  value={values[field.id] ?? ''}
+                  onChange={(e) => setValue(field.id, e.target.value)}
+                  className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                />
+              </div>
+            );
+          }
+
+          const inputType = field.type === 'NUMBER' ? 'number' : field.type === 'EMAIL' ? 'email' : 'text';
+          return (
+            <Input
+              key={field.id}
+              id={inputId}
+              type={inputType}
+              label={`${field.label}${requiredMark}`}
+              value={values[field.id] ?? ''}
+              placeholder={field.placeholder ?? undefined}
+              onChange={(e) => setValue(field.id, e.target.value)}
+            />
+          );
+        })}
+
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          <Button type="submit" loading={submitting} disabled={!acceptingResponses || submitting}>
+            Submit response
+          </Button>
+          {!acceptingResponses && (
+            <span className="text-xs text-[var(--color-text-muted)]">
+              Only published forms accept responses.
+            </span>
+          )}
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -577,6 +809,7 @@ export default function FormDetailPage() {
   const tabs = [
     { id: 'fields', label: `Fields (${form.fields.length})` },
     { id: 'responses', label: `Responses (${form._count.responses})` },
+    { id: 'preview', label: 'Preview' },
     { id: 'settings', label: 'Settings' },
   ];
 
@@ -672,6 +905,16 @@ export default function FormDetailPage() {
           workspaceId={workspaceId}
           formId={formId}
           fields={form.fields}
+        />
+      )}
+
+      {activeTab === 'preview' && (
+        <PreviewPanel
+          workspaceId={workspaceId}
+          form={form}
+          onSubmitted={() => setForm((prev) => prev
+            ? { ...prev, _count: { responses: prev._count.responses + 1 } }
+            : prev)}
         />
       )}
 

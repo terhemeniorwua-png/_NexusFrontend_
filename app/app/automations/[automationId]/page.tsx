@@ -296,19 +296,33 @@ export default function AutomationDetailPage() {
             </div>
             <div>
               <dt className="font-medium text-[var(--color-text-secondary)]">Action config</dt>
-              <dd className="mt-0.5">
-                <pre className="rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] p-2 text-xs text-[var(--color-text-primary)] overflow-auto">
-                  {JSON.stringify(automation.actionConfig, null, 2)}
-                </pre>
+              <dd className="mt-1">
+                {Object.keys(automation.actionConfig ?? {}).length === 0 ? (
+                  <span className="text-sm text-[var(--color-text-muted)]">No configuration</span>
+                ) : (
+                  <dl className="space-y-1 rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] p-2 text-xs">
+                    {Object.entries(automation.actionConfig).map(([key, value]) => (
+                      <div key={key} className="flex flex-wrap gap-x-2">
+                        <dt className="font-medium text-[var(--color-text-secondary)]">{key}:</dt>
+                        <dd className="break-all text-[var(--color-text-primary)]">{String(value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </dd>
             </div>
             {automation.condition && Object.keys(automation.condition).length > 0 && (
               <div>
-                <dt className="font-medium text-[var(--color-text-secondary)]">Condition</dt>
-                <dd className="mt-0.5">
-                  <pre className="rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] p-2 text-xs text-[var(--color-text-primary)] overflow-auto">
-                    {JSON.stringify(automation.condition, null, 2)}
-                  </pre>
+                <dt className="font-medium text-[var(--color-text-secondary)]">Conditions</dt>
+                <dd className="mt-1">
+                  <dl className="space-y-1 rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] p-2 text-xs">
+                    {Object.entries(automation.condition).map(([key, value]) => (
+                      <div key={key} className="flex flex-wrap gap-x-2">
+                        <dt className="font-medium text-[var(--color-text-secondary)]">{key}:</dt>
+                        <dd className="break-all text-[var(--color-text-primary)]">{String(value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 </dd>
               </div>
             )}
@@ -321,6 +335,10 @@ export default function AutomationDetailPage() {
               <dd className="mt-0.5 text-[var(--color-text-primary)]">{formatDate(automation.createdAt)}</dd>
             </div>
           </dl>
+          <p className="mt-4 rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] p-2 text-xs text-[var(--color-text-muted)]">
+            The trigger, conditions and action are fixed after creation. To change them, delete this
+            automation and create a new one. You can still rename it and enable or disable it here.
+          </p>
         </Card>
 
         {/* Run history */}

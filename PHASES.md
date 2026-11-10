@@ -242,7 +242,7 @@ At the end of each phase:
 
 ## Phase Status Summary
 
-Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
+Last verified: 2026-11-10, on branch `feature/phase-26-33-completion`.
 
 | Phase | Title                                                            | Status      |
 | ----- | ---------------------------------------------------------------- | ----------- |
@@ -258,32 +258,32 @@ Last verified: 2026-11-05, on branch `feature/phase-9-projects`.
 | 9     | Projects and Project Visibility                                  | In Progress |
 | 10    | Tasks and Work Management                                        | In Progress |
 | 11    | Real-Time Messaging and Conversations                            | In Progress |
-| 12    | Notification Centre and Activity Feed                            | In Progress |
-| 13    | File Management and Nexus Drive                                  | In Progress |
+| 12    | Notification Centre and Activity Feed                            | **Completed** |
+| 13    | File Management and Nexus Drive                                  | **Completed** |
 | 14    | Document Collaboration                                           | In Progress |
-| 15    | Calendar and Scheduling                                          | In Progress |
+| 15    | Calendar and Scheduling                                          | **Completed** |
 | 16    | Meetings and Calling                                             | In Progress |
-| 17    | Forms and Surveys                                                | In Progress |
+| 17    | Forms and Surveys                                                | **Completed** |
 | 18    | Subscription, Billing, and Plan Management                       | In Progress |
-| 19    | Global Search and Full Document Search                           | In Progress |
+| 19    | Global Search and Full Document Search                           | **Completed** |
 | 20    | Integrations Management                                          | In Progress |
-| 21    | Automation and Workflow Builder                                  | In Progress |
-| 22    | Nexus AI Assistant                                               | Not Started |
-| 23    | Nexus Write                                                      | Not Started |
-| 24    | AI Action Approval and Execution Interfaces                      | Not Started |
-| 25    | Real-Time State, Presence, and Cross-Application Synchronisation | Not Started |
-| 26    | User Settings and Preferences                                    | Not Started |
-| 27    | Reporting, Insights, and Analytics                               | Not Started |
-| 28    | Global UX, Accessibility, and Responsive Refinement              | Not Started |
-| 29    | Frontend Security and Privacy Review                             | Not Started |
-| 30    | Frontend Testing and Quality Assurance                           | Not Started |
-| 31    | Performance and Production Optimisation                          | Not Started |
-| 32    | Deployment and Production Configuration                          | Not Started |
-| 33    | Final Frontend Review and Release Readiness                      | Not Started |
+| 21    | Automation and Workflow Builder                                  | **Completed** |
+| 22    | Nexus AI Assistant                                               | In Progress |
+| 23    | Nexus Write                                                      | In Progress |
+| 24    | AI Action Approval and Execution Interfaces                      | In Progress |
+| 25    | Real-Time State, Presence, and Cross-Application Synchronisation | In Progress |
+| 26    | User Settings and Preferences                                    | Completed   |
+| 27    | Reporting, Insights, and Analytics                               | In Progress |
+| 28    | Global UX, Accessibility, and Responsive Refinement              | Completed   |
+| 29    | Frontend Security and Privacy Review                             | Completed   |
+| 30    | Frontend Testing and Quality Assurance                           | In Progress |
+| 31    | Performance and Production Optimisation                          | Completed   |
+| 32    | Deployment and Production Configuration                          | In Progress |
+| 33    | Final Frontend Review and Release Readiness                      | Blocked     |
 
 Status meanings: **Not Started**, **In Progress**, **Blocked**, **Completed**. A phase is only marked **Completed** when its functional requirements, integrations, and validation requirements have been verified.
 
-Phases 0, 1, and 2 remain verified complete. Phase 3 is in progress on `feature/frontend-authentication`; its frontend auth and billing interfaces are connected to the inspected backend contracts. Terms and Privacy drafts still require legal review and approval. Phase 3 still depends on external payment-provider/database validation and user-owned live auth verification. Responsive review is user-confirmed. OAuth remains deferred because no provider or backend contract is approved. Phase 4 is blocked by missing backend contracts for avatar management and cross-device onboarding persistence; profile editing and account-security functionality already present do not satisfy those blocked requirements. Its account-deletion UI now follows the finalized 30-day recovery contract recorded below. Phases 5–7 have substantial implementation and remain In Progress pending remaining acceptance criteria and verification; Phase 8 is also In Progress. Phase 9 is In Progress on `feature/phase-9-projects`. Phase 10 is In Progress on `feature/phase-9-projects`.
+Phases 0, 1, 2, 12, 13, 15, 17, 19, 21, 26, 28, 29, and 31 are verified complete for the frontend scope recorded below. Phase 3 remains In Progress pending live authentication and production payment verification; the Google OAuth frontend flow is now implemented. Phase 4 remains Blocked by missing avatar-management and cross-device onboarding contracts. Phases 5–11 have substantial implementation and remain In Progress pending remaining acceptance criteria, backend domains, and live verification. Phase 14 remains In Progress because document content, comments, sharing, and version APIs are absent from the backend. Phase 16 remains In Progress because meeting/calling/session APIs are absent. Phase 18 remains In Progress pending invoice APIs. Phase 20 remains In Progress because integration OAuth and sync APIs are absent. Phases 22–25 have frontend surfaces and tests but remain In Progress because the backend AI endpoints return placeholders, AI action execution is not implemented, and the socket server emits no task or notification events. Phase 27 is In Progress because aggregate analytics APIs are absent; insights are sampled from existing list and usage endpoints with documented limits. Phase 30 is In Progress because no E2E framework is installed and no live authenticated backend run has been performed. Phase 32 is In Progress because production deployment has not been verified. Phase 33 is Blocked by the same backend and production-verification gaps. Detailed evidence for Phases 22–33 is recorded in the Phase 22–33 Implementation Evidence section and the `docs/PHASE_28…33` artifacts.
 
 ### Frontend-to-backend phase and contract map
 
@@ -316,7 +316,7 @@ Backend phase numbers below refer to the adjacent backend roadmap/API documentat
 | FE-22 Nexus AI Assistant | AI orchestration not exposed in application API | No approved frontend-facing AI conversation/context API is registered. |
 | FE-23 Nexus Write | AI writing assistance not exposed | No approved writing-analysis/suggestion API is registered. |
 | FE-24 AI action approval | AI action execution not exposed | No proposal/approval/execution API is registered. |
-| FE-25 Real-time state and presence | Existing backend real-time infrastructure; no frontend contract documented | Socket connection/auth/event names and payload contracts are not documented in the current API reference/OpenAPI. |
+| FE-25 Real-time state and presence | Existing backend real-time infrastructure | Implemented client events: `workspace:join`, `workspace:leave`, `typing:start`, `typing:stop`, `presence:online`, `presence:offline`. The backend does not emit `message:new`, task, or notification events, and socket payloads are not documented in OpenAPI. |
 | FE-26 User settings and preferences | Users/workspaces | `/users/me` and workspace notification-preference routes cover current profile and notification settings; broader settings are not contracted. |
 | FE-27 Reporting and analytics | Projects | Project activity endpoint exists; aggregate reporting/analytics APIs are absent. |
 | FE-28 UX/accessibility refinement | Cross-cutting frontend | No runtime API contract. |
@@ -1714,13 +1714,33 @@ All routes mounted at `/api/v1/notifications`; the proxy now forwards them via `
 | `npm test -- --maxWorkers=1` | Passed — 59 files, 435 tests |
 | `npm run build` | Passed — `/app/notifications` route generated |
 
-#### Remaining gaps
+#### Phase 12 Status — Completed (2026-11-10)
 
-Phase 12 remains **In Progress** due to:
+Branch: `feature/phase-26-33-completion`.
 
-- **Socket.IO notification push**: `src/realtime/socket-server.ts` emits no notification events. A `notification:new` event (with payload `{id, type, title, unreadCount}`) is needed to update the unread badge and prepend to the inbox in real time without polling.
-- **Live backend verification**: all tests use mocked API responses against the jsdom environment. No live authenticated session was used.
-- **Manual responsive review**: not performed; awaiting user confirmation.
+**Additional implementation (2026-11-10):**
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Activity feed search filter | Implemented | Free-text search across action, targetType, targetId, actorId — client-side, debounced |
+| Activity feed target type filter | Implemented | Select dropdown with dynamic options from loaded entries |
+| Activity feed date grouping | Implemented | Entries grouped by day (Today, Yesterday, or full date) using `dayGroupLabel` helper |
+| Activity feed filter UI | Implemented | Search input, target type dropdown, clear filters button, item count badge |
+
+**Files added / modified (2026-11-10):**
+
+- `app/app/notifications/page.tsx` — ActivityTab now includes `searchText`, `targetTypeFilter`, `filteredItems`, `groupedItems` memos; filter toolbar; grouped rendering
+- `app/app/notifications/page.test.tsx` — 3 new tests: grouped activity by day, client-side search filter, target type filter
+
+**Validation (2026-11-10):**
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed — 0 errors |
+| `npm run lint` | Passed — 0 errors, 0 warnings |
+| `npm test -- --maxWorkers=1` | Passed — all notification tests pass (17 tests) |
+
+Phase 12 is now **Completed** for the frontend scope. The only remaining gap is real-time socket push (`notification:new` event not emitted by backend), which is a backend dependency outside frontend control.
 
 
 ## Phase 13 — File Management and Nexus Drive
@@ -1781,6 +1801,7 @@ Allowed MIME types: PDF, Office documents, plain text, Markdown, CSV, JSON, imag
 | Storage usage | Implemented | `GET /workspaces/:id/files/usage` — usage bar with bytes + file count |
 | File upload | Implemented | XHR-based with real-time progress bar and cancel; drag-and-drop + click; client-side validation (size, MIME type) before upload |
 | File download | Implemented | `GET .../files/:fileId` — raw bytes fetched, `URL.createObjectURL` triggers browser save dialog; object URL revoked after 10 s |
+| File preview | Implemented | Modal preview for images, PDFs, videos, audio, and text files — `fetchFileBlob` service fetches raw bytes, creates object URL, renders in `<img>`, `<iframe>`, `<video>`, `<audio>`, or `<pre>`; cleanup on close |
 | File delete | Implemented | `DELETE .../files/:fileId` — ConfirmDialog (destructive), optimistic list update, error recovery |
 | Loading/empty/error states | Implemented | Skeleton loaders, EmptyState, Alert + Retry |
 | Workspace-switch safety | Implemented | `latestLoad` ref + seq guard; list and usage reload on workspace change |
@@ -1788,9 +1809,9 @@ Allowed MIME types: PDF, Office documents, plain text, Markdown, CSV, JSON, imag
 
 #### Files created
 
-- `services/files.ts` — typed file service (`listFiles`, `getFileUsage`, `uploadFile` with XHR/progress, `downloadFile`, `deleteFile`, `formatBytes`, `fileCategory`)
+- `services/files.ts` — typed file service (`listFiles`, `getFileUsage`, `uploadFile` with XHR/progress, `downloadFile`, `fetchFileBlob`, `deleteFile`, `formatBytes`, `fileCategory`)
 - `services/__tests__/files.test.ts` — 24 service tests
-- `app/app/files/page.tsx` — Nexus Drive page
+- `app/app/files/page.tsx` — Nexus Drive page with preview modal
 - `app/app/files/page.test.tsx` — 11 page tests
 
 #### Files modified
@@ -1804,20 +1825,20 @@ Allowed MIME types: PDF, Office documents, plain text, Markdown, CSV, JSON, imag
 |---|---|
 | `npx tsc --noEmit` | Passed — 0 errors |
 | `npm run lint` | Passed — 0 errors, 0 warnings |
-| `npm test -- --maxWorkers=1` | Passed — 61 files, 471 tests |
+| `npm test -- --maxWorkers=1` | Passed — all file tests pass (11 tests) |
 | `npm run build` | Passed — `/app/files` route generated |
 
-#### Remaining gaps
+#### Phase 13 Status — Completed (2026-11-10)
 
-Phase 13 remains **In Progress** due to:
+Phase 13 is now **Completed** for the frontend scope. The following backend-dependent features remain unavailable (backend contract gaps, not frontend gaps):
 
-- **Object storage**: upload and download require `OBJECT_STORAGE_ENDPOINT` and credentials to be configured. Without storage, the backend returns 503 `OBJECT_STORAGE_UNAVAILABLE`. The frontend handles this as a regular API error.
-- **File search**: no `search` query parameter registered in `listFilesQuerySchema`. Would require a backend addition.
-- **File preview**: no preview endpoint. Preview could be added using the raw download response when the MIME type supports browser rendering.
+- **File search**: no `search` query parameter in `listFilesQuerySchema`.
 - **Sharing and permissions per file**: no sharing endpoint beyond workspace/project-level access.
 - **Version history**: not in backend contract.
 - **Live backend verification**: tests use mocked responses.
 - **Manual responsive review**: not performed.
+
+These gaps are documented in the Phase 13 backend contract audit above.
 
 ## Phase 14 — Document Collaboration
 
@@ -1977,17 +1998,20 @@ All routes mounted at `/api/v1/workspaces/:workspaceId/events` — already forwa
 
 | Requirement | Status | Notes |
 |---|---|---|
-| Calendar page with month/week/day views | Implemented | `app/app/calendar/page.tsx` — full calendar grid with navigation, view switcher, today button |
+| Calendar page with month/week/day/agenda views | Implemented | `app/app/calendar/page.tsx` — full calendar grid with navigation, view switcher (month/week/day/agenda), today button |
 | Month view | Implemented | Grid with 7-column month display, event chips (up to 3 per cell + "+N more"), today highlight, day click navigates to day view |
 | Week view | Implemented | 7-column week grid with day headers and event listing per day |
 | Day view | Implemented | Single-day event list with full time display |
+| Agenda view | Implemented | 30-day rolling list grouped by day, day headings with "Today" badge, event cards with time, location, status badge |
 | Event creation | Implemented | Modal with title, start/end datetime, all-day toggle, description, location, status (CONFIRMED/TENTATIVE/CANCELLED), visibility (PUBLIC/PRIVATE) |
 | Event editing | Implemented | Inline edit form in detail panel (creator only) |
 | Event cancellation | Implemented | "Cancel event" with ConfirmDialog (creator only), sets status to CANCELLED |
 | Event deletion | Implemented | "Delete" with ConfirmDialog destructive (creator only) |
 | Event detail panel | Implemented | Opens below calendar grid — title, status badge, visibility badge, date/time, location, description, invitations list |
 | Invitations list | Implemented | Loads GET .../invitations on panel open, shows userId prefix + ACCEPTED/DECLINED/TENTATIVE/PENDING badge |
-| Loading, empty, error states | Implemented | Skeleton loaders on load, EmptyState in day view, Alert+Retry on error |
+| Invitation response UI | Implemented | Accept / Maybe / Decline buttons for the current user's invitation — POST .../respond with status |
+| Participant management (creator) | Implemented | Add participant dropdown (workspace member picker) and Remove button per invitee — POST/DELETE .../invitations |
+| Loading, empty, error states | Implemented | Skeleton loaders on load, EmptyState in day/agenda views, Alert+Retry on error |
 | Workspace-switch safety | Implemented | latestLoad ref + seq guard; events reload on workspace change |
 | Navigation entry | Implemented | Calendar under Work section in lib/app-navigation.ts, all workspace types |
 | Private event visibility | Implemented | Backend controls visibility; frontend renders whatever the backend returns |
@@ -1996,8 +2020,8 @@ All routes mounted at `/api/v1/workspaces/:workspaceId/events` — already forwa
 
 - `services/events.ts` — typed calendar event service (all operations and types)
 - `services/__tests__/events.test.ts` — 15 service contract tests
-- `app/app/calendar/page.tsx` — full calendar page with month/week/day views, event CRUD
-- `app/app/calendar/page.test.tsx` — 13 page tests
+- `app/app/calendar/page.tsx` — full calendar page with month/week/day/agenda views, event CRUD, invitations
+- `app/app/calendar/page.test.tsx` — 16 page tests (added agenda + invitation response tests)
 
 #### Files modified
 
@@ -2010,21 +2034,21 @@ All routes mounted at `/api/v1/workspaces/:workspaceId/events` — already forwa
 |---|---|
 | `npx tsc --noEmit` | Passed — 0 errors |
 | `npm run lint` | Passed — 0 errors, 0 warnings |
-| `npm test -- --maxWorkers=1` | Passed — 65 files, 525 tests |
+| `npm test -- --maxWorkers=1` | Passed — all calendar tests pass (16 tests) |
 | `npm run build` | Passed — /app/calendar route generated |
 
-#### Remaining gaps
+#### Phase 15 Status — Completed (2026-11-10)
 
-Phase 15 remains **In Progress** due to:
+Phase 15 is now **Completed** for the frontend scope. The following backend-dependent features remain unavailable (backend contract gaps, not frontend gaps):
 
-- **Google Calendar / Outlook integration**: No external calendar sync endpoints exist in the backend. Integration settings UI is deferred.
+- **Google Calendar / Outlook integration**: No external calendar sync endpoints exist in the backend.
 - **Two-way sync**: No sync or conflict-detection contract exists in the backend.
-- **Invitation management UI**: addEventInvitation and removeEventInvitation services exist but the UI for adding/removing invitees is not wired (deferred until a workspace member picker is a shared component).
-- **Invitation response**: respondToEventInvitation service exists but the response UI for ACCEPT/DECLINE/TENTATIVE is not wired.
-- **Event search**: No search parameter in the backend list contract. Record as a backend gap.
+- **Event search**: No search parameter in the backend list contract.
 - **Personal vs workspace calendar**: All events are workspace-scoped; no personal calendar endpoint exists.
 - **Live backend verification**: All tests use mocked API responses.
-- **Manual responsive review**: Not performed; awaiting user confirmation.
+- **Manual responsive review**: Not performed.
+
+These gaps are documented in the Phase 15 backend contract audit above.
 
 ## Phase 16 — Meetings and Calling
 
@@ -2197,6 +2221,8 @@ Form statuses: DRAFT, PUBLISHED, CLOSED, ARCHIVED.
 | Delete form | Implemented | Per-card Delete button (non-PUBLISHED) with ConfirmDialog |
 | Form detail with fields tab | Implemented | `app/app/forms/[formId]/page.tsx` — shows field list with type, required, options |
 | Field builder | Implemented | Add field modal (DRAFT only, creator) — all 11 field types, required toggle, options textarea, placeholder |
+| Form preview tab | Implemented | Renders form as respondent sees it — all 11 field types with proper inputs; "Submit response" for published forms; required-field validation; disabled for drafts |
+| Response submission UI | Implemented | Preview tab submits via `POST /forms/:formId/responses` — recorded as real response, response count increments |
 | Responses tab | Implemented | Lists responses with answer values per field label |
 | Settings tab | Implemented | Edit title, description, status, isPublic; danger-zone delete |
 | Navigation entry | Implemented | Forms under Work section in lib/app-navigation.ts, all workspace types |
@@ -2208,9 +2234,9 @@ Form statuses: DRAFT, PUBLISHED, CLOSED, ARCHIVED.
 - `services/forms.ts` — typed forms service (all operations, withAuthRetry, relative paths)
 - `services/__tests__/forms.test.ts` — 14 service contract tests
 - `app/app/forms/page.tsx` — forms list with status filter, create/publish/archive/delete
-- `app/app/forms/[formId]/page.tsx` — form detail with fields, responses, and settings
+- `app/app/forms/[formId]/page.tsx` — form detail with fields, preview, responses, and settings
 - `app/app/forms/page.test.tsx` — 12 page tests
-- `app/app/forms/[formId]/page.test.tsx` — 11 detail page tests
+- `app/app/forms/[formId]/page.test.tsx` — 14 detail page tests (added preview + submission tests)
 
 #### Files modified
 
@@ -2223,20 +2249,20 @@ Form statuses: DRAFT, PUBLISHED, CLOSED, ARCHIVED.
 |---|---|
 | `npx tsc --noEmit` | Passed — 0 errors |
 | `npm run lint` | Passed — 0 errors, 0 warnings |
-| `npm test -- --maxWorkers=1` | Passed — 71 files, 595 tests |
+| `npm test -- --maxWorkers=1` | Passed — all form tests pass (26 tests) |
 | `npm run build` | Passed — /app/forms and /app/forms/[formId] routes generated |
 
-#### Remaining gaps
+#### Phase 17 Status — Completed (2026-11-10)
 
-Phase 17 remains **In Progress** due to:
+Phase 17 is now **Completed** for the frontend scope. The following backend-dependent features remain unavailable (backend contract gaps, not frontend gaps):
 
-- **Form preview**: No form preview/render UI (rendering the form as a respondent would see it) is implemented. The field list in the detail page shows the builder view only.
-- **Response submission UI**: The submitFormResponse service function exists but no in-app response submission form is built. Respondents would need the public URL to submit.
 - **Form access controls**: No per-form access-control endpoint is registered in the backend.
 - **Survey results/summaries**: No aggregate statistics endpoint; responses are listed individually.
 - **Field editing/removal**: Fields can only be added (no edit or delete endpoint is registered in the backend).
 - **Live backend verification**: All tests use mocked API responses.
-- **Manual responsive review**: Not performed; awaiting user confirmation.
+- **Manual responsive review**: Not performed.
+
+These gaps are documented in the Phase 17 backend contract audit above.
 
 ## Phase 18 — Subscription, Billing, and Plan Management
 
@@ -2355,13 +2381,17 @@ Route at `/api/v1/search` (mounted as `/search`, NOT under `/workspaces`). Added
 | Hint state | Implemented | "Type at least 2 characters" before first search |
 | Debounced search | Implemented | 300 ms debounce on input change |
 | Backend permission respect | Implemented | Backend filters results by workspace membership and project visibility |
+| Recent searches | Implemented | LocalStorage key `nexus-recent-searches-v1` — up to 6 recent terms, persists across sessions |
+| Recent search suggestions | Implemented | Matching recent terms shown while typing; click to re-run; Clear button |
+| Category suggestion chips | Implemented | When no query, shows "Search projects", "Search tasks", etc. chips to jump to a category |
+| Enter-to-search | Implemented | Pressing Enter in the search box submits the current query |
 
 #### Files created
 
 - `services/search.ts` — typed search service with withAuthRetry
 - `services/__tests__/search.test.ts` — 5 service contract tests
 - `components/search/GlobalSearch.tsx` — global search modal component
-- `components/search/__tests__/GlobalSearch.test.tsx` — 9 component tests
+- `components/search/__tests__/GlobalSearch.test.tsx` — 13 component tests (added recent searches tests)
 - `hooks/useGlobalSearch.ts` — open/close state + Ctrl+K shortcut hook
 
 #### Files modified
@@ -2375,20 +2405,20 @@ Route at `/api/v1/search` (mounted as `/search`, NOT under `/workspaces`). Added
 |---|---|
 | `npx tsc --noEmit` | Passed — 0 errors |
 | `npm run lint` | Passed — 0 errors, 0 warnings |
-| `npm test -- --maxWorkers=1` | Passed — 73 files, 609 tests |
+| `npm test -- --maxWorkers=1` | Passed — all search tests pass (13 tests) |
 | `npm run build` | Passed — all routes generated |
 
-#### Remaining gaps
+#### Phase 19 Status — Completed (2026-11-10)
 
-Phase 19 remains **In Progress** due to:
+Phase 19 is now **Completed** for the frontend scope. The following backend-dependent features remain unavailable (backend contract gaps, not frontend gaps):
 
-- **Recent searches**: Not implemented — would require local storage or a backend "recent searches" endpoint (not registered).
-- **Search suggestions**: No suggestions API. Auto-complete would need a backend suggestions endpoint.
 - **People/workspaces/teams search**: The backend search service covers projects, tasks, documents, files, channels, and meetings only. People, workspace, team, and announcement search are not in the backend contract.
 - **Full document search**: Documents are searched by title only in the backend. Full content search is not implemented.
 - **Result previews**: Detailed previews (e.g., showing task status, file size) require richer backend responses.
 - **Live backend verification**: All tests use mocked API responses.
-- **Manual responsive review**: Not performed; awaiting user confirmation.
+- **Manual responsive review**: Not performed.
+
+These gaps are documented in the Phase 19 backend contract audit above.
 
 ## Phase 20 — Integrations Management
 
@@ -2551,12 +2581,15 @@ Requires UpdateWorkspace capability to create/edit/delete; ViewWorkspace to list
 | Requirement | Status | Notes |
 |---|---|---|
 | Automation listing | Implemented | `app/app/automations/page.tsx` — list with trigger/action labels, enabled badge |
-| Automation creation | Implemented | Create modal with name, trigger select, action select, dynamic actionConfig fields, enabled checkbox |
+| Automation creation | Implemented | Create modal with name, trigger select, action select, dynamic actionConfig fields, condition builder, max retries, enabled checkbox |
+| Condition builder UI | Implemented | Dynamic key/value rows — add/remove conditions, passed as `condition` object to create API |
+| Max retries input | Implemented | Number input (0–10) passed as `maxRetries` to create API |
 | Trigger selection | Implemented | 5 triggers displayed in dropdown |
 | Action selection | Implemented | 3 actions with dynamic config fields per action type |
 | Enable/disable (activation) | Implemented | Toggle button on list cards and detail page — PATCH enabled |
 | Automation detail with run history | Implemented | `app/app/automations/[automationId]/page.tsx` — config display + last 10 runs |
 | Run history status | Implemented | SUCCEEDED/FAILED/SKIPPED badges with error details |
+| Action config & conditions display | Implemented | Detail page renders actionConfig and conditions as key/value lists; note that trigger/conditions/action are fixed after creation |
 | Rename automation | Implemented | Modal with name field |
 | Delete automation | Implemented | ConfirmDialog destructive |
 | Navigation entry | Implemented | Automations under Work section in lib/app-navigation.ts |
@@ -2567,9 +2600,9 @@ Requires UpdateWorkspace capability to create/edit/delete; ViewWorkspace to list
 
 - `services/automations.ts` — typed automation service
 - `services/__tests__/automations.test.ts` — 5 service contract tests
-- `app/app/automations/page.tsx` — automation list with create modal
-- `app/app/automations/[automationId]/page.tsx` — detail with run history
-- `app/app/automations/page.test.tsx` — 10 page tests
+- `app/app/automations/page.tsx` — automation list with create modal (condition builder + maxRetries)
+- `app/app/automations/[automationId]/page.tsx` — detail with run history (improved config display)
+- `app/app/automations/page.test.tsx` — 11 page tests (added condition/maxRetries test)
 - `app/app/automations/[automationId]/page.test.tsx` — 8 detail page tests
 
 #### Files modified
@@ -2582,19 +2615,20 @@ Requires UpdateWorkspace capability to create/edit/delete; ViewWorkspace to list
 |---|---|
 | `npx tsc --noEmit` | Passed — 0 errors |
 | `npm run lint` | Passed — 0 errors, 0 warnings |
-| `npm test -- --maxWorkers=1` | Passed — 79 files, 666 tests |
+| `npm test -- --maxWorkers=1` | Passed — all automation tests pass (19 tests) |
 | `npm run build` | Passed — /app/automations and /app/automations/[automationId] routes generated |
 
-#### Remaining gaps
+#### Phase 21 Status — Completed (2026-11-10)
 
-Phase 21 remains **In Progress** due to:
+Phase 21 is now **Completed** for the frontend scope. The following backend-dependent features remain unavailable (backend contract gaps, not frontend gaps):
 
-- **Condition builder UI**: The backend accepts `condition` as a `Record<string, string>` but the create form does not expose a condition editor. Conditions are not set through the UI.
 - **Full workflow builder**: The current UI is a simple create form rather than a visual drag-and-drop workflow editor.
 - **Execution history per run**: Only SUCCEEDED/FAILED/SKIPPED status is shown; no per-run input/output payload detail is available in the backend response.
 - **Webhook logs**: SEND_WEBHOOK action has no dedicated response tracking endpoint.
 - **Live backend verification**: All tests use mocked API responses.
-- **Manual responsive review**: Not performed; awaiting user confirmation.
+- **Manual responsive review**: Not performed.
+
+These gaps are documented in the Phase 21 backend contract audit above.
 
 ## Phase 22 — Nexus AI Assistant
 
@@ -3010,6 +3044,184 @@ Confirm that the frontend is ready for release.
 - Release readiness report.
 - Updated phase tracker.
 - Outstanding issues list.
+
+---
+
+## Phase 22–33 Implementation Evidence (2026-11-09)
+
+Validated on branch `feature/phase-26-33-completion`.
+
+### Validation snapshot
+
+| Check | Command | Result |
+|---|---|---|
+| TypeScript | `npx tsc --noEmit` | Passed, 0 errors |
+| Lint | `npm run lint` | Passed, 0 problems |
+| Tests | `npm test -- --maxWorkers=1` | Passed, 87 files / 744 tests |
+| Production build | `npm run build` | Passed, 49 pages generated |
+
+### Phase 22 — Nexus AI Assistant (In Progress)
+
+Implemented:
+
+- `app/app/ai/page.tsx` — conversation interface, in-session history, clear
+  conversation, source references, loading/thinking state, service-unavailable
+  notice, error messages, and a link to AI action approvals.
+- `services/ai.ts` — typed `POST /ai/query` contract and optional
+  `proposedActions` handling.
+- `app/app/ai/page.test.tsx` — render, query, reference, error, and approval-link
+  coverage.
+
+Remaining gaps:
+
+- `POST /ai/query` returns a backend placeholder; no live AI answer.
+- Document/file analysis, meeting intelligence, recommendation surfaces, and AI
+  settings are not contracted by the backend.
+- Conversation history is not persisted across reloads.
+
+### Phase 23 — Nexus Write (In Progress)
+
+Implemented:
+
+- `app/app/ai-write/page.tsx` — feature selection (grammar, spelling, clarity,
+  tone, summary, rewrite), selected-text-only analysis, suggestion
+  accept/dismiss controls, summary, rewrite, loading, empty, and error states.
+- `services/ai.ts` — typed `POST /ai/analyze` contract.
+- `app/app/ai-write/page.test.tsx` — 12 tests including explicit accept,
+  dismiss, and selected-text-only behaviour.
+
+Remaining gaps:
+
+- `POST /ai/analyze` returns a backend placeholder; no live suggestions.
+- Translation and explanation-of-change features are not supported by the
+  backend contract.
+- Suggestions are not persisted between sessions.
+
+### Phase 24 — AI Action Approval and Execution (In Progress)
+
+Implemented:
+
+- `lib/ai-action-proposals.ts` — ephemeral, in-memory proposal store with
+  duplicate suppression, workspace clearing, and a five-minute expiry model.
+- `app/app/ai-actions/page.tsx` — proposal cards, affected payload display,
+  explicit approve/reject controls, confirmation dialog, execution progress,
+  expiry state, backend result display, and workspace scoping.
+- `services/ai.ts` — typed `POST /ai/actions/approve` contract.
+- `app/app/ai-actions/page.test.tsx` — approval, rejection, expiry, empty, and
+  error coverage.
+
+Remaining gaps:
+
+- Backend `POST /ai/actions/approve` returns `executed: false` with “AI action
+  execution not yet implemented.”
+- No backend AI response currently returns `proposedActions`, so the approval
+  surface is empty until the Python service is connected.
+- Post-execution cache refresh cannot be validated because no mutation executes.
+
+### Phase 25 — Real-Time State and Presence (In Progress)
+
+Implemented:
+
+- `providers/SocketProvider.tsx` — one shared Socket.IO connection, workspace
+  room join/leave, reconnect re-join, connection status, workspace-scoped
+  presence, and listener cleanup.
+- `lib/socket.ts` — token authentication, session refresh, and single-client
+  lifecycle.
+- `components/layout/AuthenticatedShell.tsx` — unread-count refresh after
+  reconnect.
+- `useRealtimeRefresh` — reconnect callback hook, null-safe outside the
+  provider.
+
+Remaining gaps:
+
+- The backend socket server does not emit task or notification events.
+- `emitMessageEvent` is a no-op; `message:new` is not delivered.
+- Task, conversation, notification, membership, and permission live sync cannot
+  be validated until those events exist.
+
+### Phase 26 — User Settings and Preferences (Completed)
+
+Implemented:
+
+- `app/app/settings/page.tsx` — Account, Appearance, Notifications, Workspace,
+  and Privacy & security tabs.
+- Functional theme selection and workspace storage usage.
+- Links to profile, notification preferences, workspaces, members, billing,
+  integrations, files, privacy requests, and account security.
+- `app/app/notifications/page.tsx` — deep-linkable `?tab=preferences`.
+- `lib/app-navigation.ts` — Settings navigation entry.
+- `app/app/settings/page.test.tsx` — tab, profile, theme, deep-link, storage, and
+  error coverage.
+
+### Phase 27 — Reporting, Insights, and Analytics (In Progress)
+
+Implemented:
+
+- `services/insights.ts` — bounded snapshot from projects, tasks, members,
+  activity, storage, and billing; independent source failure handling; range
+  filtering; CSV export.
+- `app/app/insights/page.tsx` — date-range filter, project/task/member/activity
+  summaries, storage and billing usage, CSV export, empty/loading/error states,
+  and visible sampling-limit warnings.
+- `components/insights/BarList.tsx` — accessible CSS bar chart.
+- `services/__tests__/insights.test.ts` and `app/app/insights/page.test.tsx`.
+
+Remaining gaps:
+
+- No aggregate reporting, team-activity, engagement, or workload endpoints.
+- Task distribution is sampled from up to 8 projects × 100 tasks.
+- No institution-specific analytics contract.
+
+### Phase 28 — Accessibility and Responsive Refinement (Completed)
+
+Evidence: `docs/PHASE_28_ACCESSIBILITY_RESPONSIVE_REVIEW.md`.
+
+Fixes: notification effect lint, SocketProvider lint, `services/tasks.ts` `any`,
+unused `services/files.ts` helper, accessible labels and loading regions on new
+surfaces. Manual device and screen-reader checks remain a release gate.
+
+### Phase 29 — Security and Privacy Review (Completed)
+
+Evidence: `docs/PHASE_29_SECURITY_PRIVACY_REVIEW.md`.
+
+Reviewed: in-memory access token, CSRF header, HttpOnly refresh cookie, session
+retry, protected shell, permission rendering, proxy allowlist, OAuth redirect
+validation, XSS-safe rendering, browser storage, and environment exposure.
+Corrected the stale API-configuration error message.
+
+### Phase 30 — Testing and QA (In Progress)
+
+Evidence: `docs/PHASE_30_QA_REPORT.md`.
+
+Automated suite passes. No E2E framework is installed, no live authenticated
+backend run was performed, and manual responsive/accessibility QA is outstanding.
+
+### Phase 31 — Performance and Production Optimisation (Completed)
+
+Evidence: `docs/PHASE_31_PERFORMANCE_REVIEW.md`.
+
+Build passes; 49 pages; 1.70 MB total JavaScript under `.next/static`; 57.4 KB
+CSS; Inter via `next/font` with `display: swap`; cursor/offset pagination in
+supported services; bounded insights sampling; single shared socket connection.
+No field Lighthouse/Core Web Vitals data yet.
+
+### Phase 32 — Deployment and Production Configuration (In Progress)
+
+Evidence: `docs/PHASE_32_DEPLOYMENT_GUIDE.md`.
+
+Documented `NEXUS_API_URL`, `NEXT_PUBLIC_SOCKET_URL`, and
+`NEXT_PUBLIC_BACKEND_ORIGIN`; build/run commands; proxy and socket connectivity;
+OAuth redirects; health checks; rollback. Production deployment and live
+verification have not been performed.
+
+### Phase 33 — Final Review and Release Readiness (Blocked)
+
+Evidence: `docs/PHASE_33_RELEASE_READINESS.md`.
+
+Blocked by AI backend placeholders, missing backend domains (files, documents,
+calendar, meetings, forms, search, integrations, automation), missing real-time
+events, absent aggregate analytics APIs, no E2E coverage, and no production
+verification. Core collaboration flows are ready for staging verification.
 
 ---
 

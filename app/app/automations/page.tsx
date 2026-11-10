@@ -60,13 +60,22 @@ const ACTION_CONFIG_FIELDS: Record<AutomationAction, Array<{ key: string; label:
 
 // ─── Create form ──────────────────────────────────────────────────────────────
 
+interface ConditionRow {
+  key: string;
+  value: string;
+}
+
 interface CreateFormState {
   name: string;
   trigger: AutomationTrigger;
   action: AutomationAction;
   actionConfig: Record<string, string>;
+  condition: ConditionRow[];
+  maxRetries: number;
   enabled: boolean;
 }
+
+const MAX_RETRIES_LIMIT = 10;
 
 interface CreateFormProps {
   saving: boolean;
@@ -81,6 +90,8 @@ function CreateAutomationForm({ saving, error, onSubmit, onCancel }: CreateFormP
     trigger: 'EVENT_TASK_CREATED',
     action: 'SEND_NOTIFICATION',
     actionConfig: {},
+    condition: [],
+    maxRetries: 3,
     enabled: true,
   });
 
@@ -90,6 +101,27 @@ function CreateAutomationForm({ saving, error, onSubmit, onCancel }: CreateFormP
     setForm((prev) => ({
       ...prev,
       actionConfig: { ...prev.actionConfig, [key]: value },
+    }));
+  }
+
+  function addCondition() {
+    setForm((prev) => ({
+      ...prev,
+      condition: [...prev.condition, { key: '', value: '' }],
+    }));
+  }
+
+  function updateCondition(index: number, patch: Partial<ConditionRow>) {
+    setForm((prev) => ({
+      ...prev,
+      condition: prev.condition.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    }));
+  }
+
+  function removeCondition(index: number) {
+    setForm((prev) => ({
+      ...prev,
+      condition: prev.condition.filter((_, i) => i !== index),
     }));
   }
 
@@ -142,6 +174,80 @@ function CreateAutomationForm({ saving, error, onSubmit, onCancel }: CreateFormP
           placeholder={field.placeholder}
         />
       ))}
+
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">Conditions (optional)</p>
+            <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+              The automation only runs when every condition matches. Leave empty to always run.
+            </p>
+          </div>
+          <Button type="button" size="sm" variant="secondary" onClick={addCondition}>
+            Add condition
+          </Button>
+        </div>
+
+        {form.condition.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {form.condition.map((row, index) => (
+              <div key={index} className="flex items-end gap-2">
+                <div className="min-w-0 flex-1">
+                  <Input
+                    id={`ca-condition-key-${index}`}
+                    label="Condition field"
+                    srOnlyLabel
+                    value={row.key}
+                    onChange={(e) => updateCondition(index, { key: e.target.value })}
+                    placeholder="Field (e.g. priority)"
+                    maxLength={100}
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Input
+                    id={`ca-condition-value-${index}`}
+                    label="Condition value"
+                    srOnlyLabel
+                    value={row.value}
+                    onChange={(e) => updateCondition(index, { value: e.target.value })}
+                    placeholder="Value (e.g. HIGH)"
+                    maxLength={200}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => removeCondition(index)}
+                  aria-label={`Remove condition ${index + 1}`}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Input
+        id="ca-max-retries"
+        label="Max retries"
+        type="number"
+        min={0}
+        max={MAX_RETRIES_LIMIT}
+        step={1}
+        value={String(form.maxRetries)}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          setForm((p) => ({
+            ...p,
+            maxRetries: Number.isFinite(next)
+              ? Math.min(MAX_RETRIES_LIMIT, Math.max(0, Math.trunc(next)))
+              : 0,
+          }));
+        }}
+        helperText="How many times a failed run is retried (0–10)."
+      />
 
       <Checkbox
         id="ca-enabled"
@@ -278,12 +384,19 @@ export default function AutomationsPage() {
     if (creating) return;
     setCreating(true);
     setCreateError(null);
+    const condition = Object.fromEntries(
+      state.condition
+        .map((row) => [row.key.trim(), row.value.trim()] as const)
+        .filter(([key]) => key.length > 0),
+    );
     try {
       const created = await createAutomation(workspaceId, {
         name: state.name.trim(),
         trigger: state.trigger,
         action: state.action,
         actionConfig: state.actionConfig,
+        condition: Object.keys(condition).length > 0 ? condition : null,
+        maxRetries: state.maxRetries,
         enabled: state.enabled,
       });
       setAutomations((prev) => [created, ...prev]);

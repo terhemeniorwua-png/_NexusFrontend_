@@ -1,11 +1,13 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Modal } from '@/components/ui/Modal';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -15,6 +17,7 @@ import {
   getFileUsage,
   uploadFile,
   downloadFile,
+  fetchFileBlob,
   deleteFile,
   formatBytes,
   fileCategory,
@@ -83,11 +86,12 @@ function UsageBar({ usage }: { usage: FileUsage }) {
 interface FileRowProps {
   file: FileSummary;
   onDownload: (file: FileSummary) => void;
+  onPreview: (file: FileSummary) => void;
   onDelete: (file: FileSummary) => void;
   downloading: boolean;
 }
 
-function FileRow({ file, onDownload, onDelete, downloading }: FileRowProps) {
+function FileRow({ file, onDownload, onPreview, onDelete, downloading }: FileRowProps) {
   return (
     <li className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
       <span className="shrink-0 text-xl" aria-hidden="true">{fileIcon(file.mimeType)}</span>
@@ -98,6 +102,14 @@ function FileRow({ file, onDownload, onDelete, downloading }: FileRowProps) {
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => onPreview(file)}
+          aria-label={`Preview ${file.fileName}`}
+        >
+          Preview
+        </Button>
         <Button
           variant="secondary"
           size="sm"
@@ -271,6 +283,14 @@ export default function FilesPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [previewFile, setPreviewFile] = useState<FileSummary | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const previewSeq = useRef(0);
+
   const latestLoad = useRef(0);
   const loadedFor = useRef('');
 
@@ -320,6 +340,66 @@ export default function FilesPage() {
       setDownloadError(err instanceof ApiRequestError ? err.message : 'Download failed. Please try again.');
     } finally {
       setDownloadingId(null);
+    }
+  }
+
+  function releasePreviewUrl() {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+  }
+
+  function closePreview() {
+    previewSeq.current += 1;
+    releasePreviewUrl();
+    setPreviewFile(null);
+    setPreviewUrl(null);
+    setPreviewText(null);
+    setPreviewError(null);
+    setPreviewLoading(false);
+  }
+
+  useEffect(() => () => {
+    previewSeq.current += 1;
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+  }, []);
+
+  async function handlePreview(file: FileSummary) {
+    const seq = ++previewSeq.current;
+    releasePreviewUrl();
+    setPreviewFile(file);
+    setPreviewUrl(null);
+    setPreviewText(null);
+    setPreviewError(null);
+
+    const isImage = file.mimeType.startsWith('image/');
+    const isPdf = file.mimeType === 'application/pdf';
+    const isVideo = file.mimeType.startsWith('video/');
+    const isAudio = file.mimeType.startsWith('audio/');
+    const isText = file.mimeType.startsWith('text/')
+      || file.mimeType === 'application/json';
+    if (!isImage && !isPdf && !isVideo && !isAudio && !isText) return;
+
+    setPreviewLoading(true);
+    try {
+      const blob = await fetchFileBlob(workspaceId, file.id);
+      if (seq !== previewSeq.current) return;
+      if (isText) {
+        setPreviewText(await blob.text());
+      } else {
+        const url = URL.createObjectURL(blob);
+        previewUrlRef.current = url;
+        setPreviewUrl(url);
+      }
+    } catch (err) {
+      if (seq !== previewSeq.current) return;
+      setPreviewError(err instanceof ApiRequestError ? err.message : 'Could not load the preview.');
+    } finally {
+      if (seq === previewSeq.current) setPreviewLoading(false);
     }
   }
 
@@ -401,6 +481,7 @@ export default function FilesPage() {
               key={file.id}
               file={file}
               onDownload={handleDownload}
+              onPreview={(target) => { void handlePreview(target); }}
               onDelete={setPendingDelete}
               downloading={downloadingId === file.id}
             />
@@ -420,6 +501,60 @@ export default function FilesPage() {
           </Button>
         </div>
       )}
+
+      <Modal
+        open={previewFile !== null}
+        onClose={closePreview}
+        title={previewFile?.fileName ?? 'File preview'}
+        maxWidth="xl"
+        footer={previewFile ? (
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={closePreview}>Close</Button>
+            <Button
+              onClick={() => { void handleDownload(previewFile); }}
+              loading={downloadingId === previewFile.id}
+            >
+              Download
+            </Button>
+          </div>
+        ) : undefined}
+      >
+        {previewLoading ? (
+          <div aria-busy="true" aria-label="Loading preview">
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : previewError ? (
+          <Alert variant="error">{previewError}</Alert>
+        ) : previewFile && previewUrl && previewFile.mimeType.startsWith('image/') ? (
+          <Image
+            src={previewUrl}
+            alt={previewFile.fileName}
+            fill
+            className="max-h-[60vh] w-full rounded-[var(--radius-md)] object-contain"
+            sizes="100vw"
+          />
+        ) : previewFile && previewUrl && previewFile.mimeType === 'application/pdf' ? (
+          <iframe
+            src={previewUrl}
+            title={previewFile.fileName}
+            className="h-[60vh] w-full rounded-[var(--radius-md)] border-0"
+          />
+        ) : previewFile && previewUrl && previewFile.mimeType.startsWith('video/') ? (
+          <video src={previewUrl} controls className="max-h-[60vh] w-full rounded-[var(--radius-md)]">
+            <track kind="captions" />
+          </video>
+        ) : previewFile && previewUrl && previewFile.mimeType.startsWith('audio/') ? (
+          <audio src={previewUrl} controls className="w-full" />
+        ) : previewText !== null ? (
+          <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-[var(--radius-md)] bg-[var(--color-surface-secondary)] p-3 text-xs text-[var(--color-text-primary)]">
+            {previewText}
+          </pre>
+        ) : (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Preview isn&apos;t available for this file type. Download the file to open it locally.
+          </p>
+        )}
+      </Modal>
 
       <ConfirmDialog
         open={pendingDelete !== null}

@@ -45,7 +45,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
-    throw new ApiRequestError('The API is not configured. Set NEXT_PUBLIC_API_URL.', 0);
+    throw new ApiRequestError('The API is not configured. Set NEXUS_API_URL on the server.', 0);
   }
 
   const { authenticated = false, headers: inputHeaders, ...requestOptions } = options;

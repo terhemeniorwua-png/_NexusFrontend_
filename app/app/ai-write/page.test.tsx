@@ -2,7 +2,7 @@
  * app/app/ai-write/page.test.tsx
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NexusWritePage from './page';
@@ -97,5 +97,72 @@ describe('NexusWritePage', () => {
     await user.click(screen.getByRole('button', { name: 'Analyse' }));
 
     expect(await screen.findByText('Service unavailable')).toBeInTheDocument();
+  });
+
+  it('applies a suggestion only after the user accepts it', async () => {
+    mockAnalyze.mockResolvedValue({
+      text: 'helo world',
+      suggestions: [
+        { type: 'SPELLING', original: 'helo', suggestion: 'hello', explanation: 'Misspelling' },
+      ],
+      summary: undefined,
+      rewrite: undefined,
+      message: 'Analysis complete.',
+    });
+    const user = userEvent.setup();
+    render(<NexusWritePage />);
+
+    const textarea = screen.getByRole('textbox', { name: 'Text to analyse' });
+    await user.type(textarea, 'helo world');
+    await user.click(screen.getByRole('button', { name: 'Analyse' }));
+
+    // Nothing is rewritten before the user accepts.
+    expect(textarea).toHaveValue('helo world');
+    await user.click(await screen.findByRole('button', { name: 'Accept' }));
+
+    expect(textarea).toHaveValue('hello world');
+    expect(screen.getByText('Accepted')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument();
+  });
+
+  it('dismisses a suggestion without changing the text', async () => {
+    mockAnalyze.mockResolvedValue({
+      text: 'helo world',
+      suggestions: [
+        { type: 'SPELLING', original: 'helo', suggestion: 'hello' },
+      ],
+      summary: undefined,
+      rewrite: undefined,
+      message: 'Analysis complete.',
+    });
+    const user = userEvent.setup();
+    render(<NexusWritePage />);
+
+    const textarea = screen.getByRole('textbox', { name: 'Text to analyse' });
+    await user.type(textarea, 'helo world');
+    await user.click(screen.getByRole('button', { name: 'Analyse' }));
+    await user.click(await screen.findByRole('button', { name: 'Dismiss' }));
+
+    expect(textarea).toHaveValue('helo world');
+    expect(screen.queryByText('helo')).not.toBeInTheDocument();
+    expect(screen.getByText('All suggestions have been dismissed or accepted.')).toBeInTheDocument();
+  });
+
+  it('sends only the selected text when selection-only is enabled', async () => {
+    const user = userEvent.setup();
+    render(<NexusWritePage />);
+
+    const textarea = screen.getByRole('textbox', { name: 'Text to analyse' }) as HTMLTextAreaElement;
+    await user.type(textarea, 'Keep this. fixme here.');
+    textarea.setSelectionRange(11, 16);
+    fireEvent.select(textarea);
+
+    await user.click(screen.getByRole('checkbox', { name: 'Analyse selected text only' }));
+    await user.click(screen.getByRole('button', { name: 'Analyse' }));
+
+    await waitFor(() => expect(mockAnalyze).toHaveBeenCalledWith(
+      'fixme',
+      expect.arrayContaining(['GRAMMAR', 'SPELLING']),
+    ));
   });
 });

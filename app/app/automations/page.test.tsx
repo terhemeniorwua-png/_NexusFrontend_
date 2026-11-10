@@ -144,6 +144,39 @@ describe('AutomationsPage', () => {
     ));
   });
 
+  it('submits conditions and max retries when creating an automation', async () => {
+    const newAuto = fakeAuto({ id: 'auto-cond', name: 'Conditional notify' });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      if ((init as RequestInit | undefined)?.method === 'POST') return ok(newAuto, 201);
+      return ok([]);
+    });
+    const user = userEvent.setup();
+    render(<AutomationsPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Loading automations')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'New automation' }));
+    await screen.findByRole('dialog', { name: 'New automation' });
+    await user.type(screen.getByRole('textbox', { name: 'Automation name' }), 'Conditional notify');
+    await user.type(screen.getByLabelText('Message'), 'A high priority task arrived');
+    await user.click(screen.getByRole('button', { name: 'Add condition' }));
+    await user.type(screen.getByLabelText('Condition field'), 'priority');
+    await user.type(screen.getByLabelText('Condition value'), 'HIGH');
+    const retries = screen.getByLabelText('Max retries');
+    await user.clear(retries);
+    await user.type(retries, '5');
+    await user.click(screen.getByRole('button', { name: 'Create automation' }));
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(([, init]) =>
+        (init as RequestInit | undefined)?.method === 'POST');
+      expect(post).toBeDefined();
+      const body = JSON.parse(String((post?.[1] as RequestInit).body));
+      expect(body.condition).toEqual({ priority: 'HIGH' });
+      expect(body.maxRetries).toBe(5);
+      expect(body.actionConfig).toEqual({ message: 'A high priority task arrived' });
+    });
+  });
+
   it('workspace switch reloads automations', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([]));
     const { rerender } = render(<AutomationsPage />);

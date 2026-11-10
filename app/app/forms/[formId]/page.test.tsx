@@ -40,7 +40,11 @@ function fail(code: string, message: string, status = 400) {
   });
 }
 
-function fakeForm(overrides: Partial<{ status: string; createdById: string }> = {}) {
+function fakeForm(overrides: Partial<{
+  status: string;
+  createdById: string;
+  fields: Array<Record<string, unknown>>;
+}> = {}) {
   return {
     id: FORM_ID,
     workspaceId: WS_ID,
@@ -166,6 +170,63 @@ describe('FormDetailPage', () => {
     await user.click(screen.getByRole('tab', { name: 'Settings' }));
     expect(screen.getByDisplayValue('Employee Satisfaction')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save settings' })).toBeInTheDocument();
+  });
+
+  it('previews a published form and submits a response', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      if (String(url).includes('/responses') && (init as RequestInit | undefined)?.method === 'POST') {
+        return ok({ ok: true }, 201);
+      }
+      if (String(url).includes('/responses')) return ok({ items: [], nextCursor: null });
+      return ok(fakeForm({ status: 'PUBLISHED' }));
+    });
+    const user = userEvent.setup();
+    render(<FormDetailPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Loading form')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('tab', { name: 'Preview' }));
+    await user.type(screen.getByRole('textbox', { name: /Name/ }), 'Ada Lovelace');
+    await user.click(screen.getByRole('button', { name: 'Submit response' }));
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(([url, init]) =>
+        String(url).includes(`/forms/${FORM_ID}/responses`)
+        && (init as RequestInit | undefined)?.method === 'POST');
+      expect(post).toBeDefined();
+      expect(JSON.parse(String((post?.[1] as RequestInit).body))).toEqual({
+        answers: [{ fieldId: 'field-1', value: 'Ada Lovelace' }],
+      });
+    });
+    expect(await screen.findByText('Response submitted.')).toBeInTheDocument();
+  });
+
+  it('blocks preview submission until required fields are completed', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      if (String(url).includes('/responses') && (init as RequestInit | undefined)?.method === 'POST') {
+        return ok({ ok: true }, 201);
+      }
+      return ok(fakeForm({ status: 'PUBLISHED' }));
+    });
+    const user = userEvent.setup();
+    render(<FormDetailPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Loading form')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('tab', { name: 'Preview' }));
+    await user.click(screen.getByRole('button', { name: 'Submit response' }));
+    expect(await screen.findByText(/Complete required field/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) =>
+      (init as RequestInit | undefined)?.method === 'POST')).toBe(false);
+  });
+
+  it('disables preview submission while the form is a draft', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(fakeForm({ status: 'DRAFT' })));
+    const user = userEvent.setup();
+    render(<FormDetailPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Loading form')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('tab', { name: 'Preview' }));
+    expect(screen.getByRole('button', { name: 'Submit response' })).toBeDisabled();
+    expect(screen.getByText('Only published forms accept responses.')).toBeInTheDocument();
   });
 
   it('shows AccessState on 401 response', async () => {

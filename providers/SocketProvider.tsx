@@ -30,7 +30,17 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
-  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  // Presence is scoped to the workspace it was observed in. Deriving the
+  // exposed list avoids clearing state inside an effect when the workspace
+  // changes or disappears.
+  const [presence, setPresence] = useState<{
+    workspaceId: string | null;
+    ids: string[];
+  }>({ workspaceId: null, ids: [] });
+  const onlineUserIds = useMemo(
+    () => (presence.workspaceId === workspaceId ? presence.ids : []),
+    [presence, workspaceId],
+  );
   const initialized = useRef(false);
   // Kept in a ref so the one-time connect handler can re-join the room after a
   // reconnect without re-registering every listener.
@@ -66,7 +76,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     };
     const onDisconnect = () => {
       setStatus('disconnected');
-      setOnlineUserIds([]);
+      setPresence({ workspaceId: workspaceIdRef.current, ids: [] });
     };
     const onConnectError = () => setStatus('connecting');
     const onReconnectAttempt = () => setStatus('reconnecting');
@@ -75,13 +85,22 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     const onPresenceOnline = (data: { userId?: string }) => {
       if (!data?.userId) return;
-      setOnlineUserIds((current) =>
-        current.includes(data.userId as string) ? current : [...current, data.userId as string],
-      );
+      const userId = data.userId;
+      setPresence((current) => {
+        const ids = current.workspaceId === workspaceIdRef.current ? current.ids : [];
+        return {
+          workspaceId: workspaceIdRef.current,
+          ids: ids.includes(userId) ? ids : [...ids, userId],
+        };
+      });
     };
     const onPresenceOffline = (data: { userId?: string }) => {
       if (!data?.userId) return;
-      setOnlineUserIds((current) => current.filter((id) => id !== data.userId));
+      const userId = data.userId;
+      setPresence((current) => ({
+        workspaceId: current.workspaceId,
+        ids: current.ids.filter((id) => id !== userId),
+      }));
     };
 
     s.on('connect', onConnect);
@@ -109,10 +128,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   // the previous room so events from a switched-away workspace are not
   // delivered to this client.
   useEffect(() => {
-    if (!socket || !workspaceId) {
-      setOnlineUserIds([]);
-      return;
-    }
+    if (!socket || !workspaceId) return;
     socket.emit('workspace:join', workspaceId);
     socket.emit('presence:online');
 

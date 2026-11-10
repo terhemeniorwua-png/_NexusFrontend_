@@ -28,6 +28,7 @@ function fakeResult(overrides: Partial<{ id: string; type: string; title: string
 describe('GlobalSearch', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    window.localStorage.clear();
     mockSearch.mockResolvedValue([]);
   });
 
@@ -97,8 +98,50 @@ describe('GlobalSearch', () => {
     await waitFor(() => expect(screen.getByText(/No results for/)).toBeInTheDocument(), { timeout: 1000 });
   });
 
-  it('shows hint text before search is performed', () => {
+  it('shows hint text before search is performed', async () => {
+    const user = userEvent.setup();
     render(<GlobalSearch open={true} onClose={vi.fn()} />);
+    await user.type(screen.getByRole('searchbox'), 'a');
     expect(screen.getByText(/Type at least 2 characters/)).toBeInTheDocument();
+  });
+
+  it('loads and displays recent searches from local storage', async () => {
+    window.localStorage.setItem('nexus-recent-searches-v1', JSON.stringify(['alpha', 'beta']));
+    render(<GlobalSearch open={true} onClose={vi.fn()} />);
+    expect(await screen.findByLabelText('Recent searches')).toBeInTheDocument();
+    expect(screen.getByText('alpha')).toBeInTheDocument();
+    expect(screen.getByText('beta')).toBeInTheDocument();
+  });
+
+  it('remembers a submitted search and persists it', async () => {
+    mockSearch.mockResolvedValue([fakeResult()]);
+    const user = userEvent.setup();
+    render(<GlobalSearch open={true} onClose={vi.fn()} />);
+    await user.type(screen.getByRole('searchbox'), 'gamma{Enter}');
+    await waitFor(() => expect(mockSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'gamma' }),
+    ));
+    expect(JSON.parse(window.localStorage.getItem('nexus-recent-searches-v1') ?? '[]'))
+      .toContain('gamma');
+  });
+
+  it('runs a recent search when it is clicked', async () => {
+    window.localStorage.setItem('nexus-recent-searches-v1', JSON.stringify(['delta']));
+    const user = userEvent.setup();
+    render(<GlobalSearch open={true} onClose={vi.fn()} />);
+    await user.click(await screen.findByText('delta'));
+    await waitFor(() => expect(mockSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'delta' }),
+    ));
+  });
+
+  it('clears recent searches', async () => {
+    window.localStorage.setItem('nexus-recent-searches-v1', JSON.stringify(['epsilon']));
+    const user = userEvent.setup();
+    render(<GlobalSearch open={true} onClose={vi.fn()} />);
+    await screen.findByText('epsilon');
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(screen.queryByText('epsilon')).not.toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem('nexus-recent-searches-v1') ?? '[]')).toEqual([]);
   });
 });

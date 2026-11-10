@@ -39,6 +39,7 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
         { id: 'forms', label: 'Forms', href: '/app/forms', permissions: ['workspace:view'] },
         { id: 'automations', label: 'Automations', href: '/app/automations', permissions: ['workspace:view'] },
         { id: 'calendar', label: 'Calendar', href: '/app/calendar', permissions: ['workspace:view'] },
+        { id: 'insights', label: 'Insights', href: '/app/insights', permissions: ['workspace:view'] },
       ],
     },
     {
@@ -71,6 +72,7 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
         },
         { id: 'teams', label: 'Teams and structure', href: '/app/teams', workspaceKinds: ['company', 'institution'] },
         { id: 'groups', label: 'Institution groups', href: '/app/groups', workspaceKinds: ['institution'] },
+        { id: 'audit', label: 'Audit log', href: '/app/audit', workspaceKinds: ['company', 'institution'] },
       ],
     },
     {
@@ -80,6 +82,7 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
         { id: 'integrations', label: 'Integrations', href: '/app/integrations' },
         { id: 'invitations', label: 'Invitations', href: '/app/invitations' },
         { id: 'billing', label: 'Billing', href: '/app/billing' },
+        { id: 'settings', label: 'Settings', href: '/app/settings' },
         { id: 'profile', label: 'Profile', href: '/app/profile' },
         { id: 'privacy-requests', label: 'Privacy requests', href: '/app/privacy-requests' },
       ],

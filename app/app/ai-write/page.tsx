@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Checkbox } from '@/components/ui/Checkbox';
@@ -31,12 +32,22 @@ export default function NexusWritePage() {
   const [features, setFeatures] = useState<AnalysisFeature[]>(['GRAMMAR', 'SPELLING']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const [selectionOnly, setSelectionOnly] = useState(false);
+  const [suggestionStates, setSuggestionStates] = useState<
+    Record<number, 'accepted' | 'dismissed'>
+  >({});
+  const [applyError, setApplyError] = useState<string | null>(null);
   const [result, setResult] = useState<{
     suggestions: WritingSuggestion[];
     summary: string | null | undefined;
     rewrite: string | null | undefined;
     serviceMessage: string;
+    /** Character range of `text` that was sent for analysis. */
+    analysedRange: { start: number; end: number };
   } | null>(null);
+
+  const hasSelection = selection.end > selection.start;
 
   function toggleFeature(feature: AnalysisFeature) {
     setFeatures((prev) =>
@@ -45,11 +56,20 @@ export default function NexusWritePage() {
   }
 
   async function handleAnalyze() {
-    const trimmed = text.trim();
-    if (!trimmed || loading || features.length === 0) return;
+    if (loading || features.length === 0) return;
+
+    const useSelection = selectionOnly && hasSelection;
+    const analysedRange = useSelection
+      ? { start: selection.start, end: selection.end }
+      : { start: 0, end: text.length };
+    const source = text.slice(analysedRange.start, analysedRange.end);
+    const trimmed = source.trim();
+    if (!trimmed) return;
 
     setLoading(true);
     setError(null);
+    setApplyError(null);
+    setSuggestionStates({});
     setResult(null);
 
     try {
@@ -59,12 +79,49 @@ export default function NexusWritePage() {
         summary: response.summary,
         rewrite: response.rewrite,
         serviceMessage: response.message,
+        analysedRange,
       });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Analysis failed. Please try again.');
     } finally {
       setLoading(false);
     }
+  }
+
+  /**
+   * Applies one suggestion only after the user explicitly accepts it. The
+   * original string is located inside the analysed range so the rest of the
+   * document is never rewritten implicitly.
+   */
+  function acceptSuggestion(index: number, suggestion: WritingSuggestion) {
+    if (!result) return;
+    const { start, end } = result.analysedRange;
+    const segment = text.slice(start, end);
+    const offset = segment.indexOf(suggestion.original);
+    if (offset === -1) {
+      setApplyError(
+        'This suggestion could not be applied because the original text was not found. Edit the text and analyse again.',
+      );
+      return;
+    }
+
+    const replaceStart = start + offset;
+    const replaceEnd = replaceStart + suggestion.original.length;
+    setText(`${text.slice(0, replaceStart)}${suggestion.suggestion}${text.slice(replaceEnd)}`);
+    setApplyError(null);
+    setSuggestionStates((prev) => ({ ...prev, [index]: 'accepted' }));
+    setResult((prev) => {
+      if (!prev) return prev;
+      const delta = suggestion.suggestion.length - suggestion.original.length;
+      return {
+        ...prev,
+        analysedRange: { start: prev.analysedRange.start, end: prev.analysedRange.end + delta },
+      };
+    });
+  }
+
+  function dismissSuggestion(index: number) {
+    setSuggestionStates((prev) => ({ ...prev, [index]: 'dismissed' }));
   }
 
   return (
@@ -90,11 +147,30 @@ export default function NexusWritePage() {
               label="Text to analyse"
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onSelect={(e) => {
+                const target = e.currentTarget;
+                setSelection({ start: target.selectionStart, end: target.selectionEnd });
+              }}
               rows={12}
               placeholder="Paste or type the text you want to analyse…"
               maxLength={50000}
               disabled={loading}
             />
+
+            <div className="mt-3">
+              <Checkbox
+                id="nw-selection-only"
+                label="Analyse selected text only"
+                checked={selectionOnly}
+                onChange={() => setSelectionOnly((value) => !value)}
+                disabled={loading}
+                helperText={
+                  hasSelection
+                    ? `${selection.end - selection.start} characters selected`
+                    : 'Select text in the box above to limit what is sent for analysis.'
+                }
+              />
+            </div>
 
             <div className="mt-3">
               <p className="mb-2 text-sm font-medium text-[var(--color-text-secondary)]">
@@ -118,13 +194,22 @@ export default function NexusWritePage() {
               <Button
                 onClick={() => { void handleAnalyze(); }}
                 loading={loading}
-                disabled={loading || !text.trim() || features.length === 0}
+                disabled={
+                  loading
+                  || features.length === 0
+                  || (selectionOnly ? !hasSelection : !text.trim())
+                }
               >
                 Analyse
               </Button>
               {loading && <Spinner className="h-4 w-4" aria-label="Analysing" />}
               {features.length === 0 && (
                 <p className="text-xs text-[var(--color-warning)]">Select at least one feature</p>
+              )}
+              {selectionOnly && !hasSelection && features.length > 0 && (
+                <p className="text-xs text-[var(--color-warning)]">
+                  Select text in the box to analyse
+                </p>
               )}
             </div>
 
@@ -151,27 +236,62 @@ export default function NexusWritePage() {
               {/* Suggestions */}
               <Card className="p-4">
                 <h2 className="mb-2 font-semibold text-[var(--color-text-primary)]">
-                  Suggestions ({result.suggestions.length})
+                  Suggestions (
+                  {result.suggestions.filter((_, i) => suggestionStates[i] !== 'dismissed').length}
+                  )
                 </h2>
-                {result.suggestions.length === 0 ? (
-                  <p className="text-sm text-[var(--color-text-muted)]">No suggestions returned.</p>
+                {applyError && (
+                  <Alert variant="error" className="mb-3">
+                    {applyError}
+                  </Alert>
+                )}
+                {result.suggestions.filter((_, i) => suggestionStates[i] !== 'dismissed').length === 0 ? (
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    {result.suggestions.length === 0
+                      ? 'No suggestions returned.'
+                      : 'All suggestions have been dismissed or accepted.'}
+                  </p>
                 ) : (
                   <ul className="space-y-3" aria-label="Writing suggestions">
-                    {result.suggestions.map((s, i) => (
-                      <li key={i} className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-medium text-[var(--color-primary)]">{s.type}</span>
-                        </div>
-                        <p className="mt-1 text-sm">
-                          <span className="line-through text-[var(--color-error)]">{s.original}</span>
-                          {' → '}
-                          <span className="text-[var(--color-success)]">{s.suggestion}</span>
-                        </p>
-                        {s.explanation && (
-                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">{s.explanation}</p>
-                        )}
-                      </li>
-                    ))}
+                    {result.suggestions.map((s, i) => {
+                      const state = suggestionStates[i];
+                      if (state === 'dismissed') return null;
+                      return (
+                        <li key={i} className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-medium text-[var(--color-primary)]">{s.type}</span>
+                            {state === 'accepted' && <Badge variant="success">Accepted</Badge>}
+                          </div>
+                          <p className="mt-1 text-sm">
+                            <span className="line-through text-[var(--color-error)]">{s.original}</span>
+                            {' → '}
+                            <span className="text-[var(--color-success)]">{s.suggestion}</span>
+                          </p>
+                          {s.explanation && (
+                            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{s.explanation}</p>
+                          )}
+                          {state !== 'accepted' && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => acceptSuggestion(i, s)}
+                                disabled={loading}
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => dismissSuggestion(i)}
+                                disabled={loading}
+                              >
+                                Dismiss
+                              </Button>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </Card>

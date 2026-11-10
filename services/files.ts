@@ -107,17 +107,6 @@ export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 const API_BASE = '/api/backend';
 
-async function parseErrorResponse(response: Response): Promise<ApiRequestError> {
-  try {
-    const body = await response.json() as { error?: { code?: string; message?: string } };
-    const message = body.error?.message ?? response.statusText;
-    const code = body.error?.code ?? 'UNKNOWN';
-    return new ApiRequestError(message, response.status, code);
-  } catch {
-    return new ApiRequestError(response.statusText || 'Request failed', response.status);
-  }
-}
-
 // ─── List files ───────────────────────────────────────────────────────────────
 
 export async function listFiles(
@@ -253,6 +242,20 @@ export async function downloadFile(
   document.body.removeChild(anchor);
   // Revoke after a short delay so the download can start
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+// ─── Preview file ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetch a file's raw bytes for in-app preview.
+ * The caller owns the returned Blob and must revoke any object URL it creates.
+ */
+export async function fetchFileBlob(workspaceId: string, fileId: string): Promise<Blob> {
+  const response = await withAuthRetry(() => apiRawRequest(
+    `/workspaces/${workspaceId}/files/${fileId}`,
+    { authenticated: true },
+  ));
+  return response.blob();
 }
 
 // ─── Delete file ──────────────────────────────────────────────────────────────

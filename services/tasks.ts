@@ -373,14 +373,14 @@ export function deleteComment(
 }
 
 // Backend requires ISO datetimes with offset; date pickers send YYYY-MM-DD.
-function toIsoDate(v: unknown) {
-  if (typeof v !== 'string') return v;
-  if (v === '') return undefined;
-  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00.000Z`).toISOString() : v;
+function toIsoDate(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  if (value === '') return undefined;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00.000Z`).toISOString() : value;
 }
 
-function normalizeTaskInput<T extends Record<string, any>>(input: T): T {
-  const out: Record<string, any> = { ...input };
+function normalizeTaskInput<T extends object>(input: T): T {
+  const out = { ...input } as Record<string, unknown>;
   if ('startDate' in out) out.startDate = toIsoDate(out.startDate);
   if ('dueDate' in out) out.dueDate = toIsoDate(out.dueDate);
   if (typeof out.labels === 'string') {

@@ -117,3 +117,7 @@ export async function getGoogleCalendarAuthorizeUrl(): Promise<{ url: string }> 
 export async function getGithubAuthorizeUrl(): Promise<{ url: string }> {
   return authed<{ url: string }>('/integrations/github/authorize');
 }
+
+export async function getOutlookCalendarAuthorizeUrl(): Promise<{ url: string }> {
+  return authed<{ url: string }>('/integrations/outlook-calendar/authorize');
+}

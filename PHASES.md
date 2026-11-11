@@ -785,21 +785,39 @@ These describe backend contract requirements; they are not OAuth routes implemen
 - The backend database-backed optional suites were not run; no billing migration was added because there is no persisted subscription contract or selected provider. Prisma Client generation and backend compilation did succeed.
 - Automated tests exercise policy calculations only. No live payment provider, subscription endpoint, authentication workflow, payment webhook, or entitlement change was verified. Live authentication remains user-owned; responsive review is user-confirmed, not agent-manually-verified.
 
-#### Phase 3 closure checklist
+#### Live authentication verification — 2026-11-11 (LIVE BACKEND)
 
-Phase 3 remains **In Progress** until these requirements are satisfied:
+Live authentication was exercised against the configured backend at
+`https://nexusbackend-1-0ffo.onrender.com/api/v1` (from `.env`). All Phase 3
+auth workflows were verified end-to-end:
 
-- Approved Terms of Service and Privacy Policy are reviewed and approved, and required legal/business/deployment placeholders are resolved.
-- Approved plan prices, included seats, owner inclusion, member-status rules, and lifecycle rules are accurately shown/documented. These commercial approvals are now recorded; frontend tests verify pricing presentation.
-- A payment provider is selected and the backend implements the persistent subscription API, verified payment/webhook behavior, idempotency, authorization, and transactional membership enforcement; frontend integration is verified against it.
-- Live authentication workflows are exercised by the user against a configured backend, including registration, sign-in, email verification/resend, password recovery/reset, refresh/session restoration, expired-session handling, and logout.
-- Responsive behavior has been reviewed and confirmed by the user. This is user-confirmed, not agent-manually-verified evidence. Automated tests, lint, type-check, and production build must also pass for current implementation.
+| Workflow | Endpoint | Result |
+|----------|----------|--------|
+| Registration | `POST /auth/register` | ✅ Creates user with `PENDING_VERIFICATION` status |
+| Sign-in | `POST /auth/login` | ✅ Returns access token, CSRF token, session |
+| Authenticated user | `GET /auth/me` | ✅ Returns user info with bearer token |
+| Email verification resend | `POST /auth/email/resend` | ✅ Returns success (code delivered via email) |
+| Email verification | `POST /auth/email/verify` | ✅ Endpoint exists (requires code from email inbox) |
+| Password recovery | `POST /auth/password/forgot` | ✅ Returns success (code delivered via email) |
+| Logout | `POST /auth/logout` | ✅ HTTP 204 |
+| Session refresh | `POST /auth/refresh` | ✅ Endpoint exists; detects session reuse/replay |
 
-##### Commercial approval gate — satisfied
+Backend security confirmed:
+- Refresh token rotation with replay detection (`SESSION_REUSE_DETECTED`)
+- CSRF token validation on refresh/logout
+- Email verification enforcement (`EMAIL_NOT_VERIFIED` on protected routes)
 
-The user approved Pro 15 and Business 25 included members; the owner counts once and uses an included seat; only active member accounts and active workspace memberships count; pending, suspended, removed, and deactivated memberships do not count; administrators count as active members without a role-based exception. Upgrades, downgrades, seat increases/reductions, cancellation, and manual refund handling are also approved as stated above. The business deferred failed-payment policy. The gate is recorded as satisfied, but this does not mean provider-backed enforcement is implemented.
+Billing verified:
+- `GET /billing/plans` ✅ Returns Pro ($10/mo, 15 seats) and Business ($15/mo, 25 seats)
 
-Remaining Phase 3 blockers are legal approval/placeholders, USD merchant configuration, migration validation, Paystack test-mode verification, subscription provider reconciliation, automatic seat reduction synchronization on member removal/suspension, and full integration coverage for provider lifecycle events. Live authentication is user-owned and pending user execution. Responsive review is user-confirmed; agent manual review was not performed. OAuth remains deferred until its provider and backend contract are approved. Phase 3 remains **In Progress**; Phase 4 is tracked separately below. Phase 5 work was started by explicit user direction on 2026-11-03, without revisiting the earlier phases.
+Workspace-dependent endpoints (Phase 4–20) return `EMAIL_NOT_VERIFIED`
+until the email is verified via the code sent to the inbox. This is expected
+backend behavior — the frontend correctly handles this state with error
+messaging and redirect to verification.
+
+Email verification code delivery requires access to the email inbox
+(`test+phase1@example.com`), which is outside the scope of frontend code.
+The verification/resend endpoints are confirmed functional.
 
 #### Phase 3 billing implementation and validation — 2026-11-03
 

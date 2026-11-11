@@ -3049,7 +3049,7 @@ Confirm that the frontend is ready for release.
 
 ## Phase 22–33 Implementation Evidence (2026-11-09)
 
-Validated on branch `feature/phase-26-33-completion`.
+Validated on branch `feature/phases-21-30-completion`.
 
 ### Validation snapshot
 
@@ -3057,45 +3057,50 @@ Validated on branch `feature/phase-26-33-completion`.
 |---|---|---|
 | TypeScript | `npx tsc --noEmit` | Passed, 0 errors |
 | Lint | `npm run lint` | Passed, 0 problems |
-| Tests | `npm test -- --maxWorkers=1` | Passed, 87 files / 744 tests |
-| Production build | `npm run build` | Passed, 49 pages generated |
+| Tests | `npm test -- --maxWorkers=1` | Passed, 89 files / 769 tests |
+| Production build | `npm run build` | Passed, 50 pages generated |
 
 ### Phase 22 — Nexus AI Assistant (In Progress)
 
 Implemented:
 
-- `app/app/ai/page.tsx` — conversation interface, in-session history, clear
-  conversation, source references, loading/thinking state, service-unavailable
-  notice, error messages, and a link to AI action approvals.
+- `app/app/ai/page.tsx` — conversation interface, in-session history,
+  **conversation persistence across reloads** (localStorage keyed by workspaceId),
+  **"New conversation" button**, message timestamps (**HH:MM**), conversation
+  list/sidebar with recent conversations, source references, loading/thinking
+  state, service-unavailable notice, error messages, and a link to AI action
+  approvals.
 - `services/ai.ts` — typed `POST /ai/query` contract and optional
   `proposedActions` handling.
-- `app/app/ai/page.test.tsx` — render, query, reference, error, and approval-link
-  coverage.
+- `app/app/ai/page.test.tsx` — render, query, reference, error, approval-link,
+  conversation persistence, new conversation, and timestamp coverage.
 
 Remaining gaps:
 
 - `POST /ai/query` returns a backend placeholder; no live AI answer.
 - Document/file analysis, meeting intelligence, recommendation surfaces, and AI
   settings are not contracted by the backend.
-- Conversation history is not persisted across reloads.
 
 ### Phase 23 — Nexus Write (In Progress)
 
 Implemented:
 
 - `app/app/ai-write/page.tsx` — feature selection (grammar, spelling, clarity,
-  tone, summary, rewrite), selected-text-only analysis, suggestion
-  accept/dismiss controls, summary, rewrite, loading, empty, and error states.
-- `services/ai.ts` — typed `POST /ai/analyze` contract.
+  tone, summary, rewrite, **translation**), selected-text-only analysis,
+  suggestion accept/dismiss controls, **prominent explanation-of-changes
+  display**, **"Apply all accepted suggestions" button**, **character count**,
+  summary, rewrite, loading, empty, and error states. Analysis results
+  **persisted to localStorage** across reloads.
+- `services/ai.ts` — typed `POST /ai/analyze` contract with `TRANSLATION`
+  feature added to the `AnalysisFeature` union.
 - `app/app/ai-write/page.test.tsx` — 12 tests including explicit accept,
-  dismiss, and selected-text-only behaviour.
+  dismiss, selected-text-only behaviour.
 
 Remaining gaps:
 
 - `POST /ai/analyze` returns a backend placeholder; no live suggestions.
 - Translation and explanation-of-change features are not supported by the
-  backend contract.
-- Suggestions are not persisted between sessions.
+  backend contract (UI is ready for when the Python service is connected).
 
 ### Phase 24 — AI Action Approval and Execution (In Progress)
 
@@ -3105,7 +3110,11 @@ Implemented:
   duplicate suppression, workspace clearing, and a five-minute expiry model.
 - `app/app/ai-actions/page.tsx` — proposal cards, affected payload display,
   explicit approve/reject controls, confirmation dialog, execution progress,
-  expiry state, backend result display, and workspace scoping.
+  expiry state, backend result display, and workspace scoping. **Proposal
+  history view** (approved/rejected/expired separated from pending), **status
+  filters** (All / Pending / Approved / Rejected / Expired), **count badges**
+  per status, **"Clear history" button**, and prominent execution-result
+  alerts.
 - `services/ai.ts` — typed `POST /ai/actions/approve` contract.
 - `app/app/ai-actions/page.test.tsx` — approval, rejection, expiry, empty, and
   error coverage.
@@ -3131,6 +3140,15 @@ Implemented:
   reconnect.
 - `useRealtimeRefresh` — reconnect callback hook, null-safe outside the
   provider.
+- `app/app/messages/page.tsx` — **online presence indicators** (green dot next
+  to online message authors via `useOnlineUsers()`), **reconnection banner**
+  ("Reconnecting…"/"You're offline" with spinner), and **offline composer state**
+  (send disabled when disconnected).
+- Socket.IO events (verified in `src/realtime/socket-server.ts`):
+  Client emits: `workspace:join`, `workspace:leave`, `channel:join`,
+  `channel:leave`, `typing:start`, `typing:stop`, `presence:online`.
+  Client receives: `typing:start`, `typing:stop`, `presence:online`,
+  `presence:offline`, `message:new`.
 
 Remaining gaps:
 
@@ -3162,8 +3180,13 @@ Implemented:
   filtering; CSV export.
 - `app/app/insights/page.tsx` — date-range filter, project/task/member/activity
   summaries, storage and billing usage, CSV export, empty/loading/error states,
-  and visible sampling-limit warnings.
+  visible sampling-limit warnings, **trend indicators** (↑/↓/— vs first half of
+  sample for projects, tasks, and completion rate), **task completion rate**
+  summary card, **PieChart** for project status distribution and members by
+  role, and transparency bullet about trend computation.
 - `components/insights/BarList.tsx` — accessible CSS bar chart.
+- `components/insights/PieChart.tsx` — dependency-free SVG pie chart with
+  accessible labels, percentage readouts, and center total.
 - `services/__tests__/insights.test.ts` and `app/app/insights/page.test.tsx`.
 
 Remaining gaps:
@@ -3193,8 +3216,17 @@ Corrected the stale API-configuration error message.
 
 Evidence: `docs/PHASE_30_QA_REPORT.md`.
 
-Automated suite passes. No E2E framework is installed, no live authenticated
-backend run was performed, and manual responsive/accessibility QA is outstanding.
+Automated suite passes. **769 tests across 89 files pass** (0 failures),
+covering all phases 1–30: authentication, onboarding, workspace creation and
+switching, invitations, join requests, role-based UI, project visibility, task
+management, messaging, notification separation, file management, calendar and
+meetings, billing, global search, integrations, AI assistant, Nexus Write, AI
+action approvals, settings, insights, navigation, theme, socket provider,
+shared UI primitives, and the same-origin API proxy.
+
+No E2E framework is installed (requires dependency approval per CONVENTIONS
+§9). No live authenticated backend run was performed (tests mock `fetch` and
+backend contracts). Manual responsive/accessibility QA is outstanding.
 
 ### Phase 31 — Performance and Production Optimisation (Completed)
 

@@ -37,6 +37,8 @@ vi.mock('@/providers/SocketProvider', () => ({
     socket: mocks.socket,
     status: 'connected',
   }),
+  useConnectionStatus: () => 'connected',
+  useOnlineUsers: () => new Set<string>(),
 }));
 
 vi.mock('@/services/channels', () => ({

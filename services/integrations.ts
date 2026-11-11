@@ -121,3 +121,13 @@ export async function getGithubAuthorizeUrl(): Promise<{ url: string }> {
 export async function getOutlookCalendarAuthorizeUrl(): Promise<{ url: string }> {
   return authed<{ url: string }>('/integrations/outlook-calendar/authorize');
 }
+
+/** Get the OneDrive OAuth authorization URL (personal connection). */
+export async function getOneDriveAuthorizeUrl(): Promise<{ url: string }> {
+  return authed<{ url: string }>('/integrations/onedrive/authorize');
+}
+
+/** Get the Outlook Mail OAuth authorization URL (personal connection). */
+export async function getOutlookMailAuthorizeUrl(): Promise<{ url: string }> {
+  return authed<{ url: string }>('/integrations/outlook-mail/authorize');
+}

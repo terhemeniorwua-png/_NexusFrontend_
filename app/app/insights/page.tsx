@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { BarList } from '@/components/insights/BarList';
+import { PieChart } from '@/components/insights/PieChart';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { formatBytes } from '@/services/files';
@@ -96,14 +97,93 @@ function projectStatusVariant(status: string): 'success' | 'info' | 'warning' | 
   return 'default';
 }
 
+type TrendDirection = 'up' | 'down' | 'neutral';
+
+interface Trend {
+  direction: TrendDirection;
+  percent: number;
+}
+
+/**
+ * Compares a baseline value against a later value. Changes below 1% are
+ * treated as neutral so rounding noise does not produce an arrow.
+ */
+function computeTrend(firstValue: number, secondValue: number): Trend {
+  if (!Number.isFinite(firstValue) || firstValue === 0) {
+    return { direction: 'neutral', percent: 0 };
+  }
+  const change = ((secondValue - firstValue) / firstValue) * 100;
+  const percent = Math.round(Math.abs(change));
+  return {
+    direction: percent < 1 ? 'neutral' : change > 0 ? 'up' : 'down',
+    percent,
+  };
+}
+
+type SampledMetric = 'volume' | 'completionRate';
+
+/**
+ * Splits the sampled projects into an earlier and a later half (ordered by
+ * project update date) and compares a metric between them, using only data
+ * already loaded for the insights snapshot. No new backend calls are made.
+ */
+function sampleHalfTrend(
+  perProject: WorkspaceInsights['tasks']['perProject'],
+  projectDates: Map<string, string>,
+  metric: SampledMetric,
+): Trend | null {
+  if (perProject.length === 0) return null;
+  const ordered = [...perProject].sort((a, b) => {
+    const dateA = projectDates.get(a.projectId) ?? '';
+    const dateB = projectDates.get(b.projectId) ?? '';
+    return dateB.localeCompare(dateA);
+  });
+  const mid = Math.ceil(ordered.length / 2);
+  const firstHalf = ordered.slice(0, mid);
+  const secondHalf = ordered.slice(mid);
+  const sampledSum = (entries: typeof firstHalf) =>
+    entries.reduce((sum, entry) => sum + entry.sampled, 0);
+  const completedSum = (entries: typeof firstHalf) =>
+    entries.reduce((sum, entry) => sum + entry.completed, 0);
+  let firstValue: number;
+  let secondValue: number;
+  if (metric === 'volume') {
+    firstValue = sampledSum(firstHalf);
+    secondValue = sampledSum(secondHalf);
+  } else {
+    const firstSampled = sampledSum(firstHalf);
+    const secondSampled = sampledSum(secondHalf);
+    if (firstSampled === 0 || secondSampled === 0) {
+      return { direction: 'neutral', percent: 0 };
+    }
+    firstValue = (completedSum(firstHalf) / firstSampled) * 100;
+    secondValue = (completedSum(secondHalf) / secondSampled) * 100;
+  }
+  return computeTrend(firstValue, secondValue);
+}
+
+function projectCountTrend(projects: Array<{ updatedAt: string }>): Trend {
+  const sorted = [...projects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const mid = Math.ceil(sorted.length / 2);
+  return computeTrend(sorted.slice(0, mid).length, sorted.slice(mid).length);
+}
+
+function trendClass(direction: TrendDirection): string {
+  if (direction === 'up') return 'text-[var(--color-success)]';
+  if (direction === 'down') return 'text-[var(--color-error)]';
+  return 'text-[var(--color-text-muted)]';
+}
+
 function SummaryCard({
   label,
   value,
   detail,
+  trend,
 }: {
   label: string;
   value: string;
   detail: string;
+  trend?: Trend | null;
 }) {
   return (
     <Card className="p-5">
@@ -112,6 +192,21 @@ function SummaryCard({
         {value}
       </p>
       <p className="mt-1 text-xs text-[var(--color-text-muted)]">{detail}</p>
+      {trend && (
+        <p
+          className={`mt-1 text-xs font-medium flex items-center gap-1 ${trendClass(trend.direction)}`}
+          aria-label={
+            trend.direction === 'neutral'
+              ? 'No significant change compared with the first half of the sample.'
+              : `${trend.direction === 'up' ? 'Increase' : 'Decrease'} of ${trend.percent}% compared with the first half of the sample.`
+          }
+        >
+          {trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '—'}
+          {' '}
+          {trend.percent}%
+          {trend.direction !== 'neutral' && <span> vs first half of sample</span>}
+        </p>
+      )}
     </Card>
   );
 }
@@ -120,7 +215,7 @@ function InsightsSkeleton() {
   return (
     <div className="space-y-5" aria-busy="true" aria-label="Loading insights">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3, 4, 5].map((i) => (
           <Card key={i} className="p-5">
             <Skeleton className="h-4 w-20" />
             <Skeleton className="mt-3 h-7 w-16" />
@@ -129,7 +224,7 @@ function InsightsSkeleton() {
         ))}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        {[1, 2].map((i) => (
+        {[1, 2, 3, 4, 5, 6].map((i) => (
           <Card key={i} className="p-5">
             <Skeleton className="h-5 w-40" />
             <div className="mt-4 space-y-3">
@@ -214,6 +309,29 @@ export default function InsightsPage() {
     (data?.tasks.perProject ?? []).map((entry) => [entry.projectId, entry]),
   );
 
+  const projectDates = new Map(
+    (data?.projects.items ?? []).map((project) => [project.id, project.updatedAt]),
+  );
+
+  const projectTrend = projectCountTrend(data?.projects.items ?? []);
+  const tasksVolumeTrend = sampleHalfTrend(data?.tasks.perProject ?? [], projectDates, 'volume');
+  const completionRateTrend = sampleHalfTrend(
+    data?.tasks.perProject ?? [],
+    projectDates,
+    'completionRate',
+  );
+
+  const sampledTaskTotal = (data?.tasks.perProject ?? []).reduce(
+    (sum, entry) => sum + entry.sampled,
+    0,
+  );
+  const completedTaskTotal = (data?.tasks.perProject ?? []).reduce(
+    (sum, entry) => sum + entry.completed,
+    0,
+  );
+  const completionRate =
+    sampledTaskTotal > 0 ? Math.round((completedTaskTotal / sampledTaskTotal) * 100) : 0;
+
   return (
     <PageContainer width="xl">
       <PageHeader
@@ -282,11 +400,13 @@ export default function InsightsPage() {
               label="Projects"
               value={String(data.projects.total)}
               detail={`${data.projects.active} active · ${data.projects.completed} completed`}
+              trend={projectTrend}
             />
             <SummaryCard
               label="Tasks"
               value={String(data.tasks.totalAcrossProjects)}
               detail={`${data.tasks.overdue} overdue in sample`}
+              trend={tasksVolumeTrend}
             />
             <SummaryCard
               label="Members"
@@ -301,6 +421,12 @@ export default function InsightsPage() {
               label="Storage"
               value={data.storage ? formatBytes(data.storage.totalBytes) : 'Unavailable'}
               detail={data.storage ? `${data.storage.fileCount} files` : 'Usage not accessible'}
+            />
+            <SummaryCard
+              label="Task completion rate"
+              value={`${completionRate}%`}
+              detail={`${completedTaskTotal} of ${sampledTaskTotal} sampled tasks completed`}
+              trend={completionRateTrend}
             />
           </section>
 
@@ -381,6 +507,60 @@ export default function InsightsPage() {
                 emptyLabel="No tasks were returned for the sampled projects."
               />
             </Card>
+
+            <Card className="p-5">
+              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+                Project status distribution
+              </h2>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                Share of the {data.projects.total} visible projects.
+              </p>
+              <PieChart
+                className="mt-4"
+                ariaLabel="Project status distribution"
+                size={240}
+                items={data.projects.byStatus
+                  .map((entry) => ({
+                    id: entry.key,
+                    label: labelFor(STATUS_LABELS, entry.key),
+                    value: entry.count,
+                  }))
+                  .filter((item) => item.value > 0)}
+                emptyLabel="No project status data available."
+              />
+            </Card>
+
+            {data.members ? (
+              <Card className="p-5">
+                <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+                  Members by role
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {data.members.active} active · {data.members.suspended} suspended ·{' '}
+                  {data.members.total} total
+                </p>
+                <PieChart
+                  className="mt-4"
+                  ariaLabel="Members by role"
+                  size={240}
+                  items={data.members.byRole.map((entry) => ({
+                    id: entry.role,
+                    label: labelFor({}, entry.role),
+                    value: entry.count,
+                  }))}
+                  emptyLabel="No member data available."
+                />
+              </Card>
+            ) : (
+              <Card className="p-5">
+                <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+                  Members by role
+                </h2>
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                  Member breakdown is not available for this workspace.
+                </p>
+              </Card>
+            )}
           </div>
 
           <Card className="p-5">
@@ -590,6 +770,11 @@ export default function InsightsPage() {
               <li>
                 Activity is analysed from the most recent {ACTIVITY_PAGE_LIMIT} records and
                 filtered to the selected period in the browser.
+              </li>
+              <li>
+                Trend indicators compare the first half of the sampled tasks against the
+                second half, ordered by project update date. They describe the current
+                sample rather than backend-computed aggregates.
               </li>
               <li>
                 All data is scoped to the active workspace and to what the backend permits

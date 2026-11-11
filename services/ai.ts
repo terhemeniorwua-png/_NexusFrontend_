@@ -10,7 +10,7 @@
  *
  * POST /ai/analyze  (Nexus Write — Phase 23)
  *   body: { text: string, features: string[] }
- *   features: GRAMMAR | SPELLING | CLARITY | TONE | SUMMARY | REWRITE
+ *   features: GRAMMAR | SPELLING | CLARITY | TONE | SUMMARY | REWRITE | TRANSLATION
  *   response: { text, suggestions, summary?, rewrite?, message }
  *   NOTE: currently returns a placeholder (AI service not yet connected)
  *
@@ -31,7 +31,14 @@ import { withAuthRetry } from '@/lib/with-auth-retry';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type AnalysisFeature = 'GRAMMAR' | 'SPELLING' | 'CLARITY' | 'TONE' | 'SUMMARY' | 'REWRITE';
+export type AnalysisFeature =
+  | 'GRAMMAR'
+  | 'SPELLING'
+  | 'CLARITY'
+  | 'TONE'
+  | 'SUMMARY'
+  | 'REWRITE'
+  | 'TRANSLATION';
 
 export interface WritingSuggestion {
   type: string;

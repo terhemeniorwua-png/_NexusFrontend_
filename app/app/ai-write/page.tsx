@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +14,11 @@ import { Textarea } from '@/components/ui/Textarea';
 import { ApiRequestError } from '@/lib/api';
 import { analyzeText, type AnalysisFeature, type WritingSuggestion } from '@/services/ai';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'nexus-write-results-v1';
+const MAX_TEXT_LENGTH = 50000;
+
 // ─── Feature options ──────────────────────────────────────────────────────────
 
 const FEATURE_OPTIONS: Array<{ value: AnalysisFeature; label: string; description: string }> = [
@@ -23,7 +28,27 @@ const FEATURE_OPTIONS: Array<{ value: AnalysisFeature; label: string; descriptio
   { value: 'TONE', label: 'Tone', description: 'Analyze and adjust tone' },
   { value: 'SUMMARY', label: 'Summarise', description: 'Generate a summary' },
   { value: 'REWRITE', label: 'Rewrite', description: 'Suggest a rewrite' },
+  { value: 'TRANSLATION', label: 'Translation', description: 'Translate to another language' },
 ];
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface NexusWriteResult {
+  suggestions: WritingSuggestion[];
+  summary: string | null | undefined;
+  rewrite: string | null | undefined;
+  serviceMessage: string;
+  /** Character range of `text` that was sent for analysis. */
+  analysedRange: { start: number; end: number };
+}
+
+function isNexusWriteResult(value: unknown): value is NexusWriteResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as NexusWriteResult).suggestions)
+  );
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -38,16 +63,54 @@ export default function NexusWritePage() {
     Record<number, 'accepted' | 'dismissed'>
   >({});
   const [applyError, setApplyError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    suggestions: WritingSuggestion[];
-    summary: string | null | undefined;
-    rewrite: string | null | undefined;
-    serviceMessage: string;
-    /** Character range of `text` that was sent for analysis. */
-    analysedRange: { start: number; end: number };
-  } | null>(null);
+  const [applySuccess, setApplySuccess] = useState<string | null>(null);
+  const [result, setResult] = useState<NexusWriteResult | null>(null);
 
   const hasSelection = selection.end > selection.start;
+  const acceptedCount = Object.values(suggestionStates).filter(
+    (state) => state === 'accepted',
+  ).length;
+
+  // ─── Persistence ────────────────────────────────────────────────────────────
+
+  // Restore previously persisted analysis results on first client render so they
+  // survive page reloads.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (isNexusWriteResult(parsed)) {
+        // Hydrate persisted results from localStorage on first client render. This is the
+        // intended one-off synchronization with an external store, not a cascading render.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setResult(parsed);
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {
+      // Corrupted storage — ignore and start fresh.
+    }
+  }, []);
+
+  // Persist the analysis result whenever it changes, but only when there is
+  // actual content to persist. The entry is removed when the result is reset.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!result) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    const hasContent =
+      result.suggestions.length > 0 || Boolean(result.summary) || Boolean(result.rewrite);
+    if (!hasContent) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(result));
+    } catch {
+      // Storage unavailable or quota exceeded — persistence is best-effort only.
+    }
+  }, [result]);
 
   function toggleFeature(feature: AnalysisFeature) {
     setFeatures((prev) =>
@@ -69,6 +132,7 @@ export default function NexusWritePage() {
     setLoading(true);
     setError(null);
     setApplyError(null);
+    setApplySuccess(null);
     setSuggestionStates({});
     setResult(null);
 
@@ -109,6 +173,7 @@ export default function NexusWritePage() {
     const replaceEnd = replaceStart + suggestion.original.length;
     setText(`${text.slice(0, replaceStart)}${suggestion.suggestion}${text.slice(replaceEnd)}`);
     setApplyError(null);
+    setApplySuccess(null);
     setSuggestionStates((prev) => ({ ...prev, [index]: 'accepted' }));
     setResult((prev) => {
       if (!prev) return prev;
@@ -124,11 +189,72 @@ export default function NexusWritePage() {
     setSuggestionStates((prev) => ({ ...prev, [index]: 'dismissed' }));
   }
 
+  /**
+   * Applies every accepted suggestion to the current document in one batch.
+   * Useful after the text has been edited, since it re-locates each original
+   * against the current document state.
+   */
+  function applyAllAcceptedSuggestions() {
+    if (!result || loading) return;
+    const acceptedIndices = Object.keys(suggestionStates)
+      .map((key) => Number(key))
+      .filter((index) => suggestionStates[index] === 'accepted');
+    if (acceptedIndices.length === 0) return;
+
+    setApplyError(null);
+    setApplySuccess(null);
+
+    let currentText = text;
+    let applied = 0;
+    let skipped = 0;
+
+    for (const index of acceptedIndices) {
+      const suggestion = result.suggestions[index];
+      const offset = currentText.indexOf(suggestion.original);
+      if (offset === -1) {
+        skipped++;
+        continue;
+      }
+      currentText = `${currentText.slice(0, offset)}${suggestion.suggestion}${currentText.slice(
+        offset + suggestion.original.length,
+      )}`;
+      applied++;
+    }
+
+    setText(currentText);
+    if (applied === 0) {
+      setApplyError(
+        skipped === acceptedIndices.length
+          ? 'All accepted suggestions are already applied.'
+          : 'No accepted suggestions could be applied.',
+      );
+    } else {
+      setApplySuccess(
+        `Applied ${applied} suggestion${applied === 1 ? '' : 's'}.`,
+      );
+    }
+  }
+
+  function clearAll() {
+    setText('');
+    setSelection({ start: 0, end: 0 });
+    setSelectionOnly(false);
+    setSuggestionStates({});
+    setResult(null);
+    setError(null);
+    setApplyError(null);
+    setApplySuccess(null);
+  }
+
+  const nonDismissedCount = result
+    ? result.suggestions.filter((_, i) => suggestionStates[i] !== 'dismissed').length
+    : 0;
+
   return (
     <PageContainer>
       <PageHeader
         title="Nexus Write"
-        description="Writing assistance — grammar, clarity, summaries, and rewrites."
+        description="Writing assistance — grammar, spelling, clarity, tone, summaries, rewrites, and translation."
       />
 
       {/* Preview notice */}
@@ -153,9 +279,13 @@ export default function NexusWritePage() {
               }}
               rows={12}
               placeholder="Paste or type the text you want to analyse…"
-              maxLength={50000}
+              maxLength={MAX_TEXT_LENGTH}
               disabled={loading}
             />
+
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {text.length} / {MAX_TEXT_LENGTH} characters
+            </p>
 
             <div className="mt-3">
               <Checkbox
@@ -202,6 +332,14 @@ export default function NexusWritePage() {
               >
                 Analyse
               </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={clearAll}
+                disabled={loading || (!text.trim() && !result)}
+              >
+                Clear all
+              </Button>
               {loading && <Spinner className="h-4 w-4" aria-label="Analysing" />}
               {features.length === 0 && (
                 <p className="text-xs text-[var(--color-warning)]">Select at least one feature</p>
@@ -236,16 +374,19 @@ export default function NexusWritePage() {
               {/* Suggestions */}
               <Card className="p-4">
                 <h2 className="mb-2 font-semibold text-[var(--color-text-primary)]">
-                  Suggestions (
-                  {result.suggestions.filter((_, i) => suggestionStates[i] !== 'dismissed').length}
-                  )
+                  Suggestions ({nonDismissedCount})
                 </h2>
                 {applyError && (
                   <Alert variant="error" className="mb-3">
                     {applyError}
                   </Alert>
                 )}
-                {result.suggestions.filter((_, i) => suggestionStates[i] !== 'dismissed').length === 0 ? (
+                {applySuccess && (
+                  <Alert variant="success" className="mb-3">
+                    {applySuccess}
+                  </Alert>
+                )}
+                {nonDismissedCount === 0 ? (
                   <p className="text-sm text-[var(--color-text-muted)]">
                     {result.suggestions.length === 0
                       ? 'No suggestions returned.'
@@ -268,7 +409,14 @@ export default function NexusWritePage() {
                             <span className="text-[var(--color-success)]">{s.suggestion}</span>
                           </p>
                           {s.explanation && (
-                            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{s.explanation}</p>
+                            <div className="mt-2 pt-2 border-t border-[var(--color-border)]">
+                              <p className="text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+                                Why this change:
+                              </p>
+                              <p className="text-sm text-[var(--color-text-primary)]">
+                                {s.explanation}
+                              </p>
+                            </div>
                           )}
                           {state !== 'accepted' && (
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -293,6 +441,18 @@ export default function NexusWritePage() {
                       );
                     })}
                   </ul>
+                )}
+                {acceptedCount > 0 && (
+                  <div className="mt-3">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={applyAllAcceptedSuggestions}
+                      disabled={loading}
+                    >
+                      Apply all accepted suggestions
+                    </Button>
+                  </div>
                 )}
               </Card>
 

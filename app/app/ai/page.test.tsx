@@ -30,6 +30,7 @@ const mockQuery = vi.mocked(queryAI);
 describe('AIAssistantPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    window.localStorage.clear();
     mockQuery.mockResolvedValue({
       query: 'test',
       answer: null,
@@ -74,7 +75,8 @@ describe('AIAssistantPage', () => {
     await user.type(screen.getByRole('textbox', { name: 'Your question' }), 'How many projects?');
     await user.click(screen.getByRole('button', { name: 'Send message' }));
 
-    await waitFor(() => expect(screen.getByText('How many projects?')).toBeInTheDocument());
+    // The message appears in the conversation and as the conversation title.
+    expect(screen.getAllByText('How many projects?')).toHaveLength(2);
   });
 
   it('shows AI response in the conversation', async () => {
@@ -93,25 +95,27 @@ describe('AIAssistantPage', () => {
     expect(await screen.findByText('AI service not yet configured.')).toBeInTheDocument();
   });
 
-  it('shows Clear conversation button after messages', async () => {
+  it('shows New conversation button after messages', async () => {
     const user = userEvent.setup();
     render(<AIAssistantPage />);
 
     await user.type(screen.getByRole('textbox', { name: 'Your question' }), 'Hi');
     await user.click(screen.getByRole('button', { name: 'Send message' }));
 
-    expect(await screen.findByRole('button', { name: 'Clear conversation' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'New conversation' })
+    ).toBeInTheDocument();
   });
 
-  it('clears the conversation when Clear conversation is clicked', async () => {
+  it('clears the conversation when New conversation is clicked', async () => {
     const user = userEvent.setup();
     render(<AIAssistantPage />);
 
     await user.type(screen.getByRole('textbox', { name: 'Your question' }), 'Hi');
     await user.click(screen.getByRole('button', { name: 'Send message' }));
-    await screen.findByRole('button', { name: 'Clear conversation' });
+    await screen.findByRole('button', { name: 'New conversation' });
 
-    await user.click(screen.getByRole('button', { name: 'Clear conversation' }));
+    await user.click(screen.getByRole('button', { name: 'New conversation' }));
     expect(screen.getByText('Start a conversation')).toBeInTheDocument();
   });
 });

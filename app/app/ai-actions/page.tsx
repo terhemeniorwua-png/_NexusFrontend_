@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Select } from '@/components/ui/Select';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
@@ -34,6 +35,7 @@ import {
   getAiActionProposals,
   subscribeToAiActionProposals,
   updateAiActionProposal,
+  clearAiActionProposals,
   type AiActionStatus,
   type ProposedAiAction,
 } from '@/lib/ai-action-proposals';
@@ -46,6 +48,30 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   ASSIGN_TASK: 'Assign a task',
   CREATE_EVENT: 'Create a calendar event',
   UPDATE_EVENT: 'Update a calendar event',
+};
+
+type StatusFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+
+const STATUS_FILTERS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
+  { value: 'ALL', label: 'All' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'EXPIRED', label: 'Expired' },
+];
+
+const ACTION_STATUSES: ReadonlyArray<AiActionStatus> = [
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'EXPIRED',
+];
+
+const STATUS_LABELS: Record<AiActionStatus, string> = {
+  PENDING: 'Pending',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  EXPIRED: 'Expired',
 };
 
 function statusVariant(status: AiActionStatus): 'default' | 'success' | 'warning' | 'error' {
@@ -71,6 +97,9 @@ export default function AIActionsPage() {
     getAiActionProposals,
   );
 
+  const [filter, setFilter] = useState<StatusFilter>('ALL');
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+
   const workspaceProposals = proposals.filter(
     (proposal) => proposal.workspaceId === workspaceId,
   );
@@ -78,9 +107,48 @@ export default function AIActionsPage() {
     ...proposal,
     effectiveStatus: effectiveAiActionStatus(proposal),
   }));
+
+  // Pending proposals first, then resolved ones; most recent first within each group.
+  const sortedActions = [...displayActions].sort((a, b) => {
+    const aPending = a.effectiveStatus === 'PENDING';
+    const bPending = b.effectiveStatus === 'PENDING';
+    if (aPending && !bPending) return -1;
+    if (!aPending && bPending) return 1;
+    return new Date(b.proposedAt).getTime() - new Date(a.proposedAt).getTime();
+  });
+
+  const filteredActions =
+    filter === 'ALL'
+      ? sortedActions
+      : sortedActions.filter((action) => action.effectiveStatus === filter);
+
+  const pendingActions = filteredActions.filter(
+    (action) => action.effectiveStatus === 'PENDING',
+  );
+  const resolvedActions = filteredActions.filter(
+    (action) => action.effectiveStatus !== 'PENDING',
+  );
+
   const pendingCount = displayActions.filter(
     (action) => action.effectiveStatus === 'PENDING',
   ).length;
+  const resolvedCount = displayActions.length - pendingCount;
+
+  // One count badge per status, reflecting every proposal in this workspace.
+  const counts: Record<AiActionStatus, number> = {
+    PENDING: 0,
+    APPROVED: 0,
+    REJECTED: 0,
+    EXPIRED: 0,
+  };
+  for (const action of displayActions) {
+    counts[action.effectiveStatus] += 1;
+  }
+
+  function handleClearHistory() {
+    clearAiActionProposals(workspaceId);
+    setClearDialogOpen(false);
+  }
 
   return (
     <PageContainer>
@@ -123,21 +191,90 @@ export default function AIActionsPage() {
         />
       ) : (
         <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
+            <Select
+              id="ai-action-status-filter"
+              label="Filter by status"
+              value={filter}
+              onChange={(event) => {
+                setFilter(event.target.value as StatusFilter);
+              }}
+              options={STATUS_FILTERS.map(({ value, label }) => ({ value, label }))}
+              size="sm"
+            />
+
+            <div className="flex flex-wrap gap-1.5 text-sm">
+              {ACTION_STATUSES.filter((status) => counts[status] > 0).map((status) => (
+                <Badge key={status} variant={statusVariant(status)}>
+                  {STATUS_LABELS[status]} {counts[status]}
+                </Badge>
+              ))}
+            </div>
+
+            {resolvedCount > 0 && (
+              <Button size="sm" variant="ghost" onClick={() => setClearDialogOpen(true)}>
+                Clear history
+              </Button>
+            )}
+          </div>
+
           {pendingCount > 0 && (
             <p className="text-sm text-[var(--color-text-muted)]">
               {pendingCount} action{pendingCount !== 1 ? 's' : ''} awaiting review
             </p>
           )}
 
-          {displayActions.map((action) => (
-            <ProposalCard
-              key={action.id}
-              action={action}
-              workspaceId={workspaceId}
+          {filteredActions.length === 0 && (
+            <EmptyState
+              title="No actions match the selected filter"
+              description="Adjust the status filter or approve/reject a pending action to see it here."
             />
-          ))}
+          )}
+
+          {filteredActions.length > 0 && (
+            <div className="space-y-4">
+              {pendingActions.length > 0 && (
+                <section>
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    Pending approval
+                  </h2>
+                  {pendingActions.map((action) => (
+                    <ProposalCard
+                      key={action.id}
+                      action={action}
+                      workspaceId={workspaceId}
+                    />
+                  ))}
+                </section>
+              )}
+
+              {resolvedActions.length > 0 && (
+                <section>
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    Action history
+                  </h2>
+                  {resolvedActions.map((action) => (
+                    <ProposalCard
+                      key={action.id}
+                      action={action}
+                      workspaceId={workspaceId}
+                    />
+                  ))}
+                </section>
+              )}
+            </div>
+          )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={clearDialogOpen}
+        title="Clear action history"
+        description="This will remove all AI action proposals for this workspace from the UI. This cannot be undone."
+        confirmLabel="Clear history"
+        onConfirm={handleClearHistory}
+        onClose={() => setClearDialogOpen(false)}
+      />
     </PageContainer>
   );
 }
@@ -174,8 +311,12 @@ function ProposalCard({
           </div>
 
           {action.executionResult && (
-            <div className="mt-2">
-              <Alert variant={action.executionResult.executed ? 'success' : 'warning'}>
+            <div className="mt-3">
+              <Alert
+                variant={action.executionResult.executed ? 'success' : 'warning'}
+                title="Execution result"
+                className="text-sm"
+              >
                 {action.executionResult.message}
               </Alert>
             </div>

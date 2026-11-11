@@ -11,11 +11,12 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Spinner } from '@/components/ui/Spinner';
 import { Textarea } from '@/components/ui/Textarea';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
-import { useSocket } from '@/providers/SocketProvider';
+import { useConnectionStatus, useOnlineUsers, useSocket } from '@/providers/SocketProvider';
 import {
   listChannels,
   createChannel,
@@ -85,7 +86,9 @@ function requestError(cause: unknown, fallback: string): string {
 
 export default function MessagesPage() {
   const { activeWorkspace, user } = useWorkspaceContext();
-  const { socket, status: socketStatus } = useSocket();
+  const { socket } = useSocket();
+  const socketStatus = useConnectionStatus();
+  const onlineUsers = useOnlineUsers();
 
   // Channel list state
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
@@ -373,7 +376,7 @@ export default function MessagesPage() {
 
   async function handleSendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!activeWorkspace || !selectedChannel) return;
+    if (!activeWorkspace || !selectedChannel || socketStatus === 'disconnected') return;
     const parsed = messageSchema.safeParse({ body: messageBody });
     if (!parsed.success) return;
     setMessageBusy(true); setMessageError(null);
@@ -608,6 +611,21 @@ export default function MessagesPage() {
               {messageError && <div className="mt-2"><Alert variant="error">{messageError}</Alert></div>}
             </div>
 
+            {/* Reconnection / offline banner */}
+            {socketStatus === 'reconnecting' && (
+              <div className="mt-2 px-4">
+                <Alert variant="warning" className="flex items-center gap-2">
+                  <Spinner size="sm" label="Reconnecting…" />
+                  Reconnecting…
+                </Alert>
+              </div>
+            )}
+            {socketStatus === 'disconnected' && (
+              <div className="mt-2 px-4">
+                <Alert variant="warning">You&apos;re offline. Reconnecting…</Alert>
+              </div>
+            )}
+
             {/* Pinned messages */}
             {pinnedMessages.length > 0 && (
               <div className="border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-4 py-2">
@@ -646,6 +664,9 @@ export default function MessagesPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 text-sm">
                             <span className="font-medium">{msg.authorName}</span>
+                            {onlineUsers.has(msg.authorId) && (
+                              <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
+                            )}
                             <span className="text-xs text-[var(--color-text-muted)]">{timeLabel(msg.createdAt)}</span>
                             {msg.editedAt && <span className="text-xs italic text-[var(--color-text-muted)]">(edited)</span>}
                             {msg.pinnedAt && <Badge variant="outline">Pinned</Badge>}
@@ -669,6 +690,9 @@ export default function MessagesPage() {
                                 <li key={reply.id} className="text-sm">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium">{reply.authorName}</span>
+                                    {onlineUsers.has(reply.authorId) && (
+                                      <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
+                                    )}
                                     <span className="text-xs text-[var(--color-text-muted)]">{timeLabel(reply.createdAt)}</span>
                                   </div>
                                   <p className="text-[var(--color-text-primary)]">{reply.body}</p>
@@ -770,7 +794,17 @@ export default function MessagesPage() {
                       maxLength={10000}
                     />
                   </div>
-                  <Button type="submit" size="sm" loading={messageBusy} disabled={!messageBody.trim()}>Send</Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    loading={messageBusy}
+                    disabled={socketStatus === 'disconnected' || !messageBody.trim()}
+                  >
+                    Send
+                  </Button>
+                  {socketStatus === 'disconnected' && (
+                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">You&apos;re offline</p>
+                  )}
                 </form>
               )}
             </div>

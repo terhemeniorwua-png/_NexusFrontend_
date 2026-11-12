@@ -3221,6 +3221,33 @@ Fixes: notification effect lint, SocketProvider lint, `services/tasks.ts` `any`,
 unused `services/files.ts` helper, accessible labels and loading regions on new
 surfaces. Manual device and screen-reader checks remain a release gate.
 
+**Sidebar redesign addendum (2026-11-12):**
+
+Redesigned the application sidebar navigation into a compact, icon-based two-level
+system:
+
+- **Primary sidebar** (`components/layout/PrimarySidebar.tsx`): Narrow (4.75rem),
+  full-height, fixed left-edge vertical bar showing only section icons. Each section
+  (Workspace, Work, Communication, AI, People and access, Account) is a clickable
+  icon button with active state, hover effects, and tooltips.
+- **Secondary sidebar** (`components/layout/SecondarySidebar.tsx`): Expandable panel
+  (7rem) that appears beside the primary sidebar when a section is clicked. Shows
+  section title with icon, sub-navigation items with small icons + compact text labels
+  (~12px), active/hover states, badge counts, and a close button. Closes on Escape,
+  re-clicking the active section, or selecting a destination.
+- **AppShell** (`components/layout/AppShell.tsx`): Orchestrates both sidebars,
+  derives the active section from the current route on page refresh, and preserves
+  workspace switching, permission-based filtering, badge counts, and all existing
+  navigation destinations.
+- **Icons** (`components/layout/icons.tsx`): Added 12 SVG icons (Home, Building2,
+  FolderKanban, MessageSquare, CalendarDays, Files, Blocks, Search, Settings, List,
+  Clock, CheckCircle2) following the existing inline SVG convention.
+- **Responsive**: Mobile drawer with close button and autoFocus; secondary panel
+  overlays content without resizing the main area.
+
+Validation: TypeScript (0 errors), ESLint (0 errors/warnings), Vitest (767 tests
+across 89 files, 0 failures), production build (all routes generated).
+
 ### Phase 29 — Security and Privacy Review (Completed)
 
 Evidence: `docs/PHASE_29_SECURITY_PRIVACY_REVIEW.md`.

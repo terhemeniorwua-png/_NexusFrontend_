@@ -4,6 +4,8 @@ import { filterNavSections } from '@/lib/navigation';
 import type { NavSection, WorkspaceKind } from '@/types/navigation';
 import {
   Building2Icon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   FolderKanbanIcon,
   MessageSquareIcon,
   BlocksIcon,
@@ -28,17 +30,24 @@ interface SectionButtonProps {
   label: string;
   icon: React.ReactNode;
   active: boolean;
+  showLabels: boolean;
   onSelect: () => void;
 }
 
-function SectionButton({ label, icon, active, onSelect }: SectionButtonProps) {
+function SectionButton({
+  label,
+  icon,
+  active,
+  showLabels,
+  onSelect,
+}: SectionButtonProps) {
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-label={label}
       aria-pressed={active}
-      title={label}
+      title={showLabels ? undefined : label}
       className={[
         'flex h-12 w-full flex-shrink-0 items-center justify-center rounded-[var(--radius-md)]',
         'transition-[background-color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-standard)]',
@@ -46,11 +55,15 @@ function SectionButton({ label, icon, active, onSelect }: SectionButtonProps) {
           ? 'bg-[var(--color-primary-soft)] box-shadow-[var(--shadow-sm)] text-[var(--color-primary)]'
           : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-text-primary)]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)]',
+        showLabels ? 'justify-start lg:px-3' : 'justify-center lg:px-0',
       ].join(' ')}
     >
       <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
         {icon}
       </span>
+      {showLabels && (
+        <span className="min-w-0 truncate">{label}</span>
+      )}
     </button>
   );
 }
@@ -74,6 +87,10 @@ interface PrimarySidebarProps {
   onMobileClose: () => void;
   /** Content rendered at the top of the sidebar (e.g. workspace switcher). */
   headerSlot?: React.ReactNode;
+  /** Whether the desktop sidebar is collapsed. */
+  collapsed: boolean;
+  /** Toggles the desktop collapse state. */
+  onToggleCollapsed: () => void;
 }
 
 export function PrimarySidebar({
@@ -86,19 +103,27 @@ export function PrimarySidebar({
   mobileOpen,
   onMobileClose,
   headerSlot,
+  collapsed,
+  onToggleCollapsed,
 }: PrimarySidebarProps) {
   const visibleSections = filterNavSections(sections, {
     workspaceKind,
     permissions,
   });
 
+  // On mobile the drawer is always expanded while open, even if the desktop
+  // sidebar was collapsed.
+  const showLabels = !collapsed || mobileOpen;
+
   return (
     <aside
       id={sidebarId}
       aria-label="Primary navigation"
       className={[
-        'fixed inset-y-0 left-0 z-[var(--z-sidebar)] flex w-[4.75rem] flex-shrink-0 flex-col',
+        'fixed inset-y-0 left-0 z-[var(--z-sidebar)] flex flex-shrink-0 flex-col',
         'border-r border-[var(--color-border)] bg-[var(--color-surface)]',
+        'transition-[width] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+        collapsed ? 'lg:w-[4.75rem]' : 'lg:w-[16rem]',
       ].join(' ')}
     >
       {headerSlot && (
@@ -116,6 +141,7 @@ export function PrimarySidebar({
                   label={section.label ?? section.id}
                   icon={iconFor(section.id)}
                   active={active}
+                  showLabels={showLabels}
                   onSelect={() => {
                     if (active) {
                       onSelectCategory(null);
@@ -130,19 +156,43 @@ export function PrimarySidebar({
         </ul>
       </nav>
 
-      {mobileOpen && (
-        <div className="flex-shrink-0 border-t border-[var(--color-border)] p-2">
+      <div className="flex-shrink-0 border-t border-[var(--color-border)] p-2">
+        {headerSlot ? null : null}
+        {/* Desktop collapse/expand toggle */}
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed}
+          aria-controls={sidebarId}
+          className={[
+            'mt-1 flex w-full items-center justify-center rounded-[var(--radius-md)] px-2 py-2 text-sm',
+            'transition-colors duration-150',
+            'hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-text-primary)]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]',
+            'lg:block',
+          ].join(' ')}
+        >
+          {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          {showLabels ? (
+            <span className="ml-2">
+              {collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            </span>
+          ) : null}
+        </button>
+
+        {mobileOpen && (
           <button
             type="button"
             onClick={onMobileClose}
             aria-label="Close navigation"
             autoFocus
-            className="w-full flex items-center justify-center rounded-[var(--radius-md)] px-2 py-2 text-sm text-[var(--color-text-secondary)] transition-colors duration-150 hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] lg:hidden"
+            className="mt-1 w-full flex items-center justify-center rounded-[var(--radius-md)] px-2 py-2 text-sm text-[var(--color-text-secondary)] transition-colors duration-150 hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] lg:hidden"
           >
             Close navigation
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </aside>
   );
 }

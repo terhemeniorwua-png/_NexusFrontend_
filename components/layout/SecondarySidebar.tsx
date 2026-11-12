@@ -19,6 +19,8 @@ interface SecondarySidebarProps {
   items: NavItem[];
   /** Current pathname for active state detection. */
   activePath: string;
+  /** Width of the primary sidebar, used to position this panel. */
+  sidebarWidth: string;
 }
 
 interface SubNavItemProps {
@@ -70,6 +72,7 @@ export function SecondarySidebar({
   icon,
   items,
   activePath,
+  sidebarWidth,
 }: SecondarySidebarProps) {
   // Close on Escape key.
   useEffect(() => {
@@ -91,8 +94,10 @@ export function SecondarySidebar({
     <aside
       aria-label={title}
       className={[
-        'fixed inset-y-0 left-[4.75rem] z-[var(--z-sidebar)] flex w-[7rem] flex-shrink-0 flex-col',
+        'fixed inset-y-0 left-0 z-[var(--z-sidebar)] flex w-[7rem] flex-shrink-0 flex-col',
         'border-r border-[var(--color-border)] bg-[var(--color-surface)] box-shadow-[var(--shadow-md)]',
+        'transition-[left] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+        `lg:left-[${sidebarWidth}]`,
       ].join(' ')}
     >
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3">

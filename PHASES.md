@@ -3248,6 +3248,32 @@ system:
 Validation: TypeScript (0 errors), ESLint (0 errors/warnings), Vitest (767 tests
 across 89 files, 0 failures), production build (all routes generated).
 
+**Sidebar collapse/expand fix addendum (2026-11-12):**
+
+Corrected the desktop sidebar default state and main content layout:
+
+- **Sidebar collapsed by default**: `AppShell` now initializes `collapsed` state to
+  `true`. The primary sidebar renders at `lg:w-[4.75rem]` (icons only) on page load
+  and after navigation/refresh. No collapsed state is persisted in localStorage,
+  cookies, or session storage — the sidebar always resets to collapsed.
+- **Expanded sidebar width**: When expanded, the sidebar widens to `lg:w-[16rem]`
+  (256px), providing sufficient width for section labels, badges, and the toggle
+  button without text clipping or overflow.
+- **Main content shifts**: `AppShell` applies `lg:pl-[4.75rem]` when collapsed and
+  `lg:pl-[16rem]` when expanded, so the main application content shifts right to
+  make room for the sidebar and reclaims space when collapsed. The secondary
+  sub-navigation panel positions itself at `lg:left-[4.75rem]` (collapsed) or
+  `lg:left-[16rem]` (expanded) adjacent to the primary sidebar.
+- **Desktop toggle button**: A collapse/expand toggle (`ChevronRightIcon` /
+  `ChevronLeftIcon`) is rendered in the primary sidebar footer, visible on desktop
+  only. The WorkspaceSwitcher header slot receives the collapsed state so its
+  `triggerLabel` omits the kind when collapsed.
+- **Mobile behavior unchanged**: Mobile drawer remains an off-canvas overlay
+  (`lg:hidden`) with backdrop, independent of desktop collapse state.
+
+Validation: TypeScript (0 errors), ESLint (0 errors/warnings), Vitest (767 tests
+across 89 files, 0 failures), production build (all routes generated).
+
 ### Phase 29 — Security and Privacy Review (Completed)
 
 Evidence: `docs/PHASE_29_SECURITY_PRIVACY_REVIEW.md`.

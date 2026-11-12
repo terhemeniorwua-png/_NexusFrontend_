@@ -112,6 +112,7 @@ export function AppShell({
   className = '',
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -193,12 +194,14 @@ export function AppShell({
           setActiveCategoryId(categoryId);
           setMobileOpen(false);
         }}
+        collapsed={collapsed}
+        onToggleCollapsed={() => setCollapsed((prev) => !prev)}
         headerSlot={
           <WorkspaceSwitcher
             workspaces={workspaces}
             activeWorkspaceId={activeWorkspaceId}
             onWorkspaceChange={onWorkspaceChange}
-            collapsed={false}
+            collapsed={collapsed}
           />
         }
       />
@@ -217,6 +220,7 @@ export function AppShell({
               ?.items ?? []
           }
           activePath={activePath}
+          sidebarWidth={collapsed ? '4.75rem' : '16rem'}
         />
       )}
 
@@ -231,7 +235,14 @@ export function AppShell({
         />
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div
+        className={[
+          'flex min-w-0 flex-1 flex-col',
+          collapsed ? 'lg:pl-[4.75rem]' : 'lg:pl-[16rem]',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         <Topbar
           title={title}
           breadcrumbs={breadcrumbs}

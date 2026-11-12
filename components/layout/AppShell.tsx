@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Sidebar } from './Sidebar';
+import { filterNavSections, isPathActive } from '@/lib/navigation';
+import { Building2Icon, FolderKanbanIcon, MessageSquareIcon, BlocksIcon, ListIcon, SettingsIcon } from './icons';
+import { PrimarySidebar } from './PrimarySidebar';
+import { SecondarySidebar } from './SecondarySidebar';
 import { Topbar } from './Topbar';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import type { BreadcrumbItem } from '@/components/ui/Breadcrumb';
@@ -16,6 +19,19 @@ import type {
 /** DOM id shared by the sidebar and the topbar menu button. */
 const SIDEBAR_ID = 'app-sidebar';
 
+/** Maps a navigation section id to its primary-sidebar icon. */
+function iconForSection(sectionId: string): React.ReactNode {
+  const icons: Record<string, React.ReactNode> = {
+    workspace: <Building2Icon size={16} />,
+    work: <FolderKanbanIcon size={16} />,
+    communication: <MessageSquareIcon size={16} />,
+    ai: <BlocksIcon size={16} />,
+    people: <ListIcon size={16} />,
+    account: <SettingsIcon size={16} />,
+  };
+  return icons[sectionId] ?? <BlocksIcon size={16} />;
+}
+
 interface AppShellProps {
   children: React.ReactNode;
 
@@ -29,13 +45,11 @@ interface AppShellProps {
   activePath: string;
 
   /** Workspaces the user can switch to. */
-  workspaces: WorkspaceSummary[];
+  workspaces?: WorkspaceSummary[];
   /** Active workspace id. */
-  activeWorkspaceId: string;
+  activeWorkspaceId?: string;
   /** Called with the selected workspace id; the caller performs the switch. */
-  onWorkspaceChange: (workspaceId: string) => void;
-
-  /** Current user identity. */
+  onWorkspaceChange?: (workspaceId: string) => void;  /** Current user identity. */
   user: CurrentUserSummary;
   /** Account destinations such as Profile and Settings. */
   userMenuItems?: DropdownItem[];
@@ -62,11 +76,6 @@ interface AppShellProps {
 
   /** Additional page-level controls for the topbar. */
   headerActions?: React.ReactNode;
-  /** Secondary sidebar content above the collapse control. */
-  sidebarFooter?: React.ReactNode;
-
-  /** Initial desktop sidebar state. Defaults to expanded. */
-  defaultCollapsed?: boolean;
   className?: string;
 }
 
@@ -85,9 +94,9 @@ export function AppShell({
   workspaceKind,
   permissions,
   activePath,
-  workspaces,
-  activeWorkspaceId,
-  onWorkspaceChange,
+  workspaces = [],
+  activeWorkspaceId = '',
+  onWorkspaceChange = () => {},
   user,
   userMenuItems,
   onSignOut,
@@ -100,18 +109,15 @@ export function AppShell({
   notificationsHref,
   notificationUnreadCount = 0,
   headerActions,
-  sidebarFooter,
-  defaultCollapsed = false,
   className = '',
 }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const closeMobile = useCallback(() => {
-    setMobileOpen(false);
     menuButtonRef.current?.focus();
+    setMobileOpen(false);
   }, []);
 
   // Close the drawer on Escape and return focus to the trigger.
@@ -128,11 +134,6 @@ export function AppShell({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [mobileOpen]);
 
-  // Move focus into the drawer when it opens.
-  useEffect(() => {
-    if (mobileOpen) closeButtonRef.current?.focus();
-  }, [mobileOpen]);
-
   // Prevent the page behind the drawer from scrolling.
   useEffect(() => {
     if (!mobileOpen) return;
@@ -143,6 +144,19 @@ export function AppShell({
       document.body.style.overflow = previousOverflow;
     };
   }, [mobileOpen]);
+
+  const visibleSections = filterNavSections(navSections, {
+    workspaceKind,
+    permissions,
+  });
+
+  // Derive the active section from the current route when no section is
+  // explicitly selected.
+  const routeCategoryId = visibleSections.find((section) =>
+    section.items.some((item) => isPathActive(item.href, activePath, item.exact === true)),
+  )?.id;
+
+  const effectiveCategoryId = activeCategoryId ?? routeCategoryId ?? null;
 
   return (
     <div
@@ -167,28 +181,44 @@ export function AppShell({
         Skip to main content
       </a>
 
-      <Sidebar
-        id={SIDEBAR_ID}
+      <PrimarySidebar
+        sidebarId={SIDEBAR_ID}
         sections={navSections}
-        activePath={activePath}
         workspaceKind={workspaceKind}
         permissions={permissions}
-        collapsed={collapsed}
-        onToggleCollapsed={() => setCollapsed((value) => !value)}
+        activeCategoryId={effectiveCategoryId}
         mobileOpen={mobileOpen}
         onMobileClose={closeMobile}
-        onNavigate={() => setMobileOpen(false)}
-        closeButtonRef={closeButtonRef}
+        onSelectCategory={(categoryId) => {
+          setActiveCategoryId(categoryId);
+          setMobileOpen(false);
+        }}
         headerSlot={
           <WorkspaceSwitcher
             workspaces={workspaces}
             activeWorkspaceId={activeWorkspaceId}
             onWorkspaceChange={onWorkspaceChange}
-            collapsed={collapsed && !mobileOpen}
+            collapsed={false}
           />
         }
-        footerSlot={sidebarFooter}
       />
+
+      {effectiveCategoryId && (
+        <SecondarySidebar
+          open={Boolean(effectiveCategoryId)}
+          onClose={() => setActiveCategoryId(null)}
+          title={
+            visibleSections.find((section) => section.id === effectiveCategoryId)
+              ?.label ?? ''
+          }
+          icon={iconForSection(effectiveCategoryId)}
+          items={
+            visibleSections.find((section) => section.id === effectiveCategoryId)
+              ?.items ?? []
+          }
+          activePath={activePath}
+        />
+      )}
 
       {mobileOpen && (
         <div

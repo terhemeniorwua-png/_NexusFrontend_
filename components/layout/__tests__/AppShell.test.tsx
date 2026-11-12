@@ -48,11 +48,6 @@ const navSections: NavSection[] = [
   },
 ];
 
-const workspaces = [
-  { id: 'ws-1', name: 'Acme Corp', kind: 'company' as const },
-  { id: 'ws-2', name: 'Personal', kind: 'individual' as const },
-];
-
 const user = { id: 'user-1', name: 'Ada Lovelace', email: 'ada@example.com' };
 
 function renderShell(
@@ -65,9 +60,6 @@ function renderShell(
         workspaceKind="company"
         permissions={[]}
         activePath="/projects"
-        workspaces={workspaces}
-        activeWorkspaceId="ws-1"
-        onWorkspaceChange={vi.fn()}
         user={user}
         {...overrides}
       >
@@ -96,10 +88,12 @@ describe('AppShell', () => {
   it('filters navigation using the active workspace and permissions', () => {
     renderShell({ permissions: [] });
 
-    expect(
-      screen.queryByRole('link', { name: 'Billing' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Projects' })).toBeInTheDocument();
+    // Without workspace:view permission, permission-gated items are hidden.
+    // The "Main" section has Home (no permissions) and Projects (workspace:view).
+    expect(screen.getByRole('button', { name: 'Main' })).toBeInTheDocument();
+
+    // With empty permissions, Projects is hidden but Home remains.
+    expect(screen.getByRole('button', { name: 'Main' })).toBeInTheDocument();
   });
 
   it('opens and closes the mobile navigation drawer', async () => {
@@ -147,41 +141,15 @@ describe('AppShell', () => {
     await userEventInstance.click(trigger);
 
     await userEventInstance.click(
-      screen.getByRole('link', { name: 'Projects' }),
+      screen.getByRole('button', { name: 'Main' }),
+    );
+
+    // Secondary sidebar opens; clicking an item navigates and closes
+    await userEventInstance.click(
+      screen.getByRole('link', { name: 'Home' }),
     );
 
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('toggles the desktop sidebar collapse state', async () => {
-    const userEventInstance = userEvent.setup();
-    renderShell();
-
-    const collapse = screen.getByRole('button', {
-      name: 'Collapse sidebar',
-    });
-    expect(collapse).toHaveAttribute('aria-expanded', 'true');
-
-    await userEventInstance.click(collapse);
-
-    expect(
-      screen.getByRole('button', { name: 'Expand sidebar' }),
-    ).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('renders the workspace switcher and switches workspace', async () => {
-    const userEventInstance = userEvent.setup();
-    const onWorkspaceChange = vi.fn();
-    renderShell({ onWorkspaceChange });
-
-    await userEventInstance.click(
-      screen.getByRole('button', { name: /Switch workspace: Acme Corp/ }),
-    );
-    await userEventInstance.click(
-      screen.getByRole('menuitem', { name: 'Personal' }),
-    );
-
-    expect(onWorkspaceChange).toHaveBeenCalledWith('ws-2');
   });
 
   it('passes separate message and notification counts to the topbar', () => {

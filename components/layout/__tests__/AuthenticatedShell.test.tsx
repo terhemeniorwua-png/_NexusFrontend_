@@ -81,10 +81,12 @@ describe('AuthenticatedShell', () => {
     render(<ThemeProvider><AuthenticatedShell><p>Page body</p></AuthenticatedShell></ThemeProvider>);
 
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '/app');
-    expect(screen.getByRole('link', { name: 'Members' })).toHaveAttribute('href', '/app/members');
-    expect(screen.getByRole('link', { name: 'Invitations' })).toHaveAttribute('href', '/app/invitations');
-    expect(screen.getByRole('link', { name: 'Billing' })).toHaveAttribute('href', '/app/billing');
+    expect(screen.getByRole('button', { name: 'Workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Work' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Communication' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'People and access' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
     expect(screen.getByText('Page body')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Switch workspace: Nexus Studio, Company' })).toBeInTheDocument();
   });

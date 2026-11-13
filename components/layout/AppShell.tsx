@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { filterNavSections } from '@/lib/navigation';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';import { filterNavSections } from '@/lib/navigation';
 import { Building2Icon, FolderKanbanIcon, MessageSquareIcon, BlocksIcon, ListIcon, SettingsIcon } from './icons';
 import { PrimarySidebar } from './PrimarySidebar';
 import { SecondarySidebar } from './SecondarySidebar';
@@ -156,12 +155,12 @@ export function AppShell({
   // always shows just the collapsed icon rail.
   const effectiveCategoryId = activeCategoryId;
 
-  const panelMobileOpen = Boolean(effectiveCategoryId);
-
   const closePanel = () => setActiveCategoryId(null);
+  const panelOpen = Boolean(effectiveCategoryId);
 
   return (
     <div
+      style={{ '--rail-w': collapsed ? '4.75rem' : '16rem' } as CSSProperties}
       className={[
         'flex min-h-dvh w-full bg-[var(--color-background)]',
         className,
@@ -183,8 +182,28 @@ export function AppShell({
         Skip to main content
       </a>
 
-      {/* Primary navigation rail — a static column on desktop, an off-canvas
-          drawer on mobile. On desktop its width makes room in the flex flow. */}
+      {/* Top bar — fixed at the top, full width, solid background. */}
+      <Topbar
+        title={title}
+        breadcrumbs={breadcrumbs}
+        onOpenSearch={onOpenSearch}
+        searchHref={searchHref}
+        messagesHref={messagesHref}
+        messageUnreadCount={messageUnreadCount}
+        notificationsHref={notificationsHref}
+        notificationUnreadCount={notificationUnreadCount}
+        onOpenNavigation={() => setMobileOpen(true)}
+        navigationOpen={mobileOpen}
+        navigationId={SIDEBAR_ID}
+        menuButtonRef={menuButtonRef}
+        user={user}
+        userMenuItems={userMenuItems}
+        onSignOut={onSignOut}
+        actions={headerActions}
+      />
+
+      {/* Primary navigation rail — fixed to the left, full viewport height
+          below the top bar. On mobile it is an off-canvas drawer. */}
       <PrimarySidebar
         sidebarId={SIDEBAR_ID}
         sections={navSections}
@@ -210,9 +229,9 @@ export function AppShell({
         }
       />
 
-      {/* Secondary panel — part of the desktop layout (pushes content), an
-          overlay drawer with backdrop on small screens. */}
-      {effectiveCategoryId && (
+      {/* Secondary panel — fixed below the top bar next to the rail on
+          desktop, an overlay drawer on mobile. Never moves on page scroll. */}
+      {panelOpen && (
         <>
           <SecondarySidebar
             id={`${SIDEBAR_ID}-panel`}
@@ -222,7 +241,7 @@ export function AppShell({
               visibleSections.find((section) => section.id === effectiveCategoryId)
                 ?.label ?? ''
             }
-            icon={iconForSection(effectiveCategoryId)}
+            icon={iconForSection(effectiveCategoryId ?? '')}
             items={
               visibleSections.find((section) => section.id === effectiveCategoryId)
                 ?.items ?? []
@@ -230,7 +249,7 @@ export function AppShell({
             activePath={activePath}
           />
 
-          {panelMobileOpen && (
+          {panelOpen && (
             <div
               aria-hidden="true"
               onClick={closePanel}
@@ -254,34 +273,24 @@ export function AppShell({
         />
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar
-          title={title}
-          breadcrumbs={breadcrumbs}
-          onOpenSearch={onOpenSearch}
-          searchHref={searchHref}
-          messagesHref={messagesHref}
-          messageUnreadCount={messageUnreadCount}
-          notificationsHref={notificationsHref}
-          notificationUnreadCount={notificationUnreadCount}
-          onOpenNavigation={() => setMobileOpen(true)}
-          navigationOpen={mobileOpen}
-          navigationId={SIDEBAR_ID}
-          menuButtonRef={menuButtonRef}
-          user={user}
-          userMenuItems={userMenuItems}
-          onSignOut={onSignOut}
-          actions={headerActions}
-        />
-
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="flex-1 focus:outline-none"
-        >
-          {children}
-        </main>
-      </div>
+      {/* Main content — offset below the top bar and to the right of the rail
+          (plus the panel width when open). Only this area scrolls. */}
+      <main
+        id="main-content"
+        tabIndex={-1}
+        style={{
+          left: panelOpen
+            ? `calc(var(--rail-w) + var(--panel-w))`
+            : `var(--rail-w)`,
+        }}
+        className={[
+          'fixed top-[var(--nav-h)] bottom-0 right-0 overflow-y-auto',
+          'px-6 py-4',
+          'transition-[left] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+        ].join(' ')}
+      >
+        {children}
+      </main>
     </div>
   );
 }

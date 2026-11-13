@@ -34,7 +34,7 @@ function SubNavItem({ item, active }: SubNavItemProps) {
       href={item.href}
       aria-current={active ? 'page' : undefined}
       className={[
-        'flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-sm',
+        'flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2.5 text-sm',
         'transition-[background-color] duration-[var(--duration-fast)] ease-[var(--ease-standard)]',
         active
           ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)] font-medium'
@@ -101,13 +101,12 @@ export function SecondarySidebar({
         'flex flex-shrink-0 flex-col',
         'border-r border-[var(--color-border)] bg-[var(--color-surface)] box-shadow-[var(--shadow-md)]',
         'transition-[width,transform,visibility] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
-        // Mobile: overlay drawer with a backdrop supplied by the caller.
-        'fixed inset-y-0 left-0 z-[var(--z-sidebar)] w-[16rem]',
+        // Mobile: overlay drawer full height below the top bar.
+        'fixed top-[var(--nav-h)] bottom-0 left-0 z-[var(--z-nav)] w-[var(--panel-w)]',
         'invisible -translate-x-full',
         open ? 'visible translate-x-0' : 'invisible -translate-x-full',
-        // Desktop: a static column inside the shell's flex row so it pushes
-        // main content instead of covering it.
-        'lg:static lg:inset-auto lg:z-auto lg:h-full lg:top-auto lg:left-auto lg:visible lg:translate-x-0 lg:w-[16rem]',
+        // Desktop: fixed panel below the top bar, next to the rail.
+        'lg:top-[var(--nav-h)] lg:bottom-0 lg:left-[var(--rail-w)] lg:z-auto lg:w-[var(--panel-w)] lg:visible lg:translate-x-0',
       ].join(' ')}
     >
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3">
@@ -129,8 +128,8 @@ export function SecondarySidebar({
         </button>
       </header>
 
-      <nav aria-label={title} className="flex-1 overflow-y-auto px-2 py-3">
-        <ul className="flex flex-col gap-0.5">
+      <nav aria-label={title} className="flex-1 overflow-y-auto px-3 py-4">
+        <ul className="flex flex-col gap-2">
           {items.map((item) => {
             const active = isPathActive(item.href, activePath, item.exact === true);
             return (

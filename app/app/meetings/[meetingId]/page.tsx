@@ -166,6 +166,9 @@ export default function MeetingDetailPage() {
   const [autoJoin] = useState(
     () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('autojoin') === '1',
   );
+  const [audioOnly] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'audio',
+  );
 
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<number | null>(null);
@@ -485,6 +488,7 @@ export default function MeetingDetailPage() {
                 meetingId={meetingId}
                 title={meeting.title}
                 autoJoin={autoJoin}
+                audioOnly={audioOnly}
                 onParticipationChange={() => {
                   participantsLoaded.current = false;
                   void loadParticipants(workspaceId, meetingId);

@@ -1,7 +1,7 @@
 'use client';
 
 import '@livekit/components-styles';
-import { LiveKitRoom, VideoConference } from '@livekit/components-react';
+import { LiveKitRoom, StartAudio, VideoConference } from '@livekit/components-react';
 
 interface MeetingRoomLiveProps {
   serverUrl: string;
@@ -52,6 +52,7 @@ export default function MeetingRoomLive({
         style={{ height: '100%' }}
       >
         <VideoConference />
+        <StartAudio label="Click to enable audio" />
       </LiveKitRoom>
     </div>
   );

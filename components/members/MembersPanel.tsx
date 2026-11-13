@@ -269,6 +269,15 @@ export function MembersPanel({ workspace, canManage, onAccessChanged }: MembersP
                         variant="icon"
                       />
                     )}
+                    {member.membershipStatus === 'ACTIVE' && member.userId !== currentUser?.id && (
+                      <StartCallButton
+                        workspaceId={workspace.id}
+                        targetUserId={member.userId}
+                        targetName={member.name}
+                        variant="icon"
+                        mode="audio"
+                      />
+                    )}
                     <Badge variant="outline">{roleLabel(member.role, member.organizationRole)}</Badge>
                     {member.membershipStatus === 'SUSPENDED'
                       ? <Badge variant="warning">Suspended</Badge>

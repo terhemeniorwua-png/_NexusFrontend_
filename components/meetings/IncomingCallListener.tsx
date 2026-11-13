@@ -75,6 +75,34 @@ export function IncomingCallListener() {
     return () => clearTimeout(timer);
   }, [notice]);
 
+  // Ringtone while the card is showing. Browsers only allow sound after the
+  // user has interacted with the page, so a fresh tab may ring silently.
+  useEffect(() => {
+    if (!call) return;
+    const Ctx =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    void ctx.resume().catch(() => undefined);
+    const beep = () => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = 440;
+      gain.gain.value = 0.08;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    };
+    beep();
+    const timer = setInterval(beep, 2000);
+    return () => {
+      clearInterval(timer);
+      void ctx.close().catch(() => undefined);
+    };
+  }, [call]);
+
   async function accept() {
     if (!call) return;
     const target = call;
@@ -82,7 +110,8 @@ export function IncomingCallListener() {
     if (activeWorkspace?.id !== target.workspaceId) {
       await switchToWorkspace(target.workspaceId);
     }
-    router.push(`/app/meetings/${target.meetingId}?autojoin=1`);
+    const voiceOnly = target.title.startsWith('Voice call');
+    router.push(`/app/meetings/${target.meetingId}?autojoin=1${voiceOnly ? '&mode=audio' : ''}`);
   }
 
   function decline() {

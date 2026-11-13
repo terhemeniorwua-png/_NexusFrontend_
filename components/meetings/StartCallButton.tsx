@@ -12,6 +12,8 @@ interface StartCallButtonProps {
   targetName?: string;
   /** "icon" is a round icon button, "button" adds a text label. */
   variant?: 'icon' | 'button';
+  /** 'audio' joins with the camera off. Default is 'video'. */
+  mode?: 'audio' | 'video';
   className?: string;
 }
 
@@ -24,18 +26,31 @@ function PhoneIcon() {
   );
 }
 
+function VideoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m22 8-6 4 6 4V8Z" />
+      <rect x="2" y="6" width="14" height="12" rx="2" />
+    </svg>
+  );
+}
+
 export function StartCallButton({
   workspaceId,
   targetUserId,
   targetName,
   variant = 'icon',
+  mode = 'video',
   className = '',
 }: StartCallButtonProps) {
   const router = useRouter();
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const label = targetName ? `Call ${targetName}` : 'Start a call';
+  const label = mode === 'audio'
+    ? (targetName ? `Voice call ${targetName}` : 'Start a voice call')
+    : (targetName ? `Call ${targetName}` : 'Start a call');
 
   async function handleClick() {
     if (starting || !workspaceId) return;
@@ -43,7 +58,9 @@ export function StartCallButton({
     setError(null);
     try {
       const meeting = await createMeeting(workspaceId, {
-        title: targetName ? `Call with ${targetName}` : 'Instant call',
+        title: mode === 'audio'
+          ? (targetName ? `Voice call with ${targetName}` : 'Voice call')
+          : (targetName ? `Call with ${targetName}` : 'Instant call'),
         scheduledAt: null,
         participantIds: targetUserId ? [targetUserId] : [],
       });
@@ -52,7 +69,7 @@ export function StartCallButton({
       } catch {
         // Non-fatal: the room can still be joined while the status is SCHEDULED.
       }
-      router.push(`/app/meetings/${meeting.id}?autojoin=1`);
+      router.push(`/app/meetings/${meeting.id}?autojoin=1${mode === 'audio' ? '&mode=audio' : ''}`);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not start the call.');
       setStarting(false);
@@ -77,7 +94,7 @@ export function StartCallButton({
           className,
         ].join(' ')}
       >
-        <PhoneIcon />
+        {mode === 'audio' ? <PhoneIcon /> : <VideoIcon />}
         {variant === 'button' && <span>{starting ? 'Starting…' : 'Start call'}</span>}
       </button>
       {error && <span role="alert" className="text-xs text-[var(--color-danger,#dc2626)]">{error}</span>}

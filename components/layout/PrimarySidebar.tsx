@@ -32,6 +32,10 @@ interface SectionButtonProps {
   active: boolean;
   showLabels: boolean;
   onSelect: () => void;
+  /** Whether this section's secondary panel is currently open. */
+  open: boolean;
+  /** ID of the secondary panel, exposed through aria-controls. */
+  panelId: string | undefined;
 }
 
 function SectionButton({
@@ -40,6 +44,8 @@ function SectionButton({
   active,
   showLabels,
   onSelect,
+  open,
+  panelId,
 }: SectionButtonProps) {
   return (
     <button
@@ -47,6 +53,8 @@ function SectionButton({
       onClick={onSelect}
       aria-label={label}
       aria-pressed={active}
+      aria-expanded={open}
+      aria-controls={open ? panelId : undefined}
       title={showLabels ? undefined : label}
       className={[
         'flex h-12 w-full flex-shrink-0 items-center justify-center rounded-[var(--radius-md)]',
@@ -62,7 +70,7 @@ function SectionButton({
         {icon}
       </span>
       {showLabels && (
-        <span className="min-w-0 truncate">{label}</span>
+        <span className="min-w-0">{label}</span>
       )}
     </button>
   );
@@ -91,6 +99,8 @@ interface PrimarySidebarProps {
   collapsed: boolean;
   /** Toggles the desktop collapse state. */
   onToggleCollapsed: () => void;
+  /** ID of the section whose secondary panel is open, for aria-expanded. */
+  openCategoryId: string | null;
 }
 
 export function PrimarySidebar({
@@ -105,6 +115,7 @@ export function PrimarySidebar({
   headerSlot,
   collapsed,
   onToggleCollapsed,
+  openCategoryId,
 }: PrimarySidebarProps) {
   const visibleSections = filterNavSections(sections, {
     workspaceKind,
@@ -115,6 +126,8 @@ export function PrimarySidebar({
   // sidebar was collapsed.
   const showLabels = !collapsed || mobileOpen;
 
+  const panelId = sidebarId ? `${sidebarId}-panel` : undefined;
+
   return (
     <aside
       id={sidebarId}
@@ -122,7 +135,13 @@ export function PrimarySidebar({
       className={[
         'fixed inset-y-0 left-0 z-[var(--z-sidebar)] flex flex-shrink-0 flex-col',
         'border-r border-[var(--color-border)] bg-[var(--color-surface)]',
-        'transition-[width] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+        'transition-[width,transform,visibility] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+        // Mobile: off-canvas drawer opened from the topbar menu button.
+        'invisible -translate-x-full',
+        mobileOpen ? 'visible translate-x-0' : 'invisible -translate-x-full',
+        // Desktop: a static column inside the shell's flex row so the panel
+        // (and main content) push alongside it instead of being overlaid.
+        'lg:static lg:inset-auto lg:z-auto lg:h-full lg:top-auto lg:left-auto lg:visible lg:translate-x-0',
         collapsed ? 'lg:w-[4.75rem]' : 'lg:w-[16rem]',
       ].join(' ')}
     >
@@ -142,6 +161,8 @@ export function PrimarySidebar({
                   icon={iconFor(section.id)}
                   active={active}
                   showLabels={showLabels}
+                  open={openCategoryId === section.id}
+                  panelId={panelId}
                   onSelect={() => {
                     if (active) {
                       onSelectCategory(null);

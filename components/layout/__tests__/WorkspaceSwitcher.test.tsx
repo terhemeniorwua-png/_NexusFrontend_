@@ -52,6 +52,27 @@ describe('WorkspaceSwitcher', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders a menu wide enough for the workspace name and role', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceSwitcher
+        workspaces={workspaces}
+        activeWorkspaceId="ws-1"
+        onWorkspaceChange={vi.fn()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: /Switch workspace: Acme Corp/ }),
+    );
+
+    const menu = screen.getByRole('menu');
+    // The menu must not be clamped to the narrow 60px width that hid the
+    // workspace name and role behind the sidebar panel.
+    expect(menu).not.toHaveClass('w-60');
+    expect(menu).toHaveClass('min-w-[16rem]');
+  });
+
   it('calls onWorkspaceChange with the selected workspace id', async () => {
     const user = userEvent.setup();
     const onWorkspaceChange = vi.fn();

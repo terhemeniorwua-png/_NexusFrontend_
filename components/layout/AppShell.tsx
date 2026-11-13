@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { filterNavSections, isPathActive } from '@/lib/navigation';
+import { filterNavSections } from '@/lib/navigation';
 import { Building2Icon, FolderKanbanIcon, MessageSquareIcon, BlocksIcon, ListIcon, SettingsIcon } from './icons';
 import { PrimarySidebar } from './PrimarySidebar';
 import { SecondarySidebar } from './SecondarySidebar';
@@ -151,13 +151,14 @@ export function AppShell({
     permissions,
   });
 
-  // Derive the active section from the current route when no section is
-  // explicitly selected.
-  const routeCategoryId = visibleSections.find((section) =>
-    section.items.some((item) => isPathActive(item.href, activePath, item.exact === true)),
-  )?.id;
+  // The secondary panel opens only when the user explicitly taps a section
+  // icon. It is never opened automatically from the route, so a fresh load
+  // always shows just the collapsed icon rail.
+  const effectiveCategoryId = activeCategoryId;
 
-  const effectiveCategoryId = activeCategoryId ?? routeCategoryId ?? null;
+  const panelMobileOpen = Boolean(effectiveCategoryId);
+
+  const closePanel = () => setActiveCategoryId(null);
 
   return (
     <div
@@ -182,6 +183,8 @@ export function AppShell({
         Skip to main content
       </a>
 
+      {/* Primary navigation rail — a static column on desktop, an off-canvas
+          drawer on mobile. On desktop its width makes room in the flex flow. */}
       <PrimarySidebar
         sidebarId={SIDEBAR_ID}
         sections={navSections}
@@ -196,6 +199,7 @@ export function AppShell({
         }}
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed((prev) => !prev)}
+        openCategoryId={effectiveCategoryId}
         headerSlot={
           <WorkspaceSwitcher
             workspaces={workspaces}
@@ -206,22 +210,37 @@ export function AppShell({
         }
       />
 
+      {/* Secondary panel — part of the desktop layout (pushes content), an
+          overlay drawer with backdrop on small screens. */}
       {effectiveCategoryId && (
-        <SecondarySidebar
-          open={Boolean(effectiveCategoryId)}
-          onClose={() => setActiveCategoryId(null)}
-          title={
-            visibleSections.find((section) => section.id === effectiveCategoryId)
-              ?.label ?? ''
-          }
-          icon={iconForSection(effectiveCategoryId)}
-          items={
-            visibleSections.find((section) => section.id === effectiveCategoryId)
-              ?.items ?? []
-          }
-          activePath={activePath}
-          sidebarWidth={collapsed ? '4.75rem' : '16rem'}
-        />
+        <>
+          <SecondarySidebar
+            id={`${SIDEBAR_ID}-panel`}
+            open
+            onClose={closePanel}
+            title={
+              visibleSections.find((section) => section.id === effectiveCategoryId)
+                ?.label ?? ''
+            }
+            icon={iconForSection(effectiveCategoryId)}
+            items={
+              visibleSections.find((section) => section.id === effectiveCategoryId)
+                ?.items ?? []
+            }
+            activePath={activePath}
+          />
+
+          {panelMobileOpen && (
+            <div
+              aria-hidden="true"
+              onClick={closePanel}
+              className={[
+                'fixed inset-0 z-[var(--z-sidebar-backdrop)] bg-black/40 lg:hidden',
+                'animate-[nx-fade-in_var(--duration-fast)_var(--ease-standard)]',
+              ].join(' ')}
+            />
+          )}
+        </>
       )}
 
       {mobileOpen && (
@@ -235,14 +254,7 @@ export function AppShell({
         />
       )}
 
-      <div
-        className={[
-          'flex min-w-0 flex-1 flex-col',
-          collapsed ? 'lg:pl-[4.75rem]' : 'lg:pl-[16rem]',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
+      <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           title={title}
           breadcrumbs={breadcrumbs}

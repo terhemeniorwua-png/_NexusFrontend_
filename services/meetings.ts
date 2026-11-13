@@ -210,3 +210,8 @@ export interface MeetingToken {
 export async function getMeetingToken(workspaceId: string, meetingId: string): Promise<MeetingToken> {
   return authed<MeetingToken>(`${base(workspaceId)}/${meetingId}/token`, { method: 'POST' });
 }
+
+/** Decline an incoming call. Tells the caller and marks the invite DECLINED. */
+export async function declineMeeting(workspaceId: string, meetingId: string): Promise<{ ok: true }> {
+  return authed<{ ok: true }>(`${base(workspaceId)}/${meetingId}/decline`, { method: 'POST' });
+}

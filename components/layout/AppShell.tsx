@@ -171,11 +171,12 @@ export function AppShell({
 
   // Left offset of the main content area. Rail width plus panel width when open.
   const plClass = panelOpen
-    ? collapsed ? 'lg:pl-[20.75rem]' : 'lg:pl-[32rem]'
-    : collapsed ? 'lg:pl-[4.75rem]' : 'lg:pl-[16rem]';
+    ? collapsed ? 'lg:left-[20.75rem]' : 'lg:left-[32rem]'
+    : collapsed ? 'lg:left-[4.75rem]' : 'lg:left-[16rem]';
 
   return (
     <div
+      style={{ '--rail-w': collapsed ? '4.75rem' : '16rem' } as React.CSSProperties}
       className={[
         'flex min-h-dvh w-full bg-[var(--color-background)]',
         className,
@@ -297,7 +298,7 @@ export function AppShell({
           'fixed top-14 bottom-0 left-0 right-0 min-w-0 overflow-y-auto overflow-x-hidden',
           'px-4 py-4 sm:px-6',
           plClass,
-          'transition-[padding] duration-300 ease-in-out',
+          'transition-[left] duration-300 ease-in-out',
         ].join(' ')}
       >
         {children}

@@ -290,12 +290,12 @@ describe('AppShell', () => {
 
       const main = screen.getByRole('main');
       // Collapsed rail: content starts at the rail width.
-      expect(main).toHaveClass('lg:pl-[4.75rem]');
+      expect(main).toHaveClass('lg:left-[4.75rem]');
 
       await user.click(screen.getByRole('button', { name: 'AI' }));
 
       // Panel open: content starts at rail width plus panel width.
-      expect(main).toHaveClass('lg:pl-[20.75rem]');
+      expect(main).toHaveClass('lg:left-[20.75rem]');
     });
 
     it('keeps the rail fixed full height below the top bar on desktop', () => {

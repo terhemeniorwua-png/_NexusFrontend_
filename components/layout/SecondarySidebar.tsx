@@ -106,7 +106,7 @@ export function SecondarySidebar({
         'invisible -translate-x-full',
         open ? 'visible translate-x-0' : 'invisible -translate-x-full',
         // Desktop: fixed panel below the topbar, next to the rail.
-        'lg:top-14 lg:bottom-0 lg:left-[4.75rem] lg:z-auto lg:w-[16rem] lg:visible lg:translate-x-0',
+        'lg:top-14 lg:bottom-0 lg:left-[var(--rail-w,4.75rem)] lg:z-40 lg:w-[16rem] lg:visible lg:translate-x-0',
       ].join(' ')}
     >
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3">

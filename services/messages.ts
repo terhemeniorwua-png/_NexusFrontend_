@@ -1,4 +1,4 @@
-import { apiRequest, ApiRequestError } from '@/lib/api';
+import { apiRawRequest, apiRequest, ApiRequestError } from '@/lib/api';
 import { refreshSession } from '@/services/auth';
 
 // ---------------------------------------------------------------------------
@@ -208,4 +208,14 @@ export function sendVoiceMessage(
   form.append('audio', audio, `voice.${ext}`);
   form.append('durationMs', String(Math.round(durationMs)));
   return request<MessageSummary>(`${channelPath(workspaceId, channelId)}/voice`, { method: 'POST', body: form });
+}
+
+export async function fetchVoiceAudio(
+  workspaceId: string,
+  channelId: string,
+  messageId: string,
+): Promise<Blob> {
+  const response = await apiRawRequest(messagePath(workspaceId, channelId, messageId, '/audio'), { authenticated: true });
+  if (!response.ok) throw new ApiRequestError('Voice message could not be loaded.', response.status);
+  return response.blob();
 }

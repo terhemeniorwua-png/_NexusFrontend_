@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
 import { useVoiceRecorder } from '@/components/chat/useVoiceRecorder';
+import { VoiceMessagePlayer } from '@/components/chat/VoiceMessagePlayer';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -381,6 +382,9 @@ export default function MessagesPage() {
   // Send message
   // ---------------------------------------------------------------------------
 
+  const workspaceRole = (activeWorkspace as { role?: string } | null)?.role;
+  const canPost = selectedChannel?.postPolicy !== 'MANAGERS_ONLY' || workspaceRole === 'OWNER' || workspaceRole === 'PROJECT_MANAGER';
+
   async function handleSendVoice() {
     if (!activeWorkspace || !selectedChannel || !rec.blob || socketStatus === 'disconnected') return;
     setMessageBusy(true); setMessageError(null);
@@ -692,7 +696,11 @@ export default function MessagesPage() {
                             {msg.editedAt && <span className="text-xs italic text-[var(--color-text-muted)]">(edited)</span>}
                             {msg.pinnedAt && <Badge variant="outline">Pinned</Badge>}
                           </div>
-                          <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{msg.body}</p>
+                          {msg.type === 'VOICE' && activeWorkspace ? (
+                            <VoiceMessagePlayer workspaceId={activeWorkspace.id} channelId={msg.channelId} messageId={msg.id} durationMs={msg.audioDurationMs ?? null} />
+                          ) : (
+                            <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{msg.body}</p>
+                          )}
 
                           {/* Reply count */}
                           {msg.replyCount > 0 && (
@@ -787,7 +795,9 @@ export default function MessagesPage() {
                   <EmojiPicker onEmojiClick={(e) => { setMessageBody((b) => b + e.emoji); }} lazyLoadEmojis />
                 </div>
               )}
-              {editMessageTarget ? (
+              {!canPost ? (
+                <p className="text-center text-sm text-[var(--color-text-muted)]">Only workspace managers can post in this channel.</p>
+              ) : editMessageTarget ? (
                 <div className="space-y-2">
                   <Textarea
                     id="edit-message-input"

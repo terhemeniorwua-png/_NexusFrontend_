@@ -16,6 +16,7 @@ import { getUnreadCount } from '@/services/notifications';
 import { getUserProfile } from '@/services/profile';
 import type { WorkspaceSummary } from '@/types/navigation';
 import { resolveAvatarUrl } from '@/lib/avatar';
+import { IncomingCallListener } from '@/components/meetings/IncomingCallListener';
 
 /** How often to poll the unread count (ms). Only fires when the tab is visible. */
 const UNREAD_POLL_INTERVAL = 60_000;
@@ -160,6 +161,8 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
         open={searchOpen}
         onClose={closeSearch}
       />
+
+      <IncomingCallListener />
     </AppShell>
   );
 }

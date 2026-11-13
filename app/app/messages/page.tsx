@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { z } from 'zod';
+import dynamic from 'next/dynamic';
+import { useVoiceRecorder } from '@/components/chat/useVoiceRecorder';
+import { VoiceMessagePlayer } from '@/components/chat/VoiceMessagePlayer';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -29,6 +32,7 @@ import {
 import {
   listMessages,
   sendMessage,
+  sendVoiceMessage,
   editMessage,
   deleteMessage,
   pinMessage,
@@ -57,6 +61,8 @@ const messageSchema = z.object({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 
 function typeBadge(t: ChannelType): 'success' | 'info' | 'warning' | 'outline' | 'default' {
   if (t === 'WORKSPACE') return 'success';
@@ -87,6 +93,8 @@ function requestError(cause: unknown, fallback: string): string {
 export default function MessagesPage() {
   const { activeWorkspace, user } = useWorkspaceContext();
   const { socket } = useSocket();
+  const rec = useVoiceRecorder();
+  const [showEmoji, setShowEmoji] = useState(false);
   const socketStatus = useConnectionStatus();
   const onlineUsers = useOnlineUsers();
 
@@ -374,6 +382,23 @@ export default function MessagesPage() {
   // Send message
   // ---------------------------------------------------------------------------
 
+  const workspaceRole = (activeWorkspace as { role?: string } | null)?.role;
+  const canPost = selectedChannel?.postPolicy !== 'MANAGERS_ONLY' || workspaceRole === 'OWNER' || workspaceRole === 'PROJECT_MANAGER';
+
+  async function handleSendVoice() {
+    if (!activeWorkspace || !selectedChannel || !rec.blob || socketStatus === 'disconnected') return;
+    setMessageBusy(true); setMessageError(null);
+    try {
+      const sent = await sendVoiceMessage(activeWorkspace.id, selectedChannel.id, rec.blob, rec.elapsedMs);
+      setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
+      rec.reset();
+    } catch (cause) {
+      setMessageError(requestError(cause, 'Voice message could not be sent.'));
+    } finally {
+      setMessageBusy(false);
+    }
+  }
+
   async function handleSendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeWorkspace || !selectedChannel || socketStatus === 'disconnected') return;
@@ -381,12 +406,11 @@ export default function MessagesPage() {
     if (!parsed.success) return;
     setMessageBusy(true); setMessageError(null);
     try {
-      await sendMessage(activeWorkspace.id, selectedChannel.id, { body: parsed.data.body });
+      const sent = await sendMessage(activeWorkspace.id, selectedChannel.id, { body: parsed.data.body });
+      setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
       setMessageBody('');
       // Stop typing indicator
       if (socket) socket.emit('typing:stop', selectedChannel.id);
-      // Reload messages to get the new one
-      await loadMessages(selectedChannel);
     } catch (cause) {
       setMessageError(requestError(cause, 'Message could not be sent.'));
     } finally {
@@ -671,7 +695,11 @@ export default function MessagesPage() {
                             {msg.editedAt && <span className="text-xs italic text-[var(--color-text-muted)]">(edited)</span>}
                             {msg.pinnedAt && <Badge variant="outline">Pinned</Badge>}
                           </div>
-                          <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{msg.body}</p>
+                          {msg.type === 'VOICE' && activeWorkspace ? (
+                            <VoiceMessagePlayer workspaceId={activeWorkspace.id} channelId={msg.channelId} messageId={msg.id} durationMs={msg.audioDurationMs ?? null} />
+                          ) : (
+                            <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{msg.body}</p>
+                          )}
 
                           {/* Reply count */}
                           {msg.replyCount > 0 && (
@@ -760,8 +788,15 @@ export default function MessagesPage() {
             </div>
 
             {/* Message composer */}
-            <div className="border-t border-[var(--color-border)] p-3">
-              {editMessageTarget ? (
+            <div className="relative border-t border-[var(--color-border)] p-3">
+              {showEmoji && (
+                <div className="absolute bottom-full right-3 z-20">
+                  <EmojiPicker onEmojiClick={(e) => { setMessageBody((b) => b + e.emoji); }} lazyLoadEmojis />
+                </div>
+              )}
+              {!canPost ? (
+                <p className="text-center text-sm text-[var(--color-text-muted)]">Only workspace managers can post in this channel.</p>
+              ) : editMessageTarget ? (
                 <div className="space-y-2">
                   <Textarea
                     id="edit-message-input"
@@ -778,6 +813,7 @@ export default function MessagesPage() {
                   </div>
                 </div>
               ) : (
+                <>
                 <form onSubmit={(e) => void handleSendMessage(e)} className="flex items-end gap-2">
                   <div className="flex-1">
                     <Textarea
@@ -794,6 +830,8 @@ export default function MessagesPage() {
                       maxLength={10000}
                     />
                   </div>
+                  <Button type="button" size="sm" variant="secondary" aria-label="Insert emoji" onClick={() => setShowEmoji((v) => !v)}>😊</Button>
+                  <Button type="button" size="sm" variant="secondary" aria-label="Record voice message" disabled={socketStatus === 'disconnected' || rec.state !== 'idle'} onClick={() => { setShowEmoji(false); void rec.start(); }}>🎙️</Button>
                   <Button
                     type="submit"
                     size="sm"
@@ -806,6 +844,22 @@ export default function MessagesPage() {
                     <p className="mt-1 text-xs text-[var(--color-text-muted)]">You&apos;re offline</p>
                   )}
                 </form>
+                {rec.error && <p className="mt-1 text-xs text-red-600">{rec.error}</p>}
+                {rec.state === 'recording' && (
+                  <div className="mt-2 flex items-center gap-3 text-sm">
+                    <span className="animate-pulse text-red-600">● Recording {Math.floor(rec.elapsedMs / 1000)}s</span>
+                    <Button size="sm" variant="secondary" onClick={rec.cancel}>Cancel</Button>
+                    <Button size="sm" onClick={rec.stop}>Stop</Button>
+                  </div>
+                )}
+                {rec.state === 'preview' && (
+                  <div className="mt-2 flex items-center gap-3 text-sm">
+                    <span>Voice message ready ({Math.max(1, Math.round(rec.elapsedMs / 1000))}s)</span>
+                    <Button size="sm" variant="secondary" onClick={rec.reset} disabled={messageBusy}>Discard</Button>
+                    <Button size="sm" onClick={() => void handleSendVoice()} loading={messageBusy}>Send voice</Button>
+                  </div>
+                )}
+                </>
               )}
             </div>
           </>

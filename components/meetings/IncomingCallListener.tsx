@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { useRingtone } from '@/hooks/useRingtone';
 import { getSocket } from '@/lib/socket';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { declineMeeting } from '@/services/meetings';
@@ -12,6 +13,7 @@ interface IncomingCall {
   title: string;
   callerId: string;
   callerName: string;
+  workspaceName?: string;
 }
 
 interface CallEvent {
@@ -75,33 +77,7 @@ export function IncomingCallListener() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  // Ringtone while the card is showing. Browsers only allow sound after the
-  // user has interacted with the page, so a fresh tab may ring silently.
-  useEffect(() => {
-    if (!call) return;
-    const Ctx =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    void ctx.resume().catch(() => undefined);
-    const beep = () => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = 440;
-      gain.gain.value = 0.08;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.4);
-    };
-    beep();
-    const timer = setInterval(beep, 2000);
-    return () => {
-      clearInterval(timer);
-      void ctx.close().catch(() => undefined);
-    };
-  }, [call]);
+  useRingtone(!!call);
 
   async function accept() {
     if (!call) return;
@@ -122,7 +98,7 @@ export function IncomingCallListener() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[var(--z-toast)] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2">
+    <div className="pointer-events-none fixed left-1/2 top-4 -translate-x-1/2 z-[var(--z-toast)] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-2">
       {notice && (
         <div
           role="status"
@@ -138,7 +114,7 @@ export function IncomingCallListener() {
           className="pointer-events-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-lg)]"
         >
           <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Incoming call from {call.callerName}
+            Incoming call from {call.callerName}{call.workspaceName && <> · {call.workspaceName}</>}
           </p>
           <p className="mt-0.5 truncate text-xs text-[var(--color-text-secondary)]">{call.title}</p>
           <div className="mt-3 flex gap-2">

@@ -389,9 +389,9 @@ export default function MessagesPage() {
     if (!activeWorkspace || !selectedChannel || !rec.blob || socketStatus === 'disconnected') return;
     setMessageBusy(true); setMessageError(null);
     try {
-      await sendVoiceMessage(activeWorkspace.id, selectedChannel.id, rec.blob, rec.elapsedMs);
+      const sent = await sendVoiceMessage(activeWorkspace.id, selectedChannel.id, rec.blob, rec.elapsedMs);
+      setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
       rec.reset();
-      await loadMessages(selectedChannel);
     } catch (cause) {
       setMessageError(requestError(cause, 'Voice message could not be sent.'));
     } finally {
@@ -406,12 +406,11 @@ export default function MessagesPage() {
     if (!parsed.success) return;
     setMessageBusy(true); setMessageError(null);
     try {
-      await sendMessage(activeWorkspace.id, selectedChannel.id, { body: parsed.data.body });
+      const sent = await sendMessage(activeWorkspace.id, selectedChannel.id, { body: parsed.data.body });
+      setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
       setMessageBody('');
       // Stop typing indicator
       if (socket) socket.emit('typing:stop', selectedChannel.id);
-      // Reload messages to get the new one
-      await loadMessages(selectedChannel);
     } catch (cause) {
       setMessageError(requestError(cause, 'Message could not be sent.'));
     } finally {

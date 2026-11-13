@@ -46,6 +46,15 @@ const navSections: NavSection[] = [
       },
     ],
   },
+  {
+    id: 'ai',
+    label: 'AI',
+    items: [
+      { id: 'ai-assistant', label: 'AI Assistant', href: '/app/ai' },
+      { id: 'ai-write', label: 'Nexus Write', href: '/app/ai-write' },
+      { id: 'ai-actions', label: 'AI Actions', href: '/app/ai-actions' },
+    ],
+  },
 ];
 
 const user = { id: 'user-1', name: 'Ada Lovelace', email: 'ada@example.com' };
@@ -184,5 +193,94 @@ describe('AppShell', () => {
     expect(
       screen.getByRole('button', { name: 'New project' }),
     ).toBeInTheDocument();
+  });
+
+  describe('secondary panel (expandable section)', () => {
+    it('is not rendered on a fresh load — only the icon rail is visible', () => {
+      renderShell();
+
+      expect(screen.queryByRole('button', { name: 'AI' })).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'AI' })).not.toBeInTheDocument();
+    });
+
+    it('opens the panel when a section icon is clicked and shows its items', async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      await user.click(screen.getByRole('button', { name: 'AI' }));
+
+      const panel = screen.getByRole('region', { name: 'AI' });
+      expect(panel).toBeInTheDocument();
+      expect(panel).toHaveClass('w-[16rem]');
+      expect(panel).toHaveClass('lg:static');
+      expect(screen.getByRole('link', { name: 'AI Assistant' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Nexus Write' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'AI Actions' })).toBeInTheDocument();
+    });
+
+    it('exposes aria-expanded and aria-controls on the section icon', async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      const button = screen.getByRole('button', { name: 'AI' });
+      expect(button).toHaveAttribute('aria-expanded', 'false');
+
+      await user.click(button);
+
+      expect(button).toHaveAttribute('aria-expanded', 'true');
+      expect(button).toHaveAttribute('aria-controls', 'app-sidebar-panel');
+      expect(screen.getByRole('region', { name: 'AI' })).toHaveAttribute(
+        'id',
+        'app-sidebar-panel',
+      );
+    });
+
+    it('closes the panel when the same section icon is clicked again', async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      await user.click(screen.getByRole('button', { name: 'AI' }));
+      expect(screen.getByRole('region', { name: 'AI' })).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'AI' }));
+      expect(screen.queryByRole('region', { name: 'AI' })).not.toBeInTheDocument();
+    });
+
+    it('closes the panel on Escape and restores focus to the icon', async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      await user.click(screen.getByRole('button', { name: 'AI' }));
+      const button = screen.getByRole('button', { name: 'AI' });
+
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('region', { name: 'AI' })).not.toBeInTheDocument();
+      expect(button).toHaveFocus();
+    });
+
+    it('switches panel content when a different section icon is clicked', async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      await user.click(screen.getByRole('button', { name: 'Main' }));
+      expect(screen.getByRole('link', { name: 'Projects' })).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'AI' }));
+      expect(screen.getByRole('link', { name: 'AI Assistant' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Projects' })).not.toBeInTheDocument();
+    });
+
+    it('does not truncate navigation labels in the panel', async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      await user.click(screen.getByRole('button', { name: 'AI' }));
+
+      const panel = screen.getByRole('region', { name: 'AI' });
+      expect(panel.querySelectorAll('a').length).toBeGreaterThan(0);
+      // No label may be visually truncated with an ellipsis.
+      expect(panel.querySelectorAll('.truncate')).toHaveLength(0);
+    });
   });
 });

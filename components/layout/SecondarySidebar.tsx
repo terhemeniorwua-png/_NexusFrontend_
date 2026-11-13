@@ -11,6 +11,8 @@ interface SecondarySidebarProps {
   open: boolean;
   /** Closes the panel. */
   onClose: () => void;
+  /** DOM id, exposed so the primary rail can reference it via aria-controls. */
+  id?: string;
   /** Title shown in the panel header. */
   title: string;
   /** Icon shown in the panel header. */
@@ -19,8 +21,6 @@ interface SecondarySidebarProps {
   items: NavItem[];
   /** Current pathname for active state detection. */
   activePath: string;
-  /** Width of the primary sidebar, used to position this panel. */
-  sidebarWidth: string;
 }
 
 interface SubNavItemProps {
@@ -45,7 +45,7 @@ function SubNavItem({ item, active }: SubNavItemProps) {
       <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center text-[var(--color-text-muted)]">
         {item.icon ?? <span className="h-3.5 w-3.5 rounded-full bg-[var(--color-surface-secondary)]" />}
       </span>
-      <span className="min-w-0 truncate">{item.label}</span>
+      <span className="min-w-0">{item.label}</span>
 
       {item.badgeCount !== undefined && item.badgeCount > 0 && (
         <span
@@ -68,11 +68,11 @@ function SubNavItem({ item, active }: SubNavItemProps) {
 export function SecondarySidebar({
   open,
   onClose,
+  id,
   title,
   icon,
   items,
   activePath,
-  sidebarWidth,
 }: SecondarySidebarProps) {
   // Close on Escape key.
   useEffect(() => {
@@ -90,14 +90,24 @@ export function SecondarySidebar({
 
   if (!open) return null;
 
+  const panelId = id ?? 'app-sidebar-panel';
+
   return (
     <aside
+      id={panelId}
+      role="region"
       aria-label={title}
       className={[
-        'fixed inset-y-0 left-0 z-[var(--z-sidebar)] flex w-[7rem] flex-shrink-0 flex-col',
+        'flex flex-shrink-0 flex-col',
         'border-r border-[var(--color-border)] bg-[var(--color-surface)] box-shadow-[var(--shadow-md)]',
-        'transition-[left] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
-        `lg:left-[${sidebarWidth}]`,
+        'transition-[width,transform,visibility] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+        // Mobile: overlay drawer with a backdrop supplied by the caller.
+        'fixed inset-y-0 left-0 z-[var(--z-sidebar)] w-[16rem]',
+        'invisible -translate-x-full',
+        open ? 'visible translate-x-0' : 'invisible -translate-x-full',
+        // Desktop: a static column inside the shell's flex row so it pushes
+        // main content instead of covering it.
+        'lg:static lg:inset-auto lg:z-auto lg:h-full lg:top-auto lg:left-auto lg:visible lg:translate-x-0 lg:w-[16rem]',
       ].join(' ')}
     >
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3">

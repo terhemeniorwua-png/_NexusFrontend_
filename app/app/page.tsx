@@ -35,10 +35,10 @@ export default function AppHomePage() {
             description={`You’re working in ${activeWorkspace.name}. Switch between your workspaces or manage their details below.`}
           />
           {error && <Alert variant="error" title="Workspace switch failed">{error}</Alert>}
-          <Card className="p-6 sm:p-9">
-            <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-              <WorkspaceSwitcher workspaces={workspaces.map(toSwitcherSummary)} activeWorkspaceId={activeWorkspace.id} onWorkspaceChange={(workspaceId) => { void switchToWorkspace(workspaceId); }} />
-              <Link href="/app/workspaces" className="inline-flex h-9 items-center justify-center rounded-md border border-[var(--color-border)] px-4 text-sm font-medium hover:bg-[var(--color-surface-secondary)]">Manage workspaces</Link>
+          <Card className="p-4 sm:p-9">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+              <WorkspaceSwitcher workspaces={workspaces.map(toSwitcherSummary)} activeWorkspaceId={activeWorkspace.id} onWorkspaceChange={(workspaceId) => { void switchToWorkspace(workspaceId); }} className="min-w-0 max-w-full" />
+              <Link href="/app/workspaces" className="inline-flex h-9 w-full items-center justify-center rounded-md border border-[var(--color-border)] px-4 text-sm font-medium hover:bg-[var(--color-surface-secondary)] sm:w-auto">Manage workspaces</Link>
             </div>
             {switchingWorkspaceId && <p role="status" className="mt-3 text-sm text-[var(--color-text-secondary)]">Switching workspace…</p>}
             <div className="mt-7 grid gap-3 sm:grid-cols-3">

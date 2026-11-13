@@ -196,3 +196,17 @@ export async function removeParticipant(
     { method: 'DELETE' },
   );
 }
+
+export interface MeetingToken {
+  token: string;
+  url: string;
+  room: string;
+}
+
+/**
+ * Request a LiveKit access token for a meeting.
+ * 403/404: no access, 409: meeting ended or cancelled, 503: calls not configured.
+ */
+export async function getMeetingToken(workspaceId: string, meetingId: string): Promise<MeetingToken> {
+  return authed<MeetingToken>(`${base(workspaceId)}/${meetingId}/token`, { method: 'POST' });
+}

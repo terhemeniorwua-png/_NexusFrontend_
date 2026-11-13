@@ -18,12 +18,11 @@ import { Textarea } from '@/components/ui/Textarea';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
+import { MeetingRoom } from '@/components/meetings/MeetingRoom';
 import {
   getMeeting,
   updateMeeting,
   deleteMeeting,
-  joinMeeting,
-  leaveMeeting,
   listParticipants,
   addParticipant,
   removeParticipant,
@@ -182,11 +181,6 @@ export default function MeetingDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const [joining, setJoining] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [leaving, setLeaving] = useState(false);
-  const [leaveError, setLeaveError] = useState<string | null>(null);
-
   const [addUserId, setAddUserId] = useState('');
   const [addingParticipant, setAddingParticipant] = useState(false);
   const [addParticipantError, setAddParticipantError] = useState<string | null>(null);
@@ -291,37 +285,6 @@ export default function MeetingDetailPage() {
     }
   }
 
-  async function handleJoin() {
-    if (joining) return;
-    setJoining(true);
-    setJoinError(null);
-    try {
-      await joinMeeting(workspaceId, meetingId);
-      // Refresh participants
-      participantsLoaded.current = false;
-      void loadParticipants(workspaceId, meetingId);
-    } catch (err) {
-      setJoinError(err instanceof ApiRequestError ? err.message : 'Could not join meeting.');
-    } finally {
-      setJoining(false);
-    }
-  }
-
-  async function handleLeave() {
-    if (leaving) return;
-    setLeaving(true);
-    setLeaveError(null);
-    try {
-      await leaveMeeting(workspaceId, meetingId);
-      participantsLoaded.current = false;
-      void loadParticipants(workspaceId, meetingId);
-    } catch (err) {
-      setLeaveError(err instanceof ApiRequestError ? err.message : 'Could not leave meeting.');
-    } finally {
-      setLeaving(false);
-    }
-  }
-
   async function handleAddParticipant(e: React.FormEvent) {
     e.preventDefault();
     const uid = addUserId.trim();
@@ -362,8 +325,6 @@ export default function MeetingDetailPage() {
   }
 
   const isCreator = meeting?.createdById === currentUserId;
-  const myParticipant = participants.find((p) => p.userId === currentUserId);
-  const isJoined = myParticipant?.status === 'JOINED';
 
   // ── Render ──
 
@@ -451,34 +412,10 @@ export default function MeetingDetailPage() {
                 </Button>
               </>
             )}
-            {meeting.status !== 'ENDED' && meeting.status !== 'CANCELLED' && (
-              isJoined ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => { void handleLeave(); }}
-                  loading={leaving}
-                  disabled={leaving}
-                >
-                  Leave
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={() => { void handleJoin(); }}
-                  loading={joining}
-                  disabled={joining}
-                >
-                  {meeting.status === 'LIVE' ? '🔴 Join live' : 'Join'}
-                </Button>
-              )
-            )}
           </div>
         }
       />
 
-      {joinError && <Alert variant="error" className="mb-3">{joinError}</Alert>}
-      {leaveError && <Alert variant="error" className="mb-3">{leaveError}</Alert>}
       {deleteError && <Alert variant="error" className="mb-3">{deleteError}</Alert>}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -531,18 +468,25 @@ export default function MeetingDetailPage() {
             )}
           </Card>
 
-          {/* Calling note */}
-          {meeting.status === 'LIVE' && (
-            <Card className="border-[var(--color-success)] bg-[var(--color-success-soft)] p-4">
-              <p className="text-sm font-semibold text-[var(--color-success)]">
-                🔴 This meeting is live
-              </p>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                In-meeting audio/video calls require a managed calling SDK integration. When a
-                calling provider is configured, the meeting room interface will appear here.
-              </p>
-            </Card>
-          )}
+          <section id="meeting-room" aria-label="Meeting room">
+            {meeting.status === 'ENDED' || meeting.status === 'CANCELLED' ? (
+              <Card className="p-4">
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  This meeting is {meeting.status.toLowerCase()} and can no longer be joined.
+                </p>
+              </Card>
+            ) : (
+              <MeetingRoom
+                workspaceId={workspaceId}
+                meetingId={meetingId}
+                title={meeting.title}
+                onParticipationChange={() => {
+                  participantsLoaded.current = false;
+                  void loadParticipants(workspaceId, meetingId);
+                }}
+              />
+            )}
+          </section>
         </div>
 
         {/* Participants panel */}

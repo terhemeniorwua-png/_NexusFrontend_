@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';import { filterNavSections } from '@/lib/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { filterNavSections } from '@/lib/navigation';
 import { Building2Icon, FolderKanbanIcon, MessageSquareIcon, BlocksIcon, ListIcon, SettingsIcon } from './icons';
 import { PrimarySidebar } from './PrimarySidebar';
 import { SecondarySidebar } from './SecondarySidebar';
@@ -48,7 +49,7 @@ interface AppShellProps {
   /** Active workspace id. */
   activeWorkspaceId?: string;
   /** Called with the selected workspace id; the caller performs the switch. */
-  onWorkspaceChange?: (workspaceId: string) => void;  /** Current user identity. */
+  onWorkspaceChange?: (workspaceId: string) => void; /** Current user identity. */
   user: CurrentUserSummary;
   /** Account destinations such as Profile and Settings. */
   userMenuItems?: DropdownItem[];
@@ -86,6 +87,16 @@ interface AppShellProps {
  * Application state (session, active workspace, permissions, unread counts)
  * is supplied by the caller so the shell can be adopted without assuming a
  * backend contract that is not confirmed yet.
+ *
+ * Layout (desktop):
+ * - Topbar: fixed at the top, full width.
+ * - Icon rail: fixed to the left, full viewport height below the topbar.
+ * - Expanded panel: fixed below the topbar, next to the rail, never moves on scroll.
+ * - Main content: offset below the topbar and to the right of the rail (plus the
+ *   panel width when the panel is open). Only this area scrolls.
+ *
+ * Mobile: topbar stays at the top; rail and panel are off-canvas drawers opened
+ * from the topbar menu button / section icon.
  */
 export function AppShell({
   children,
@@ -158,9 +169,13 @@ export function AppShell({
   const closePanel = () => setActiveCategoryId(null);
   const panelOpen = Boolean(effectiveCategoryId);
 
+  // Left offset of the main content area. Rail width plus panel width when open.
+  const plClass = panelOpen
+    ? collapsed ? 'lg:pl-[20.75rem]' : 'lg:pl-[32rem]'
+    : collapsed ? 'lg:pl-[4.75rem]' : 'lg:pl-[16rem]';
+
   return (
     <div
-      style={{ '--rail-w': collapsed ? '4.75rem' : '16rem' } as CSSProperties}
       className={[
         'flex min-h-dvh w-full bg-[var(--color-background)]',
         className,
@@ -203,7 +218,7 @@ export function AppShell({
       />
 
       {/* Primary navigation rail — fixed to the left, full viewport height
-          below the top bar. On mobile it is an off-canvas drawer. */}
+          below the topbar. On mobile it is an off-canvas drawer. */}
       <PrimarySidebar
         sidebarId={SIDEBAR_ID}
         sections={navSections}
@@ -229,7 +244,7 @@ export function AppShell({
         }
       />
 
-      {/* Secondary panel — fixed below the top bar next to the rail on
+      {/* Secondary panel — fixed below the topbar next to the rail on
           desktop, an overlay drawer on mobile. Never moves on page scroll. */}
       {panelOpen && (
         <>
@@ -273,20 +288,16 @@ export function AppShell({
         />
       )}
 
-      {/* Main content — offset below the top bar and to the right of the rail
+      {/* Main content — offset below the topbar and to the right of the rail
           (plus the panel width when open). Only this area scrolls. */}
       <main
         id="main-content"
         tabIndex={-1}
-        style={{
-          left: panelOpen
-            ? `calc(var(--rail-w) + var(--panel-w))`
-            : `var(--rail-w)`,
-        }}
         className={[
-          'fixed top-[var(--nav-h)] bottom-0 right-0 overflow-y-auto',
-          'px-6 py-4',
-          'transition-[left] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+          'fixed top-14 bottom-0 left-0 right-0 min-w-0 overflow-y-auto overflow-x-hidden',
+          'px-4 py-4 sm:px-6',
+          plClass,
+          'transition-[padding] duration-300 ease-in-out',
         ].join(' ')}
       >
         {children}

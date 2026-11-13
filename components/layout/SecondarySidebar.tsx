@@ -102,7 +102,7 @@ export function SecondarySidebar({
         'border-r border-[var(--color-border)] bg-[var(--color-surface)] box-shadow-[var(--shadow-md)]',
         'transition-[width,transform,visibility] duration-300 ease-in-out',
         // Mobile: overlay drawer full height below the top bar.
-        'fixed top-14 bottom-0 left-0 z-50 w-[16rem]',
+        'fixed top-14 bottom-0 left-0 z-[var(--z-sidebar)] w-[16rem]',
         'invisible -translate-x-full',
         open ? 'visible translate-x-0' : 'invisible -translate-x-full',
         // Desktop: fixed panel below the topbar, next to the rail.

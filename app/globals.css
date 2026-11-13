@@ -68,7 +68,6 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
   /* Z-index scale */
-  --z-nav:      900;   /* Shell chrome (top bar / rail / panel): below popovers */
   --z-dropdown: 1000;
   --z-sidebar-backdrop: 1190;
   --z-sidebar:   1200;

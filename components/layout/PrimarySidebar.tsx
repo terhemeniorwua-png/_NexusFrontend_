@@ -134,7 +134,7 @@ export function PrimarySidebar({
       role="region"
       aria-label="Primary navigation"
       className={[
-        'fixed top-14 bottom-0 left-0 z-50 flex flex-shrink-0 flex-col',
+        'fixed top-14 bottom-0 left-0 z-[var(--z-sidebar)] lg:z-50 flex flex-shrink-0 flex-col',
         'border-r border-[var(--color-border)] bg-[var(--color-surface)]',
         'transition-[width,transform,visibility] duration-300 ease-in-out',
         // Mobile: off-canvas drawer opened from the topbar menu button.

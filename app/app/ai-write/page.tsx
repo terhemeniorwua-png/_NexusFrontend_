@@ -11,6 +11,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Spinner } from '@/components/ui/Spinner';
 import { Textarea } from '@/components/ui/Textarea';
+import { AiStatusBanner } from '@/components/ai/AiStatusBanner';
 import { ApiRequestError } from '@/lib/api';
 import { analyzeText, type AnalysisFeature, type WritingSuggestion } from '@/services/ai';
 
@@ -257,12 +258,7 @@ export default function NexusWritePage() {
         description="Writing assistance — grammar, spelling, clarity, tone, summaries, rewrites, and translation."
       />
 
-      {/* Preview notice */}
-      <Alert variant="warning" className="mb-4">
-        <strong>Preview mode:</strong> The Nexus Write AI service is not yet connected to a live AI
-        model. Analysis requests are accepted and validated but will return placeholder responses
-        until the Python AI service is configured.
-      </Alert>
+      <AiStatusBanner className="mb-4" />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left — Input */}

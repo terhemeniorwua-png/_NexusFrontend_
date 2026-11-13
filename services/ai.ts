@@ -89,6 +89,14 @@ export interface AiActionApprovalResponse {
   message: string;
 }
 
+/** Health of the in-process AI provider, reported by GET /ai/health. */
+export interface AiHealthStatus {
+  configured: boolean;
+  status: 'up' | 'down';
+  latencyMs: number;
+  version?: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -151,6 +159,11 @@ export async function queryAI(
     body: JSON.stringify({ query, ...(workspaceId ? { workspaceId } : {}) }),
   });
   return { query, answer: data.answer, references: data.references ?? [], message: 'ok' } as AiQueryResponse;
+}
+
+/** Probe the AI provider's health via GET /ai/health. */
+export async function getAiHealth(): Promise<AiHealthStatus> {
+  return authed<AiHealthStatus>('/ai/health', { method: 'GET' });
 }
 
 /** Submit an approved AI action for execution. */

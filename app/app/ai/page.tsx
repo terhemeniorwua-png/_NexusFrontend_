@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Spinner } from '@/components/ui/Spinner';
 import { Textarea } from '@/components/ui/Textarea';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { AiStatusBanner } from '@/components/ai/AiStatusBanner';
 import { ApiRequestError } from '@/lib/api';
 import { addAiActionProposals, type ProposedAiAction } from '@/lib/ai-action-proposals';
 import { queryAI, type AiQueryResponse } from '@/services/ai';
@@ -120,6 +121,31 @@ function conversationTitle(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return 'New conversation';
   return trimmed.length > 40 ? `${trimmed.slice(0, 37)}...` : trimmed;
+}
+
+/**
+ * Map a backend AI error to a user-facing message. The backend error code is
+ * read from the error object (never parsed from message text).
+ */
+function mapAiError(err: unknown): string {
+  if (!(err instanceof ApiRequestError)) {
+    return 'Request failed. Please try again.';
+  }
+  switch (err.code) {
+    case 'AI_NOT_CONFIGURED':
+      return 'AI is not set up on this server yet.';
+    case 'AI_RATE_LIMITED':
+      return 'The AI provider is busy. Please try again in a moment.';
+    case 'AI_TIMEOUT':
+      return 'The AI took too long to respond. Please try again.';
+    case 'AI_UNAVAILABLE':
+    case 'AI_UPSTREAM_ERROR':
+    case 'AI_UPSTREAM_AUTH':
+    case 'AI_UPSTREAM_CREDITS':
+      return 'The AI service is temporarily unavailable.';
+    default:
+      return err.message;
+  }
 }
 
 // ─── Page ───────────────────────────────────────────────────────────────────
@@ -255,7 +281,7 @@ export default function AIAssistantPage() {
         setProposedCount((count) => count + proposals.length);
       }
     } catch (err) {
-      const errText = err instanceof ApiRequestError ? err.message : 'Request failed. Please try again.';
+      const errText = mapAiError(err);
       setError(errText);
       const errorMsg: Message = {
         id: newId(),
@@ -297,12 +323,7 @@ export default function AIAssistantPage() {
         description="Ask questions about your workspace, tasks, and documents."
       />
 
-      {/* Service availability notice */}
-      <Alert variant="warning" className="mb-4">
-        <strong>Preview mode:</strong> The Nexus AI service is not yet connected to a live AI model.
-        Responses will acknowledge your query but cannot provide real answers until the Python AI
-        service is configured.
-      </Alert>
+      <AiStatusBanner className="mb-4" />
 
       {proposedCount > 0 && (
         <Alert variant="info" className="mb-4">

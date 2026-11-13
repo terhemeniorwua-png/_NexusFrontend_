@@ -74,4 +74,27 @@ describe('account selection authentication flow', () => {
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Change account type/ })).not.toBeInTheDocument();
   });
+
+  it('widens the account type modal and loosens the cards', () => {
+    render(<AuthPage mode="sign-up" />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('max-w-[56rem]');
+    const card = screen.getByText('Personal account').closest('button');
+    expect(card).toHaveClass('p-6');
+    expect(card).toHaveClass('min-w-0');
+    expect(card).not.toHaveClass('p-4');
+  });
+
+  it('restyles the change account type link as a bordered button beside the logo', async () => {
+    const user = userEvent.setup();
+    render(<AuthPage mode="sign-up" />);
+    await user.click(screen.getByRole('button', { name: /Personal account/ }));
+    const link = screen.getByRole('button', { name: 'Change account type' });
+    expect(link).toHaveClass('border border-border rounded-md px-2.5 py-1 text-xs whitespace-nowrap');
+    expect(link).toHaveClass('text-text-secondary');
+    // The link flows beside the logo (justify-between) instead of absolutely
+    // overlapping it.
+    expect(link).not.toHaveClass('absolute');
+    expect(link.closest('div')).toHaveClass('sm:justify-between');
+  });
 });

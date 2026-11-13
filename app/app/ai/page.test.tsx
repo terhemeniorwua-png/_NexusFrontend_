@@ -23,9 +23,12 @@ vi.mock('@/providers/WorkspaceProvider', () => ({ useWorkspaceContext: () => moc
 
 vi.mock('@/services/ai', () => ({
   queryAI: vi.fn(),
+  getAiHealth: vi.fn(),
 }));
-import { queryAI } from '@/services/ai';
+import { queryAI, getAiHealth, type AiHealthStatus } from '@/services/ai';
+import { ApiRequestError } from '@/lib/api';
 const mockQuery = vi.mocked(queryAI);
+const mockGetAiHealth = vi.mocked(getAiHealth);
 
 describe('AIAssistantPage', () => {
   beforeEach(() => {
@@ -37,6 +40,12 @@ describe('AIAssistantPage', () => {
       references: [],
       message: 'AI service not yet configured.',
     });
+    // Healthy provider by default: no banner is shown.
+    mockGetAiHealth.mockResolvedValue({
+      configured: true,
+      status: 'up',
+      latencyMs: 10,
+    } as AiHealthStatus);
   });
 
   it('renders the AI assistant heading', () => {
@@ -49,9 +58,97 @@ describe('AIAssistantPage', () => {
     expect(screen.getByText('Start a conversation')).toBeInTheDocument();
   });
 
-  it('shows the service availability notice', () => {
+  it('shows no banner when the AI provider is healthy', () => {
+    mockGetAiHealth.mockResolvedValue({
+      configured: true,
+      status: 'up',
+      latencyMs: 10,
+    } as AiHealthStatus);
     render(<AIAssistantPage />);
-    expect(screen.getByText(/Preview mode/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows "AI is not enabled on this server" when not configured', async () => {
+    mockGetAiHealth.mockResolvedValue({
+      configured: false,
+      status: 'down',
+      latencyMs: 0,
+    } as AiHealthStatus);
+    render(<AIAssistantPage />);
+    expect(
+      await screen.findByText('AI is not enabled on this server.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows "temporarily unavailable" when the provider is down', async () => {
+    mockGetAiHealth.mockResolvedValue({
+      configured: true,
+      status: 'down',
+      latencyMs: 0,
+    } as AiHealthStatus);
+    render(<AIAssistantPage />);
+    expect(
+      await screen.findByText('The AI service is temporarily unavailable.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows "temporarily unavailable" when the health request fails', async () => {
+    mockGetAiHealth.mockRejectedValue(new Error('network down'));
+    render(<AIAssistantPage />);
+    expect(
+      await screen.findByText('The AI service is temporarily unavailable.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows nothing while the health check is loading', async () => {
+    let resolveHealth: ((value: AiHealthStatus) => void) | undefined;
+    mockGetAiHealth.mockReturnValue(
+      new Promise((resolve) => {
+        resolveHealth = resolve;
+      }),
+    );
+    render(<AIAssistantPage />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    resolveHealth!({ configured: true, status: 'up', latencyMs: 5 });
+    await waitFor(() =>
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument(),
+    );
+  });
+
+  it.each([
+    ['AI_NOT_CONFIGURED', 'AI is not set up on this server yet.'],
+    [
+      'AI_RATE_LIMITED',
+      'The AI provider is busy. Please try again in a moment.',
+    ],
+    [
+      'AI_TIMEOUT',
+      'The AI took too long to respond. Please try again.',
+    ],
+    ['AI_UNAVAILABLE', 'The AI service is temporarily unavailable.'],
+  ])('maps %s to a readable error message', async (code, expected) => {
+    mockQuery.mockRejectedValue(new ApiRequestError('boom', 500, code));
+    const user = userEvent.setup();
+    render(<AIAssistantPage />);
+    await user.type(screen.getByRole('textbox', { name: 'Your question' }), 'Hi');
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(
+      (await screen.findAllByText(expected)).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('keeps the generic message for an unknown error code', async () => {
+    mockQuery.mockRejectedValue(
+      new ApiRequestError('Something custom went wrong', 500, 'UNKNOWN_CODE'),
+    );
+    const user = userEvent.setup();
+    render(<AIAssistantPage />);
+    await user.type(screen.getByRole('textbox', { name: 'Your question' }), 'Hi');
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(
+      (await screen.findAllByText('Something custom went wrong')).length,
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it('sends a query when Send button is clicked', async () => {

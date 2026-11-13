@@ -12,6 +12,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { ApiRequestError } from '@/lib/api';
+import { StartCallButton } from '@/components/meetings/StartCallButton';
+import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { AccessState } from '@/components/shared/AccessState';
 import {
   assignableRoleOptions,
@@ -66,6 +68,7 @@ export function MembersPanel({ workspace, canManage, onAccessChanged }: MembersP
   const [confirmRole, setConfirmRole] = useState(false);
   const [membershipTarget, setMembershipTarget] = useState<{ member: WorkspaceMember; action: 'suspend' | 'restore' } | null>(null);
 
+  const { user: currentUser } = useWorkspaceContext();
   const roleOptions = assignableRoleOptions(workspace);
 
   const loadMembers = useCallback(async () => {
@@ -258,6 +261,23 @@ export function MembersPanel({ workspace, canManage, onAccessChanged }: MembersP
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    {member.membershipStatus === 'ACTIVE' && member.userId !== currentUser?.id && (
+                      <StartCallButton
+                        workspaceId={workspace.id}
+                        targetUserId={member.userId}
+                        targetName={member.name}
+                        variant="icon"
+                      />
+                    )}
+                    {member.membershipStatus === 'ACTIVE' && member.userId !== currentUser?.id && (
+                      <StartCallButton
+                        workspaceId={workspace.id}
+                        targetUserId={member.userId}
+                        targetName={member.name}
+                        variant="icon"
+                        mode="audio"
+                      />
+                    )}
                     <Badge variant="outline">{roleLabel(member.role, member.organizationRole)}</Badge>
                     {member.membershipStatus === 'SUSPENDED'
                       ? <Badge variant="warning">Suspended</Badge>

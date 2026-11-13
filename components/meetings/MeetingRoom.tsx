@@ -38,6 +38,10 @@ interface MeetingRoomProps {
   workspaceId: string;
   meetingId: string;
   title: string;
+  /** Join immediately on mount (used when a call is placed from the call button). */
+  autoJoin?: boolean;
+  /** Start with the camera off. */
+  audioOnly?: boolean;
   /** Called after joining or leaving so the participant list can refresh. */
   onParticipationChange?: () => void;
 }
@@ -46,11 +50,13 @@ export function MeetingRoom({
   workspaceId,
   meetingId,
   title,
+  autoJoin = false,
+  audioOnly = false,
   onParticipationChange,
 }: MeetingRoomProps) {
   const [phase, setPhase] = useState<'idle' | 'joining' | 'live'>('idle');
   const [audio, setAudio] = useState(true);
-  const [video, setVideo] = useState(true);
+  const [video, setVideo] = useState(!audioOnly);
   const [session, setSession] = useState<MeetingToken | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +104,14 @@ export function MeetingRoom({
       setPhase('idle');
     }
   }
+
+  const autoJoinedRef = useRef(false);
+  useEffect(() => {
+    if (!autoJoin || autoJoinedRef.current) return;
+    autoJoinedRef.current = true;
+    void handleJoin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoJoin]);
 
   function handleDisconnected() {
     setSession(null);

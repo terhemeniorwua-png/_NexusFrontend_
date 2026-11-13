@@ -11,6 +11,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@livekit/components-react": "^2.9.25",
+    "@livekit/components-styles": "^1.2.0",
+    "livekit-client": "^2.24.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",

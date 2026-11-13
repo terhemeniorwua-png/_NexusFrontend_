@@ -12,6 +12,10 @@ const mocks = vi.hoisted(() => ({
   restoreWorkspaceMember: vi.fn(),
 }));
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('@/providers/WorkspaceProvider', () => ({
+  useWorkspaceContext: () => ({ user: { id: 'current-user-test' } }),
+}));
 vi.mock('@/services/workspaces', () => ({
   listWorkspaceMembers: mocks.listWorkspaceMembers,
   updateWorkspaceMemberRole: mocks.updateWorkspaceMemberRole,

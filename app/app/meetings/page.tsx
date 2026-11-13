@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
+import { StartCallButton } from '@/components/meetings/StartCallButton';
 import {
   listMeetings,
   createMeeting,
@@ -346,9 +347,12 @@ export default function MeetingsPage() {
         title="Meetings"
         description="Schedule, manage, and join workspace meetings."
         actions={
-          <Button onClick={() => { setCreateOpen(true); setCreateError(null); }}>
-            New meeting
-          </Button>
+          <div className="flex items-center gap-2">
+            <StartCallButton workspaceId={workspaceId} variant="button" />
+            <Button onClick={() => { setCreateOpen(true); setCreateError(null); }}>
+              New meeting
+            </Button>
+          </div>
         }
       />
 

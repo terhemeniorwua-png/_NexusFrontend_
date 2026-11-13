@@ -162,6 +162,13 @@ export default function MeetingDetailPage() {
   const { activeWorkspace, user } = useWorkspaceContext();
   const workspaceId = activeWorkspace?.id ?? '';
   const currentUserId = user?.id ?? '';
+  // Read lazily from the URL; the room only renders after the meeting loads on the client.
+  const [autoJoin] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('autojoin') === '1',
+  );
+  const [audioOnly] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'audio',
+  );
 
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<number | null>(null);
@@ -480,6 +487,8 @@ export default function MeetingDetailPage() {
                 workspaceId={workspaceId}
                 meetingId={meetingId}
                 title={meeting.title}
+                autoJoin={autoJoin}
+                audioOnly={audioOnly}
                 onParticipationChange={() => {
                   participantsLoaded.current = false;
                   void loadParticipants(workspaceId, meetingId);

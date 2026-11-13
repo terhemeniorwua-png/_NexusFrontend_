@@ -129,6 +129,22 @@ export function Topbar({
         <MenuIcon />
       </button>
 
+      <Link
+        href="/app"
+        aria-label="Nexus home"
+        className="flex flex-shrink-0 items-center gap-2 rounded-[var(--radius-md)] px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+      >
+        <span
+          aria-hidden="true"
+          className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary)] text-sm font-bold text-white"
+        >
+          N
+        </span>
+        <span className="hidden text-base font-semibold text-[var(--color-text-primary)] sm:inline">
+          Nexus
+        </span>
+      </Link>
+
       <div className="min-w-0 flex-1 overflow-hidden">
         {hasBreadcrumbs ? (
           <Breadcrumb items={breadcrumbs ?? []} />

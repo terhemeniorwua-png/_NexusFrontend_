@@ -38,6 +38,8 @@ interface MeetingRoomProps {
   workspaceId: string;
   meetingId: string;
   title: string;
+  /** Join immediately on mount (used when a call is placed from the call button). */
+  autoJoin?: boolean;
   /** Called after joining or leaving so the participant list can refresh. */
   onParticipationChange?: () => void;
 }
@@ -46,6 +48,7 @@ export function MeetingRoom({
   workspaceId,
   meetingId,
   title,
+  autoJoin = false,
   onParticipationChange,
 }: MeetingRoomProps) {
   const [phase, setPhase] = useState<'idle' | 'joining' | 'live'>('idle');
@@ -98,6 +101,14 @@ export function MeetingRoom({
       setPhase('idle');
     }
   }
+
+  const autoJoinedRef = useRef(false);
+  useEffect(() => {
+    if (!autoJoin || autoJoinedRef.current) return;
+    autoJoinedRef.current = true;
+    void handleJoin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoJoin]);
 
   function handleDisconnected() {
     setSession(null);

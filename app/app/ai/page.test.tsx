@@ -26,6 +26,7 @@ vi.mock('@/services/ai', () => ({
   getAiHealth: vi.fn(),
 }));
 import { queryAI, getAiHealth, type AiHealthStatus } from '@/services/ai';
+import { ApiRequestError } from '@/lib/api';
 const mockQuery = vi.mocked(queryAI);
 const mockGetAiHealth = vi.mocked(getAiHealth);
 
@@ -113,6 +114,41 @@ describe('AIAssistantPage', () => {
     await waitFor(() =>
       expect(screen.queryByRole('alert')).not.toBeInTheDocument(),
     );
+  });
+
+  it.each([
+    ['AI_NOT_CONFIGURED', 'AI is not set up on this server yet.'],
+    [
+      'AI_RATE_LIMITED',
+      'The AI provider is busy. Please try again in a moment.',
+    ],
+    [
+      'AI_TIMEOUT',
+      'The AI took too long to respond. Please try again.',
+    ],
+    ['AI_UNAVAILABLE', 'The AI service is temporarily unavailable.'],
+  ])('maps %s to a readable error message', async (code, expected) => {
+    mockQuery.mockRejectedValue(new ApiRequestError('boom', 500, code));
+    const user = userEvent.setup();
+    render(<AIAssistantPage />);
+    await user.type(screen.getByRole('textbox', { name: 'Your question' }), 'Hi');
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(
+      (await screen.findAllByText(expected)).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('keeps the generic message for an unknown error code', async () => {
+    mockQuery.mockRejectedValue(
+      new ApiRequestError('Something custom went wrong', 500, 'UNKNOWN_CODE'),
+    );
+    const user = userEvent.setup();
+    render(<AIAssistantPage />);
+    await user.type(screen.getByRole('textbox', { name: 'Your question' }), 'Hi');
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(
+      (await screen.findAllByText('Something custom went wrong')).length,
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it('sends a query when Send button is clicked', async () => {

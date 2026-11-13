@@ -74,4 +74,14 @@ describe('account selection authentication flow', () => {
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Change account type/ })).not.toBeInTheDocument();
   });
+
+  it('widens the account type modal and loosens the cards', () => {
+    render(<AuthPage mode="sign-up" />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('max-w-[56rem]');
+    const card = screen.getByText('Personal account').closest('button');
+    expect(card).toHaveClass('p-6');
+    expect(card).toHaveClass('min-w-0');
+    expect(card).not.toHaveClass('p-4');
+  });
 });

@@ -699,12 +699,20 @@ export function AuthForm({ mode, initialEmail = '', accountType, redirectPath, d
   return (
     <section className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-lg sm:p-8">
       <div className="mb-7">
-        <div className="relative mb-8 flex min-h-10 flex-col items-center gap-3 sm:flex-row sm:justify-center">
+        <div className="relative mb-8 flex min-h-10 items-center gap-3 sm:flex-row sm:justify-between sm:items-center">
           <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight text-text-primary" aria-label="Nexus home">
             <span className="grid size-10 place-items-center rounded-lg bg-primary text-base font-bold text-white">N</span>
             Nexus
           </Link>
-          {onBackToAccountType && <button type="button" onClick={onBackToAccountType} className="self-end text-sm font-medium text-primary hover:underline sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2">← Change account type</button>}
+          {onBackToAccountType && (
+            <button
+              type="button"
+              onClick={onBackToAccountType}
+              className="whitespace-nowrap text-xs border border-border rounded-md px-2.5 py-1 text-text-secondary transition-colors hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)]"
+            >
+              Change account type
+            </button>
+          )}
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">{mode === 'sign-up' && accountType === 'business' ? 'Create a business account' : mode === 'sign-up' && accountType === 'institution' ? 'Create an institution account' : content.title}</h1>
         <p className="mt-2 text-sm leading-6 text-text-secondary">{accountType ? `${accountType === 'personal' ? 'Personal' : accountType === 'business' ? 'Business' : 'Institution'} account · ${mode === 'sign-in' ? 'Sign in with your Nexus identity.' : content.subtitle}` : content.subtitle}</p>

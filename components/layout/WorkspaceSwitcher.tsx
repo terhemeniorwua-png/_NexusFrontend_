@@ -86,7 +86,11 @@ export function WorkspaceSwitcher({
       align="start"
       className={['w-full', className].filter(Boolean).join(' ')}
       triggerClassName="w-full justify-start gap-2 px-2"
-      menuClassName="w-60"
+      // The menu is wide enough for the workspace name and role to stay fully
+      // readable. It renders inside the fixed sidebar, which sits on its own
+      // z-index layer above the (now static) secondary panel, so the menu is
+      // not covered or clipped by it.
+      menuClassName="min-w-[16rem] max-w-[24rem]"
     >
       <span className="sr-only">Switch workspace: </span>
       <span className="flex min-w-0 flex-1 items-center gap-2">

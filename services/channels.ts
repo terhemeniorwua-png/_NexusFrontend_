@@ -8,6 +8,8 @@ import { refreshSession } from '@/services/auth';
 export type ChannelType = 'WORKSPACE' | 'TEAM' | 'DEPARTMENT' | 'PROJECT' | 'PRIVATE';
 
 export interface ChannelSummary {
+  postPolicy?: 'ALL_MEMBERS' | 'MANAGERS_ONLY';
+  isDefault?: boolean;
   id: string;
   workspaceId: string;
   type: ChannelType;

@@ -19,6 +19,9 @@ export interface MessageSummary {
   deletedAt: string | null;
   replyCount: number;
   reactionCount: number;
+  type?: 'TEXT' | 'VOICE';
+  audioMime?: string | null;
+  audioDurationMs?: number | null;
 }
 
 export interface MessagePage {
@@ -192,4 +195,17 @@ export function getUnreadCount(
   return request<{ unreadCount: number }>(
     channelPath(workspaceId, channelId, '/unread-count'),
   );
+}
+
+export function sendVoiceMessage(
+  workspaceId: string,
+  channelId: string,
+  audio: Blob,
+  durationMs: number,
+): Promise<MessageSummary> {
+  const form = new FormData();
+  const ext = audio.type.includes('mp4') ? 'm4a' : audio.type.includes('ogg') ? 'ogg' : 'webm';
+  form.append('audio', audio, `voice.${ext}`);
+  form.append('durationMs', String(Math.round(durationMs)));
+  return request<MessageSummary>(`${channelPath(workspaceId, channelId)}/voice`, { method: 'POST', body: form });
 }

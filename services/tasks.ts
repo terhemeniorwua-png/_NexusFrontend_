@@ -321,7 +321,7 @@ export function removeDependency(
 // Comment management
 // ---------------------------------------------------------------------------
 
-export function listComments(
+export async function listComments(
   workspaceId: string,
   projectId: string,
   taskId: string,
@@ -329,9 +329,11 @@ export function listComments(
 ): Promise<TaskComment[]> {
   const params = new URLSearchParams();
   if (limit !== undefined) params.set('limit', String(limit));
-  return request<TaskComment[]>(
+  const result = await request<TaskComment[] | { items?: TaskComment[] }>(
     taskPath(workspaceId, projectId, taskId, '/comments') + (params.size ? `?${params}` : ''),
   );
+  if (Array.isArray(result)) return result;
+  return Array.isArray(result?.items) ? result.items : [];
 }
 
 export function addComment(

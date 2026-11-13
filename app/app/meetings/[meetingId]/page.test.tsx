@@ -31,6 +31,15 @@ const mockCtx = {
 };
 vi.mock('@/providers/WorkspaceProvider', () => ({ useWorkspaceContext: () => mockCtx }));
 
+vi.mock('@/components/meetings/MeetingRoom', () => ({
+  MeetingRoom: ({ title }: { title: string }) => (
+    <div data-testid="meeting-room">
+      <button type="button">Join meeting</button>
+      <span>{title}</span>
+    </div>
+  ),
+}));
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function ok(data: unknown, status = 200) {
@@ -123,31 +132,26 @@ describe('MeetingDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
   });
 
-  it('shows Join button when meeting is not ended or cancelled', async () => {
+  it('shows the meeting room when the meeting can be joined', async () => {
     routeMock((url) => {
       if (url.includes('/participants')) return ok([]);
       return ok(fakeMeeting({ status: 'SCHEDULED' }));
     });
     render(<MeetingDetailPage />);
     await waitFor(() => expect(screen.queryByLabelText('Loading meeting')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Join' })).toBeInTheDocument();
+    expect(screen.getByTestId('meeting-room')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Join meeting' })).toBeInTheDocument();
   });
 
-  it('calls POST .../join when Join is clicked', async () => {
-    const fetchMock = routeMock((url) => {
-      if (url.includes('/join')) return ok({ ok: true });
+  it.each(['ENDED', 'CANCELLED'])('does not show the room when the meeting is %s', async (status) => {
+    routeMock((url) => {
       if (url.includes('/participants')) return ok([]);
-      return ok(fakeMeeting({ status: 'SCHEDULED' }));
+      return ok(fakeMeeting({ status }));
     });
-    const user = userEvent.setup();
     render(<MeetingDetailPage />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Join' })).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: 'Join' }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/join'),
-      expect.objectContaining({ method: 'POST' }),
-    ));
+    await waitFor(() => expect(screen.queryByLabelText('Loading meeting')).not.toBeInTheDocument());
+    expect(screen.queryByTestId('meeting-room')).not.toBeInTheDocument();
+    expect(screen.getByText(/can no longer be joined/i)).toBeInTheDocument();
   });
 
   it('opens edit modal when Edit is clicked', async () => {

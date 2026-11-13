@@ -113,7 +113,7 @@ export function Topbar({
   return (
     <header
       className={[
-        'fixed inset-x-0 top-0 z-[var(--z-nav)] flex h-[var(--nav-h)] flex-shrink-0 items-center gap-2',
+        'fixed inset-x-0 top-0 z-50 flex h-14 flex-shrink-0 items-center gap-2',
         'border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 sm:px-4',
       ].join(' ')}
     >

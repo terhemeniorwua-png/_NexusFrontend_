@@ -100,13 +100,13 @@ export function SecondarySidebar({
       className={[
         'flex flex-shrink-0 flex-col',
         'border-r border-[var(--color-border)] bg-[var(--color-surface)] box-shadow-[var(--shadow-md)]',
-        'transition-[width,transform,visibility] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+        'transition-[width,transform,visibility] duration-300 ease-in-out',
         // Mobile: overlay drawer full height below the top bar.
-        'fixed top-[var(--nav-h)] bottom-0 left-0 z-[var(--z-nav)] w-[var(--panel-w)]',
+        'fixed top-14 bottom-0 left-0 z-50 w-[16rem]',
         'invisible -translate-x-full',
         open ? 'visible translate-x-0' : 'invisible -translate-x-full',
-        // Desktop: fixed panel below the top bar, next to the rail.
-        'lg:top-[var(--nav-h)] lg:bottom-0 lg:left-[var(--rail-w)] lg:z-auto lg:w-[var(--panel-w)] lg:visible lg:translate-x-0',
+        // Desktop: fixed panel below the topbar, next to the rail.
+        'lg:top-14 lg:bottom-0 lg:left-[4.75rem] lg:z-auto lg:w-[16rem] lg:visible lg:translate-x-0',
       ].join(' ')}
     >
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3">

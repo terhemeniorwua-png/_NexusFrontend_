@@ -134,18 +134,19 @@ export function PrimarySidebar({
       role="region"
       aria-label="Primary navigation"
       className={[
-        'fixed top-[var(--nav-h)] bottom-0 left-0 z-[var(--z-nav)] flex flex-shrink-0 flex-col',
+        'fixed top-14 bottom-0 left-0 z-50 flex flex-shrink-0 flex-col',
         'border-r border-[var(--color-border)] bg-[var(--color-surface)]',
-        'transition-[width,transform,visibility] duration-[var(--duration-base)] ease-[var(--ease-standard)]',
+        'transition-[width,transform,visibility] duration-300 ease-in-out',
         // Mobile: off-canvas drawer opened from the topbar menu button.
         'w-[16rem] invisible -translate-x-full',
         mobileOpen ? 'visible translate-x-0' : 'invisible -translate-x-full',
-        // Desktop: fixed rail below the top bar, full viewport height.
-        'lg:w-[var(--rail-w)]',
+        // Desktop: fixed rail below the topbar, full viewport height.
+        'lg:top-14 lg:bottom-0 lg:visible lg:translate-x-0',
+        collapsed ? 'lg:w-[4.75rem]' : 'lg:w-[16rem]',
       ].join(' ')}
     >
       {headerSlot && (
-        <div className="flex h-[var(--nav-h)] flex-shrink-0 items-center justify-center border-b border-[var(--color-border)] px-2">
+        <div className="flex h-14 flex-shrink-0 items-center justify-center border-b border-[var(--color-border)] px-2">
           {headerSlot}
         </div>
       )}

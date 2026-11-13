@@ -67,10 +67,6 @@
   --duration-slow: 240ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
-  /* Shell layout */
-  --nav-h:      3.5rem; /* Top bar height */
-  --panel-w:    16rem;  /* Expanded side panel width (256px) */
-
   /* Z-index scale */
   --z-nav:      900;   /* Shell chrome (top bar / rail / panel): below popovers */
   --z-dropdown: 1000;

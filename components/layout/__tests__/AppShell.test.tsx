@@ -212,8 +212,8 @@ describe('AppShell', () => {
       const panel = screen.getByRole('region', { name: 'AI' });
       expect(panel).toBeInTheDocument();
       expect(panel).toHaveClass('fixed');
-      expect(panel).toHaveClass('w-[var(--panel-w)]');
-      expect(panel).toHaveClass('top-[var(--nav-h)]');
+      expect(panel).toHaveClass('w-[16rem]');
+      expect(panel).toHaveClass('top-14');
       expect(screen.getByRole('link', { name: 'AI Assistant' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Nexus Write' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'AI Actions' })).toBeInTheDocument();
@@ -290,12 +290,12 @@ describe('AppShell', () => {
 
       const main = screen.getByRole('main');
       // Collapsed rail: content starts at the rail width.
-      expect(main).toHaveStyle({ left: 'var(--rail-w)' });
+      expect(main).toHaveClass('lg:pl-[4.75rem]');
 
       await user.click(screen.getByRole('button', { name: 'AI' }));
 
       // Panel open: content starts at rail width plus panel width.
-      expect(main).toHaveStyle({ left: 'calc(var(--rail-w) + var(--panel-w))' });
+      expect(main).toHaveClass('lg:pl-[20.75rem]');
     });
 
     it('keeps the rail fixed full height below the top bar on desktop', () => {
@@ -303,7 +303,7 @@ describe('AppShell', () => {
 
       const rail = screen.getByRole('region', { name: 'Primary navigation' });
       expect(rail).toHaveClass('fixed');
-      expect(rail).toHaveClass('top-[var(--nav-h)]');
+      expect(rail).toHaveClass('top-14');
       expect(rail).toHaveClass('bottom-0');
       expect(rail).toHaveClass('left-0');
     });

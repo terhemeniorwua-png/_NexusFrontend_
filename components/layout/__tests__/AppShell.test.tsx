@@ -211,8 +211,9 @@ describe('AppShell', () => {
 
       const panel = screen.getByRole('region', { name: 'AI' });
       expect(panel).toBeInTheDocument();
-      expect(panel).toHaveClass('w-[16rem]');
-      expect(panel).toHaveClass('lg:static');
+      expect(panel).toHaveClass('fixed');
+      expect(panel).toHaveClass('w-[var(--panel-w)]');
+      expect(panel).toHaveClass('top-[var(--nav-h)]');
       expect(screen.getByRole('link', { name: 'AI Assistant' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Nexus Write' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'AI Actions' })).toBeInTheDocument();
@@ -281,6 +282,30 @@ describe('AppShell', () => {
       expect(panel.querySelectorAll('a').length).toBeGreaterThan(0);
       // No label may be visually truncated with an ellipsis.
       expect(panel.querySelectorAll('.truncate')).toHaveLength(0);
+    });
+
+    it('offsets content to the right of the rail, and further right when the panel opens', async () => {
+      const user = userEvent.setup();
+      renderShell();
+
+      const main = screen.getByRole('main');
+      // Collapsed rail: content starts at the rail width.
+      expect(main).toHaveStyle({ left: 'var(--rail-w)' });
+
+      await user.click(screen.getByRole('button', { name: 'AI' }));
+
+      // Panel open: content starts at rail width plus panel width.
+      expect(main).toHaveStyle({ left: 'calc(var(--rail-w) + var(--panel-w))' });
+    });
+
+    it('keeps the rail fixed full height below the top bar on desktop', () => {
+      renderShell();
+
+      const rail = screen.getByRole('region', { name: 'Primary navigation' });
+      expect(rail).toHaveClass('fixed');
+      expect(rail).toHaveClass('top-[var(--nav-h)]');
+      expect(rail).toHaveClass('bottom-0');
+      expect(rail).toHaveClass('left-0');
     });
   });
 });

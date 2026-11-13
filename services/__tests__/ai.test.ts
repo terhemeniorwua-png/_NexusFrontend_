@@ -21,7 +21,7 @@ describe('analyzeText', () => {
     );
     await analyzeText('hello world', ['GRAMMAR', 'SPELLING']);
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/backend/ai/analyze',
+      '/api/backend/ai/writing/analyze',
       expect.objectContaining({
         method: 'POST',
         body: expect.stringContaining('"features":["GRAMMAR","SPELLING"]'),
@@ -33,13 +33,13 @@ describe('analyzeText', () => {
 describe('queryAI', () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it('calls POST /ai/query with query string', async () => {
+  it('calls POST /ai/chat with query string', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       ok({ query: 'test', answer: null, references: [], message: 'ok' }),
     );
     await queryAI('What is Nexus?');
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/backend/ai/query',
+      '/api/backend/ai/chat',
       expect.objectContaining({
         method: 'POST',
         body: expect.stringContaining('"query":"What is Nexus?"'),

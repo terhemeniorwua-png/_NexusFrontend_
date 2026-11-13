@@ -102,28 +102,55 @@ export async function analyzeText(
   text: string,
   features: AnalysisFeature[],
 ): Promise<AnalyzeTextResponse> {
-  return authed<AnalyzeTextResponse>('/ai/analyze', {
+  const supported = ['SPELLING', 'GRAMMAR', 'PUNCTUATION', 'CLARITY', 'VOCABULARY', 'TONE', 'STYLE'];
+  const backendFeatures = features.filter((f) => supported.includes(f));
+  const data = await authed<{
+    suggestions: {
+      category: string;
+      original: string;
+      replacement: string;
+      explanation?: string;
+      message?: string;
+    }[];
+    summary?: string | null;
+  }>('/ai/writing/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, features }),
+    body: JSON.stringify({
+      text,
+      ...(backendFeatures.length ? { features: backendFeatures } : {}),
+    }),
   });
+  return {
+    text,
+    suggestions: data.suggestions.map((s) => ({
+      type: s.category,
+      original: s.original,
+      suggestion: s.replacement,
+      explanation: s.explanation ?? s.message,
+    })),
+    summary: data.summary ?? null,
+    rewrite: null,
+    message: 'ok',
+  };
 }
 
 /** Send a query to the AI assistant. */
 export async function queryAI(
   query: string,
   workspaceId?: string,
-  context?: string,
+  _context?: string,
 ): Promise<AiQueryResponse> {
-  return authed<AiQueryResponse>('/ai/query', {
+  const data = await authed<{
+    answer: string;
+    references: AiQueryResponse['references'];
+    conversationId: string;
+  }>('/ai/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query,
-      ...(workspaceId ? { workspaceId } : {}),
-      ...(context ? { context } : {}),
-    }),
+    body: JSON.stringify({ query, ...(workspaceId ? { workspaceId } : {}) }),
   });
+  return { query, answer: data.answer, references: data.references ?? [], message: 'ok' } as AiQueryResponse;
 }
 
 /** Submit an approved AI action for execution. */

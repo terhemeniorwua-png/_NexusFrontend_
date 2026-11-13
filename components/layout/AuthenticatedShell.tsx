@@ -15,6 +15,7 @@ import { signOut } from '@/services/auth';
 import { getUnreadCount } from '@/services/notifications';
 import { getUserProfile } from '@/services/profile';
 import type { WorkspaceSummary } from '@/types/navigation';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 /** How often to poll the unread count (ms). Only fires when the tab is visible. */
 const UNREAD_POLL_INTERVAL = 60_000;
@@ -64,7 +65,7 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
     let active = true;
     getUserProfile()
       .then((profile) => {
-        if (active) setAvatarUrl(profile.profile.avatarUrl);
+        if (active) setAvatarUrl(resolveAvatarUrl(profile.profile.avatarUrl));
       })
       .catch(() => {
         // Non-fatal — the topbar falls back to initials.

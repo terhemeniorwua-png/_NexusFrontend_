@@ -5,6 +5,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { ApiRequestError } from '@/lib/api';
 import { deleteAvatar, uploadAvatar, type UserProfileView } from '@/services/profile';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -154,7 +155,7 @@ export function AvatarUpload({ avatarUrl, name, onProfileUpdate }: AvatarUploadP
 
   // The URL shown in the avatar: prefer the optimistic preview, then the
   // confirmed server URL.
-  const displayUrl = preview ?? avatarUrl;
+  const displayUrl = preview ?? resolveAvatarUrl(avatarUrl);
   const hasPhoto = Boolean(avatarUrl);
 
   return (

@@ -28,6 +28,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Select } from '@/components/ui/Select';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { AiStatusBanner } from '@/components/ai/AiStatusBanner';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { ApiRequestError } from '@/lib/api';
 import {
@@ -157,11 +158,7 @@ export default function AIActionsPage() {
         description="Review and approve AI-proposed actions before they are executed."
       />
 
-      <Alert variant="warning" className="mb-4">
-        <strong>Preview mode:</strong> AI-proposed actions appear here for explicit user approval.
-        The backend validates permissions and executes only after confirmed approval. The Python AI
-        service is not yet connected, so no proposals will arrive until it starts returning them.
-      </Alert>
+      <AiStatusBanner className="mb-4" />
 
       <Card className="mb-6 border-[var(--color-primary)] bg-[var(--color-primary-soft)] p-4">
         <h2 className="mb-2 font-semibold text-[var(--color-primary)]">How AI action approval works</h2>

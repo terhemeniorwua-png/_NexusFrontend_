@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Spinner } from '@/components/ui/Spinner';
 import { Textarea } from '@/components/ui/Textarea';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { AiStatusBanner } from '@/components/ai/AiStatusBanner';
 import { ApiRequestError } from '@/lib/api';
 import { addAiActionProposals, type ProposedAiAction } from '@/lib/ai-action-proposals';
 import { queryAI, type AiQueryResponse } from '@/services/ai';
@@ -297,12 +298,7 @@ export default function AIAssistantPage() {
         description="Ask questions about your workspace, tasks, and documents."
       />
 
-      {/* Service availability notice */}
-      <Alert variant="warning" className="mb-4">
-        <strong>Preview mode:</strong> The Nexus AI service is not yet connected to a live AI model.
-        Responses will acknowledge your query but cannot provide real answers until the Python AI
-        service is configured.
-      </Alert>
+      <AiStatusBanner className="mb-4" />
 
       {proposedCount > 0 && (
         <Alert variant="info" className="mb-4">

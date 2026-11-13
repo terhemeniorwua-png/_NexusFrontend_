@@ -14,9 +14,11 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/services/ai', () => ({
   analyzeText: vi.fn(),
+  getAiHealth: vi.fn(),
 }));
-import { analyzeText } from '@/services/ai';
+import { analyzeText, getAiHealth, type AiHealthStatus } from '@/services/ai';
 const mockAnalyze = vi.mocked(analyzeText);
+const mockGetAiHealth = vi.mocked(getAiHealth);
 
 describe('NexusWritePage', () => {
   beforeEach(() => {
@@ -28,6 +30,12 @@ describe('NexusWritePage', () => {
       rewrite: undefined,
       message: 'AI service not yet configured.',
     });
+    // Healthy provider by default: no banner is shown.
+    mockGetAiHealth.mockResolvedValue({
+      configured: true,
+      status: 'up',
+      latencyMs: 10,
+    } as AiHealthStatus);
   });
 
   it('renders the Nexus Write heading', () => {
@@ -35,9 +43,46 @@ describe('NexusWritePage', () => {
     expect(screen.getByRole('heading', { name: 'Nexus Write', level: 1 })).toBeInTheDocument();
   });
 
-  it('shows the preview mode notice', () => {
+  it('shows no banner when the AI provider is healthy', () => {
+    mockGetAiHealth.mockResolvedValue({
+      configured: true,
+      status: 'up',
+      latencyMs: 10,
+    } as AiHealthStatus);
     render(<NexusWritePage />);
-    expect(screen.getByText(/Preview mode/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows "AI is not enabled on this server" when not configured', async () => {
+    mockGetAiHealth.mockResolvedValue({
+      configured: false,
+      status: 'down',
+      latencyMs: 0,
+    } as AiHealthStatus);
+    render(<NexusWritePage />);
+    expect(
+      await screen.findByText('AI is not enabled on this server.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows "temporarily unavailable" when the provider is down', async () => {
+    mockGetAiHealth.mockResolvedValue({
+      configured: true,
+      status: 'down',
+      latencyMs: 0,
+    } as AiHealthStatus);
+    render(<NexusWritePage />);
+    expect(
+      await screen.findByText('The AI service is temporarily unavailable.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows "temporarily unavailable" when the health request fails', async () => {
+    mockGetAiHealth.mockRejectedValue(new Error('network down'));
+    render(<NexusWritePage />);
+    expect(
+      await screen.findByText('The AI service is temporarily unavailable.'),
+    ).toBeInTheDocument();
   });
 
   it('renders feature checkboxes', () => {

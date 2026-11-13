@@ -28,9 +28,11 @@ vi.mock('@/providers/WorkspaceProvider', () => ({ useWorkspaceContext: () => moc
 
 vi.mock('@/services/ai', () => ({
   approveAiAction: vi.fn(),
+  getAiHealth: vi.fn(),
 }));
-import { approveAiAction } from '@/services/ai';
+import { approveAiAction, getAiHealth, type AiHealthStatus } from '@/services/ai';
 const mockApprove = vi.mocked(approveAiAction);
+const mockGetAiHealth = vi.mocked(getAiHealth);
 
 function proposal(overrides: Partial<ProposedAiAction> = {}): ProposedAiAction {
   return {
@@ -55,6 +57,12 @@ describe('AIActionsPage', () => {
       executed: false,
       message: 'AI action execution not yet implemented. The approval was valid.',
     });
+    // Healthy provider by default: no banner is shown.
+    mockGetAiHealth.mockResolvedValue({
+      configured: true,
+      status: 'up',
+      latencyMs: 10,
+    } as AiHealthStatus);
   });
 
   it('renders the AI Action Approvals heading', () => {
@@ -62,9 +70,46 @@ describe('AIActionsPage', () => {
     expect(screen.getByRole('heading', { name: 'AI Action Approvals', level: 1 })).toBeInTheDocument();
   });
 
-  it('shows the preview mode notice', () => {
+  it('shows no banner when the AI provider is healthy', () => {
+    mockGetAiHealth.mockResolvedValue({
+      configured: true,
+      status: 'up',
+      latencyMs: 10,
+    } as AiHealthStatus);
     render(<AIActionsPage />);
-    expect(screen.getByText(/Preview mode/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows "AI is not enabled on this server" when not configured', async () => {
+    mockGetAiHealth.mockResolvedValue({
+      configured: false,
+      status: 'down',
+      latencyMs: 0,
+    } as AiHealthStatus);
+    render(<AIActionsPage />);
+    expect(
+      await screen.findByText('AI is not enabled on this server.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows "temporarily unavailable" when the provider is down', async () => {
+    mockGetAiHealth.mockResolvedValue({
+      configured: true,
+      status: 'down',
+      latencyMs: 0,
+    } as AiHealthStatus);
+    render(<AIActionsPage />);
+    expect(
+      await screen.findByText('The AI service is temporarily unavailable.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows "temporarily unavailable" when the health request fails', async () => {
+    mockGetAiHealth.mockRejectedValue(new Error('network down'));
+    render(<AIActionsPage />);
+    expect(
+      await screen.findByText('The AI service is temporarily unavailable.'),
+    ).toBeInTheDocument();
   });
 
   it('shows the approval rules card', () => {

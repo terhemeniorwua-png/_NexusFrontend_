@@ -13,6 +13,7 @@ import {
   useChat,
   useTracks,
 } from '@livekit/components-react';
+import HostControls from './HostControls';
 
 interface MeetingRoomLiveProps {
   serverUrl: string;
@@ -21,23 +22,23 @@ interface MeetingRoomLiveProps {
   video: boolean;
   onDisconnected: () => void;
   onError: (error: Error) => void;
+  /** Pass only for the host; shows the Host controls menu. */
+  host?: { workspaceId: string; meetingId: string };
 }
 
 /** Fit the call to the area under the header and right of the sidebar. */
 function useContentInset() {
-  const [inset, setInset] = useState({ top: 56, left: 76 });
+  const [inset, setInset] = useState({ top: 56, left: 0 });
   useEffect(() => {
+    const main = document.getElementById('main-content');
     const measure = () => {
-      const header = document.querySelector('header');
-      const main = document.querySelector('main');
-      setInset({
-        top: header ? Math.max(header.getBoundingClientRect().bottom, 0) : 56,
-        left: main ? Math.max(main.getBoundingClientRect().left, 0) : 76,
-      });
+      if (!main) return;
+      const rect = main.getBoundingClientRect();
+      const padLeft = parseFloat(window.getComputedStyle(main).paddingLeft) || 0;
+      setInset({ top: Math.max(rect.top, 0), left: Math.max(rect.left + padLeft, 0) });
     };
     measure();
     window.addEventListener('resize', measure);
-    const main = document.querySelector('main');
     const observer = main ? new ResizeObserver(measure) : null;
     if (main && observer) observer.observe(main);
     return () => {
@@ -48,7 +49,7 @@ function useContentInset() {
   return inset;
 }
 
-function CallLayout() {
+function CallLayout({ host }: { host?: { workspaceId: string; meetingId: string } }) {
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -90,6 +91,7 @@ function CallLayout() {
         </div>
         <div className="flex items-center justify-center gap-2 border-t border-[var(--color-border)] p-2">
           <ControlBar variation="minimal" controls={{ chat: false }} />
+          {host && <HostControls workspaceId={host.workspaceId} meetingId={host.meetingId} />}
           <button
             type="button"
             onClick={() => setChatOpen((v) => !v)}
@@ -170,6 +172,7 @@ export default function MeetingRoomLive({
   video,
   onDisconnected,
   onError,
+  host,
 }: MeetingRoomLiveProps) {
   const inset = useContentInset();
   return (
@@ -208,7 +211,7 @@ export default function MeetingRoomLive({
         onError={onError}
         style={{ height: '100%' }}
       >
-        <CallLayout />
+        <CallLayout host={host} />
         <RoomAudioRenderer />
         <StartAudio label="Click to enable audio" />
       </LiveKitRoom>

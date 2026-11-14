@@ -35,6 +35,8 @@ export function meetingJoinErrorMessage(error: unknown): string {
 }
 
 interface MeetingRoomProps {
+  /** True only for the meeting creator; shows Host controls. */
+  isHost?: boolean;
   workspaceId: string;
   meetingId: string;
   title: string;
@@ -47,6 +49,7 @@ interface MeetingRoomProps {
 }
 
 export function MeetingRoom({
+  isHost,
   workspaceId,
   meetingId,
   title,
@@ -124,6 +127,7 @@ export function MeetingRoom({
       <div className="space-y-3">
         {error && <Alert variant="error">{error}</Alert>}
         <LiveRoom
+          host={isHost ? { workspaceId, meetingId } : undefined}
           serverUrl={session.url}
           token={session.token}
           audio={audio}

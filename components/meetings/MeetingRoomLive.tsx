@@ -2,7 +2,7 @@
 
 import '@livekit/components-styles';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
-import { Track } from 'livekit-client';
+import { Track, type Room } from 'livekit-client';
 import {
   ControlBar,
   GridLayout,
@@ -11,6 +11,8 @@ import {
   RoomAudioRenderer,
   StartAudio,
   useChat,
+  useLocalParticipant,
+  useRoomContext,
   useTracks,
 } from '@livekit/components-react';
 import HostControls from './HostControls';
@@ -24,6 +26,8 @@ interface MeetingRoomLiveProps {
   onError: (error: Error) => void;
   /** Pass only for the host; shows the Host controls menu. */
   host?: { workspaceId: string; meetingId: string };
+  /** Reports the room and screen-share state to the provider, which shows the mini bar. */
+  onRoomState?: (state: { room: Room; sharing: boolean }) => void;
 }
 
 /** Fit the call to the area under the header and right of the sidebar. */
@@ -164,6 +168,15 @@ function CallLayout({ host }: { host?: { workspaceId: string; meetingId: string 
   );
 }
 
+function RoomBridge({ onRoomState }: { onRoomState: (state: { room: Room; sharing: boolean }) => void }) {
+  const room = useRoomContext();
+  const { isScreenShareEnabled } = useLocalParticipant();
+  useEffect(() => {
+    onRoomState({ room, sharing: isScreenShareEnabled });
+  }, [room, isScreenShareEnabled, onRoomState]);
+  return null;
+}
+
 /** Loaded client-only (no SSR). */
 export default function MeetingRoomLive({
   serverUrl,
@@ -173,6 +186,7 @@ export default function MeetingRoomLive({
   onDisconnected,
   onError,
   host,
+  onRoomState,
 }: MeetingRoomLiveProps) {
   const inset = useContentInset();
   return (
@@ -212,6 +226,7 @@ export default function MeetingRoomLive({
         style={{ height: '100%' }}
       >
         <CallLayout host={host} />
+        {onRoomState && <RoomBridge onRoomState={onRoomState} />}
         <RoomAudioRenderer />
         <StartAudio label="Click to enable audio" />
       </LiveKitRoom>

@@ -484,6 +484,7 @@ export default function MeetingDetailPage() {
               </Card>
             ) : (
               <MeetingRoom
+                isHost={isCreator}
                 workspaceId={workspaceId}
                 meetingId={meetingId}
                 title={meeting.title}

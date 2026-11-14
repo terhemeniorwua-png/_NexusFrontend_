@@ -215,3 +215,21 @@ export async function getMeetingToken(workspaceId: string, meetingId: string): P
 export async function declineMeeting(workspaceId: string, meetingId: string): Promise<{ ok: true }> {
   return authed<{ ok: true }>(`${base(workspaceId)}/${meetingId}/decline`, { method: 'POST' });
 }
+
+/** Host only: end the meeting, disconnect everyone and block further joins. */
+export async function endMeetingForAll(workspaceId: string, meetingId: string): Promise<MeetingSummary> {
+  return authed<MeetingSummary>(`${base(workspaceId)}/${meetingId}/host/end`, { method: 'POST' });
+}
+
+/** Host only: mute every other participant's microphone. */
+export async function muteAllInCall(workspaceId: string, meetingId: string): Promise<{ muted: number }> {
+  return authed<{ muted: number }>(`${base(workspaceId)}/${meetingId}/host/mute-all`, { method: 'POST' });
+}
+
+/** Host only: disconnect one person from the live call. */
+export async function removeFromCall(workspaceId: string, meetingId: string, userId: string): Promise<{ ok: true }> {
+  return authed<{ ok: true }>(`${base(workspaceId)}/${meetingId}/host/remove`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}

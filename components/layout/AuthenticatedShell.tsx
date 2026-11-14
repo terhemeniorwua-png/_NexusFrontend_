@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/Alert';
+import { Toaster } from '@/components/ui/Toaster';
 import { AppShell } from '@/components/layout/AppShell';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
 import { buildAppNavigation, workspaceKindFor } from '@/lib/app-navigation';
@@ -163,6 +164,7 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
       />
 
       <IncomingCallListener />
+      <Toaster />
     </AppShell>
   );
 }

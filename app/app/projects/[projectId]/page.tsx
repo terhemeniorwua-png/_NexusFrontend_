@@ -1,18 +1,29 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { AccessState } from '@/components/shared/AccessState';
+import { Can } from '@/components/shared/Can';
+import { PageAccessState } from '@/components/shared/PageAccessState';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
-import { getProject, type ProjectSummary, type ProjectVisibility } from '@/services/projects';
+import {
+  archiveProject,
+  deleteProject,
+  getProject,
+  type ProjectSummary,
+  type ProjectVisibility,
+} from '@/services/projects';
 
 function visibilityLabel(v: ProjectVisibility): string {
   if (v === 'WORKSPACE') return 'Organisation-wide';
@@ -30,14 +41,24 @@ function dateLabel(value: string | null): string {
   return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
 }
 
+function requestError(cause: unknown, fallback: string): string {
+  return cause instanceof ApiRequestError ? cause.message : fallback;
+}
+
 export default function ProjectOverviewPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
+  const { can, isLoading: permissionsLoading } = usePermissions();
+  const router = useRouter();
   useWorkspaceRedirect();
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -64,6 +85,36 @@ export default function ProjectOverviewPage() {
     return () => { active = false; };
   }, [load]);
 
+  async function handleArchive() {
+    if (!activeWorkspace || !project) return;
+    setBusy(true); setError(null);
+    try {
+      await archiveProject(activeWorkspace.id, project.id);
+      setConfirmArchive(false);
+      setNotice('Project archived.');
+      await load();
+    } catch (cause) {
+      setError(requestError(cause, 'Project could not be archived.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!activeWorkspace || !project) return;
+    setBusy(true); setError(null);
+    try {
+      await deleteProject(activeWorkspace.id, project.id);
+      setConfirmDelete(false);
+      router.push('/app/projects');
+    } catch (cause) {
+      setError(requestError(cause, 'Project could not be deleted.'));
+      setBusy(false);
+    }
+  }
+
+  const projectHref = `/app/projects/${encodeURIComponent(projectId)}`;
+
   if (!activeWorkspace) {
     return (
       <EmptyState
@@ -74,7 +125,7 @@ export default function ProjectOverviewPage() {
     );
   }
 
-  if (loading) {
+  if (loading || permissionsLoading) {
     return (
       <div className="space-y-4" role="status" aria-label="Loading project">
         <Skeleton className="h-10 w-2/3 rounded-lg" />
@@ -85,31 +136,71 @@ export default function ProjectOverviewPage() {
   }
 
   if (accessStatus) return <AccessState status={accessStatus} onRetry={() => void load()} />;
-  if (error) return <Alert variant="error" title="Project unavailable">{error}</Alert>;
+  if (!can('project.view')) {
+    return (
+      <PageAccessState
+        title="Project not found or no access"
+        description="This project may have been deleted, or it is private and you are not a member."
+        backHref="/app/projects"
+        backLabel="Back to projects"
+      />
+    );
+  }
+  if (error && !project) return <Alert variant="error" title="Project unavailable">{error}</Alert>;
   if (!project) return null;
 
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex flex-wrap items-center gap-2 mb-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
-          <span className="text-sm text-[var(--color-text-muted)] font-mono bg-[var(--color-surface-secondary)] px-1.5 py-0.5 rounded">
-            {project.key}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2 mt-2">
-          <Badge variant={visibilityVariant(project.visibility)}>{visibilityLabel(project.visibility)}</Badge>
-          <Badge variant={project.status === 'ACTIVE' ? 'success' : 'outline'}>
-            {project.status.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
-          </Badge>
-          {project.myRole && (
-            <Badge variant="default">My role: {project.myRole.replace('_', ' ').toLowerCase()}</Badge>
-          )}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+              <span className="text-sm text-[var(--color-text-muted)] font-mono bg-[var(--color-surface-secondary)] px-1.5 py-0.5 rounded">
+                {project.key}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Badge variant={visibilityVariant(project.visibility)}>{visibilityLabel(project.visibility)}</Badge>
+              <Badge variant={project.status === 'ACTIVE' ? 'success' : 'outline'}>
+                {project.status.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
+              </Badge>
+              {project.myRole && (
+                <Badge variant="default">My role: {project.myRole.replaceAll('_', ' ').toLowerCase()}</Badge>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Can permission="project.update">
+              <Link
+                href={`${projectHref}/settings`}
+                className="inline-flex h-9 items-center rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              >
+                Edit project
+              </Link>
+            </Can>
+            {project.status !== 'ARCHIVED' && (
+              <Can permission="project.archive">
+                <Button variant="secondary" onClick={() => setConfirmArchive(true)} disabled={busy}>
+                  Archive
+                </Button>
+              </Can>
+            )}
+            <Can permission="project.delete">
+              <Button variant="destructive" onClick={() => setConfirmDelete(true)} disabled={busy}>
+                Delete
+              </Button>
+            </Can>
+          </div>
         </div>
         {project.description && (
           <p className="mt-3 text-[var(--color-text-secondary)]">{project.description}</p>
         )}
       </div>
+
+      {notice && <Alert variant="success">{notice}</Alert>}
+      {error && <Alert variant="error">{error}</Alert>}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4">
@@ -149,8 +240,14 @@ export default function ProjectOverviewPage() {
             )}
           </div>
           <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-            Members of the associated team or department can access this project.
-            Manage associations in <Link href={`/app/projects/${encodeURIComponent(project.id)}/settings`} className="text-[var(--color-primary)] underline">settings</Link>.
+            Members of the associated team or department can access this project.{' '}
+            <Can
+              permission="project.settings.manage"
+              fallback="Ask a project manager to change the associations."
+            >
+              Manage associations in{' '}
+              <Link href={`${projectHref}/settings`} className="text-[var(--color-primary)] underline">settings</Link>.
+            </Can>
           </p>
         </Card>
       )}
@@ -173,12 +270,17 @@ export default function ProjectOverviewPage() {
           <p className="text-sm text-[var(--color-text-secondary)] mb-3">
             Create and manage tasks, track progress, and assign work to team members.
           </p>
-          <Link
-            href={`/app/projects/${encodeURIComponent(project.id)}/tasks`}
-            className="text-sm text-[var(--color-primary)] underline font-medium"
+          <Can
+            permission="task.view"
+            fallback={<span className="text-sm text-[var(--color-text-muted)]">Task access is not available for your role.</span>}
           >
-            View tasks →
-          </Link>
+            <Link
+              href={`${projectHref}/tasks`}
+              className="text-sm text-[var(--color-primary)] underline font-medium"
+            >
+              View tasks →
+            </Link>
+          </Can>
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
             {project.taskCount} task{project.taskCount !== 1 ? 's' : ''}
           </p>
@@ -203,6 +305,28 @@ export default function ProjectOverviewPage() {
         <p className="mt-3 text-xs text-[var(--color-text-muted)]">Last updated</p>
         <p className="mt-1 text-sm">{dateLabel(project.updatedAt)}</p>
       </Card>
+
+      <ConfirmDialog
+        open={confirmArchive}
+        onClose={() => setConfirmArchive(false)}
+        onConfirm={() => void handleArchive()}
+        title="Archive project?"
+        description={`Archive ${project.name}? The project will be hidden from the default list. All data is preserved and the project can be restored from settings.`}
+        confirmLabel="Archive project"
+        destructive
+        loading={busy}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => void handleDelete()}
+        title="Delete project?"
+        description={`Delete ${project.name} permanently? This cannot be undone.`}
+        confirmLabel="Delete project"
+        destructive
+        loading={busy}
+      />
     </div>
   );
 }

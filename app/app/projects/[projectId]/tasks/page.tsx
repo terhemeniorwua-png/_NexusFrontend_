@@ -13,19 +13,27 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { Dropdown, type DropdownItem } from '@/components/ui/Dropdown';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Textarea } from '@/components/ui/Textarea';
 import { AccessState } from '@/components/shared/AccessState';
+import { PageAccessState } from '@/components/shared/PageAccessState';
+import { PermissionButton } from '@/components/shared/PermissionButton';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
+import { listProjectMembers, type ProjectMember } from '@/services/projects';
 import {
+  addAssignee,
   archiveTask,
   completeTask,
   createTask,
+  deleteTask,
   listTasks,
+  removeAssignee,
   reopenTask,
   restoreTask,
   type CreateTaskInput,
@@ -155,7 +163,17 @@ function groupByDate(tasks: TaskSummary[]): Map<string, TaskSummary[]> {
 export default function ProjectTasksPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
+  const { can, isLoading: permissionsLoading } = usePermissions();
   useWorkspaceRedirect();
+
+  const canView = can('task.view');
+  const canCreate = can('task.create');
+  const canAssign = can('task.assign');
+  const canReassign = can('task.reassign');
+  const canDelete = can('task.delete');
+  const canComplete = can('task.complete');
+  const canUpdate = can('task.update');
+  const canManageAssignees = canAssign || canReassign;
 
   // --- Data state ---
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
@@ -196,6 +214,11 @@ export default function ProjectTasksPage() {
   const [restoreTarget, setRestoreTarget] = useState<TaskSummary | null>(null);
   const [completeTarget, setCompleteTarget] = useState<TaskSummary | null>(null);
   const [reopenTarget, setReopenTarget] = useState<TaskSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TaskSummary | null>(null);
+  const [assignTarget, setAssignTarget] = useState<TaskSummary | null>(null);
+  const [assignUserId, setAssignUserId] = useState('');
+  const [taskActionBusy, setTaskActionBusy] = useState(false);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
 
   // --- Calendar state ---
   const [calendarDate, setCalendarDate] = useState(() => new Date());
@@ -210,7 +233,10 @@ export default function ProjectTasksPage() {
   // -----------------------------------------------------------------------
 
   const load = useCallback(async (append = false) => {
-    if (!activeWorkspace) return;
+    if (!activeWorkspace || !canView) {
+      setLoading(false);
+      return;
+    }
     if (activeWorkspace.id !== activeWorkspaceIdRef.current) return;
     const loadId = ++latestLoad.current;
     if (!append) {
@@ -244,14 +270,25 @@ export default function ProjectTasksPage() {
     } finally {
       if (loadId === latestLoad.current) setLoading(false);
     }
-  }, [activeWorkspace, projectId, search, statusFilter, priorityFilter, sortBy, sortOrder, includeArchived, nextCursor]);
+  }, [activeWorkspace, projectId, canView, search, statusFilter, priorityFilter, sortBy, sortOrder, includeArchived, nextCursor]);
 
   useEffect(() => {
-    if (!activeWorkspace) return;
+    if (!activeWorkspace || !canView) return;
     let active = true;
     void Promise.resolve().then(() => { if (active) void load(); });
     return () => { active = false; };
-  }, [activeWorkspace, load]);
+  }, [activeWorkspace, canView, load]);
+
+  // Load project members only when the caller can change assignees. A failure
+  // here must never prevent the task list from rendering.
+  useEffect(() => {
+    if (!activeWorkspace || !canManageAssignees) return;
+    let active = true;
+    void listProjectMembers(activeWorkspace.id, projectId)
+      .then((list) => { if (active) setMembers(list); })
+      .catch(() => { /* The assignee picker stays empty; tasks remain usable. */ });
+    return () => { active = false; };
+  }, [activeWorkspace, projectId, canManageAssignees]);
 
   // -----------------------------------------------------------------------
   // Create task
@@ -350,12 +387,91 @@ export default function ProjectTasksPage() {
     finally { setBusy(false); }
   }
 
+  async function handleDelete() {
+    if (!activeWorkspace || !deleteTarget) return;
+    setTaskActionBusy(true); setError(null);
+    try {
+      await deleteTask(activeWorkspace.id, projectId, deleteTarget.id);
+      setDeleteTarget(null);
+      setNotice(`Task ${deleteTarget.key} deleted.`);
+      await load();
+    } catch (cause) { setError(requestError(cause, 'Task could not be deleted.')); }
+    finally { setTaskActionBusy(false); }
+  }
+
+  async function handleAddAssignee(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!activeWorkspace || !assignTarget || !assignUserId) return;
+    setTaskActionBusy(true); setError(null);
+    try {
+      await addAssignee(activeWorkspace.id, projectId, assignTarget.id, assignUserId);
+      setAssignUserId('');
+      setNotice('Assignee added.');
+      await load();
+    } catch (cause) { setError(requestError(cause, 'Assignee could not be added.')); }
+    finally { setTaskActionBusy(false); }
+  }
+
+  async function handleRemoveAssignee(userId: string) {
+    if (!activeWorkspace || !assignTarget) return;
+    setTaskActionBusy(true); setError(null);
+    try {
+      await removeAssignee(activeWorkspace.id, projectId, assignTarget.id, userId);
+      setNotice('Assignee removed.');
+      await load();
+    } catch (cause) { setError(requestError(cause, 'Assignee could not be removed.')); }
+    finally { setTaskActionBusy(false); }
+  }
+
   // -----------------------------------------------------------------------
   // Render guards
   // -----------------------------------------------------------------------
 
   const taskDetailHref = (taskId: string) =>
     `/app/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`;
+
+  const currentAssignTarget = assignTarget
+    ? tasks.find((task) => task.id === assignTarget.id) ?? assignTarget
+    : null;
+  const assignedIds = new Set(currentAssignTarget?.assignees.map((a) => a.userId) ?? []);
+  const assignableMembers = members
+    .filter((member) => !assignedIds.has(member.userId))
+    .map((member) => ({ value: member.userId, label: `${member.user.name} · ${member.user.email}` }));
+
+  function taskActionItems(task: TaskSummary): DropdownItem[] {
+    const items: DropdownItem[] = [];
+    if (canManageAssignees) {
+      items.push({
+        id: 'assign',
+        label: 'Manage assignees',
+        onSelect: () => { setAssignTarget(task); setAssignUserId(''); },
+      });
+    }
+    if (canComplete) {
+      items.push({
+        id: 'complete',
+        label: task.status === 'APPROVED' ? 'Reopen task' : 'Mark complete',
+        onSelect: () => (task.status === 'APPROVED' ? setReopenTarget(task) : setCompleteTarget(task)),
+      });
+    }
+    if (canUpdate) {
+      items.push({
+        id: 'archive',
+        label: task.archivedAt ? 'Restore task' : 'Archive task',
+        onSelect: () => (task.archivedAt ? setRestoreTarget(task) : setArchiveTarget(task)),
+      });
+    }
+    if (canDelete) {
+      items.push({
+        id: 'delete',
+        label: 'Delete task',
+        destructive: true,
+        separatorBefore: items.length > 0,
+        onSelect: () => setDeleteTarget(task),
+      });
+    }
+    return items;
+  }
 
   const isLoading = loading && loadedWorkspaceId !== activeWorkspace?.id;
 
@@ -379,12 +495,39 @@ export default function ProjectTasksPage() {
     );
   }
 
+  if (permissionsLoading) {
+    return (
+      <div className="mx-auto w-full max-w-6xl space-y-3 px-5 py-8 sm:px-8" role="status" aria-label="Loading tasks">
+        <Skeleton className="h-10 w-1/3 rounded-lg" />
+        <Skeleton className="h-20 w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  if (!canView) {
+    return (
+      <PageAccessState
+        description="Your project role does not include access to the task list."
+        backHref={`/app/projects/${encodeURIComponent(projectId)}`}
+      />
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-5 py-8 sm:px-8">
       <PageHeader
         title="Tasks"
         description="Create, track, and manage tasks for this project. Switch between board, list, calendar, and timeline views."
-        actions={<Button onClick={() => setShowCreate(true)}>New task</Button>}
+        actions={
+          <PermissionButton
+            permission="task.create"
+            onClick={() => setShowCreate(true)}
+            deniedReason="Your project role cannot create tasks."
+          >
+            New task
+          </PermissionButton>
+        }
       />
 
       {error && <Alert variant="error" title="Could not complete request">{error}</Alert>}
@@ -504,7 +647,7 @@ export default function ProjectTasksPage() {
               title="No tasks found"
               description={search || statusFilter || priorityFilter ? 'No tasks match the current filters.' : 'Create your first task to get started.'}
               action={
-                !search && !statusFilter && !priorityFilter
+                !search && !statusFilter && !priorityFilter && canCreate
                   ? <Button onClick={() => setShowCreate(true)}>Create task</Button>
                   : undefined
               }
@@ -536,40 +679,60 @@ export default function ProjectTasksPage() {
                             {columnTasks.length === 0 ? (
                               <p className="px-3 py-4 text-center text-xs text-[var(--color-text-muted)]">No tasks</p>
                             ) : (
-                              columnTasks.map((task) => (
-                                <Link
-                                  key={task.id}
-                                  href={taskDetailHref(task.id)}
-                                  className="block rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-[var(--shadow-sm)] transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
-                                >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <span className="font-mono text-xs text-[var(--color-text-muted)]">{task.key}</span>
-                                    <Badge variant={task.priority}>{priorityLabel(task.priority)}</Badge>
-                                  </div>
-                                  <p className="mt-1 text-sm font-medium text-[var(--color-text-primary)] line-clamp-2">{task.title}</p>
-                                  <div className="mt-2 flex items-center justify-between">
-                                    <div className="flex -space-x-1.5">
-                                      {task.assignees.slice(0, 3).map((a) => (
-                                        <span
-                                          key={a.userId}
-                                          title={a.user.name}
-                                          className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-surface)] bg-[var(--color-surface-secondary)] text-[10px] font-medium text-[var(--color-text-secondary)]"
+                              columnTasks.map((task) => {
+                                const actions = taskActionItems(task);
+                                return (
+                                  <div
+                                    key={task.id}
+                                    className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)] transition-shadow hover:shadow-md"
+                                  >
+                                    <Link
+                                      href={taskDetailHref(task.id)}
+                                      className="block rounded-t-[var(--radius-md)] p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <span className="font-mono text-xs text-[var(--color-text-muted)]">{task.key}</span>
+                                        <Badge variant={task.priority}>{priorityLabel(task.priority)}</Badge>
+                                      </div>
+                                      <p className="mt-1 text-sm font-medium text-[var(--color-text-primary)] line-clamp-2">{task.title}</p>
+                                      <div className="mt-2 flex items-center justify-between">
+                                        <div className="flex -space-x-1.5">
+                                          {task.assignees.slice(0, 3).map((a) => (
+                                            <span
+                                              key={a.userId}
+                                              title={a.user.name}
+                                              className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-surface)] bg-[var(--color-surface-secondary)] text-[10px] font-medium text-[var(--color-text-secondary)]"
+                                            >
+                                              {initials(a.user.name)}
+                                            </span>
+                                          ))}
+                                          {task.assignees.length > 3 && (
+                                            <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-surface)] bg-[var(--color-surface-secondary)] text-[10px] text-[var(--color-text-muted)]">
+                                              +{task.assignees.length - 3}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {task.dueDate && (
+                                          <span className="text-xs text-[var(--color-text-muted)]">{shortDate(task.dueDate)}</span>
+                                        )}
+                                      </div>
+                                    </Link>
+                                    {actions.length > 0 && (
+                                      <div className="flex items-center justify-end border-t border-[var(--color-border)] px-2 py-1">
+                                        <Dropdown
+                                          items={actions}
+                                          label={`Actions for ${task.key}`}
+                                          triggerLabel={`Actions for ${task.key}`}
+                                          align="end"
+                                          triggerClassName="h-7 px-2 text-xs"
                                         >
-                                          {initials(a.user.name)}
-                                        </span>
-                                      ))}
-                                      {task.assignees.length > 3 && (
-                                        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-surface)] bg-[var(--color-surface-secondary)] text-[10px] text-[var(--color-text-muted)]">
-                                          +{task.assignees.length - 3}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {task.dueDate && (
-                                      <span className="text-xs text-[var(--color-text-muted)]">{shortDate(task.dueDate)}</span>
+                                          Actions
+                                        </Dropdown>
+                                      </div>
                                     )}
                                   </div>
-                                </Link>
-                              ))
+                                );
+                              })
                             )}
                           </div>
                         </div>
@@ -594,10 +757,13 @@ export default function ProjectTasksPage() {
                           <th scope="col" className="px-4 py-2 font-medium text-[var(--color-text-secondary)] whitespace-nowrap">Priority</th>
                           <th scope="col" className="px-4 py-2 font-medium text-[var(--color-text-secondary)] whitespace-nowrap">Assignees</th>
                           <th scope="col" className="px-4 py-2 font-medium text-[var(--color-text-secondary)] whitespace-nowrap">Due date</th>
+                          <th scope="col" className="px-4 py-2 font-medium text-[var(--color-text-secondary)] whitespace-nowrap">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--color-border)]">
-                        {tasks.map((task) => (
+                        {tasks.map((task) => {
+                          const actions = taskActionItems(task);
+                          return (
                           <tr
                             key={task.id}
                             className="hover:bg-[var(--color-surface-secondary)] transition-colors"
@@ -652,8 +818,24 @@ export default function ProjectTasksPage() {
                             <td className="px-4 py-2.5 whitespace-nowrap text-[var(--color-text-secondary)]">
                               {dateLabel(task.dueDate)}
                             </td>
+                            <td className="px-4 py-2.5 whitespace-nowrap">
+                              {actions.length === 0 ? (
+                                <span className="text-xs text-[var(--color-text-muted)]">—</span>
+                              ) : (
+                                <Dropdown
+                                  items={actions}
+                                  label={`Actions for ${task.key}`}
+                                  triggerLabel={`Actions for ${task.key}`}
+                                  align="end"
+                                  triggerClassName="h-7 px-2 text-xs"
+                                >
+                                  Actions
+                                </Dropdown>
+                              )}
+                            </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -943,8 +1125,95 @@ export default function ProjectTasksPage() {
       </Modal>
 
       {/* ----------------------------------------------------------------- */}
+      {/* Manage assignees modal                                             */}
+      {/* ----------------------------------------------------------------- */}
+      <Modal
+        open={Boolean(currentAssignTarget)}
+        onClose={() => { setAssignTarget(null); setAssignUserId(''); }}
+        title={`Manage assignees${currentAssignTarget ? ` · ${currentAssignTarget.key}` : ''}`}
+        footer={
+          <Button
+            variant="secondary"
+            onClick={() => { setAssignTarget(null); setAssignUserId(''); }}
+            disabled={taskActionBusy}
+          >
+            Done
+          </Button>
+        }
+      >
+        {currentAssignTarget && (
+          <div className="space-y-4">
+            {currentAssignTarget.assignees.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">No assignees yet.</p>
+            ) : (
+              <ul className="space-y-2" aria-label="Task assignee list">
+                {currentAssignTarget.assignees.map((assignee) => (
+                  <li key={assignee.userId} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{assignee.user.name}</p>
+                      <p className="text-xs text-[var(--color-text-muted)] truncate">{assignee.user.email}</p>
+                    </div>
+                    {canReassign && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={taskActionBusy}
+                        onClick={() => void handleRemoveAssignee(assignee.userId)}
+                        aria-label={`Remove ${assignee.user.name} as assignee`}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {canAssign && (
+              assignableMembers.length === 0 ? (
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  Every available project member is already assigned to this task.
+                </p>
+              ) : (
+                <form onSubmit={(event) => void handleAddAssignee(event)} className="flex flex-wrap items-end gap-2" aria-label="Add assignee">
+                  <div className="min-w-48 flex-1">
+                    <Select
+                      id="list-add-assignee"
+                      label="Add assignee"
+                      value={assignUserId}
+                      onChange={(event) => setAssignUserId(event.target.value)}
+                      options={assignableMembers}
+                      placeholder="Select a project member…"
+                    />
+                  </div>
+                  <Button type="submit" loading={taskActionBusy} disabled={!assignUserId}>Add</Button>
+                </form>
+              )
+            )}
+
+            {!canAssign && canReassign && (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Your role can remove assignees but cannot add new ones.
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* ----------------------------------------------------------------- */}
       {/* Confirmation dialogs                                               */}
       {/* ----------------------------------------------------------------- */}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void handleDelete()}
+        title={`Delete ${deleteTarget?.key}?`}
+        description="This task will be permanently deleted. This cannot be undone."
+        confirmLabel="Delete task"
+        destructive
+        loading={taskActionBusy}
+      />
+
       <ConfirmDialog
         open={Boolean(archiveTarget)}
         onClose={() => setArchiveTarget(null)}

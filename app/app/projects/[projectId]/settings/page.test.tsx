@@ -5,16 +5,37 @@ import SettingsPage from './page';
 
 const mocks = vi.hoisted(() => ({
   activeWorkspace: null as null | { id: string; name: string; type: string; role: string; organizationRole: null },
+  permissionState: null as unknown,
   getProject: vi.fn(),
   updateProject: vi.fn(),
   archiveProject: vi.fn(),
   restoreProject: vi.fn(),
+  deleteProject: vi.fn(),
   updateProjectOrganizationAccess: vi.fn(),
   transferProjectOwnership: vi.fn(),
   listDepartments: vi.fn(),
   listTeams: vi.fn(),
   listWorkspaceMembers: vi.fn(),
 }));
+
+function setPermissions(permissions: string[], overrides: Record<string, unknown> = {}) {
+  mocks.permissionState = {
+    permissions,
+    projectRole: 'PROJECT_MANAGER',
+    workspaceRole: 'OWNER',
+    accessSource: 'workspace_admin',
+    assignableRoles: [],
+    roleDefinitions: [],
+    isLoading: false,
+    accessStatus: null,
+    error: null,
+    can: (permission: string) => permissions.includes(permission),
+    canAny: (list: string[]) => list.some((permission) => permissions.includes(permission)),
+    canAll: (list: string[]) => list.every((permission) => permissions.includes(permission)),
+    refresh: vi.fn(),
+    ...overrides,
+  };
+}
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -28,11 +49,15 @@ vi.mock('next/link', () => ({
 vi.mock('@/providers/WorkspaceProvider', () => ({
   useWorkspaceContext: () => ({ activeWorkspace: mocks.activeWorkspace, loading: false }),
 }));
+vi.mock('@/providers/ProjectPermissionsProvider', () => ({
+  usePermissions: () => mocks.permissionState,
+}));
 vi.mock('@/services/projects', () => ({
   getProject: mocks.getProject,
   updateProject: mocks.updateProject,
   archiveProject: mocks.archiveProject,
   restoreProject: mocks.restoreProject,
+  deleteProject: mocks.deleteProject,
   updateProjectOrganizationAccess: mocks.updateProjectOrganizationAccess,
   transferProjectOwnership: mocks.transferProjectOwnership,
 }));
@@ -57,6 +82,15 @@ const makeProject = (overrides: Record<string, unknown> = {}) => ({
 describe('ProjectSettingsPage — organizational access', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setPermissions([
+      'project.view',
+      'project.update',
+      'project.archive',
+      'project.delete',
+      'project.settings.manage',
+      'project.member.manage',
+      'task.view',
+    ]);
     mocks.activeWorkspace = { id: 'ws-1', name: 'Alpha', type: 'COMPANY', role: 'OWNER', organizationRole: null };
     mocks.getProject.mockResolvedValue(makeProject());
     mocks.listTeams.mockResolvedValue([{ id: 'team-1', name: 'Engineering', workspaceId: 'ws-1', description: null, departmentId: null, status: 'ACTIVE', leadId: null, lead: null, memberCount: 3, createdAt: '', updatedAt: '' }]);
@@ -99,6 +133,15 @@ describe('ProjectSettingsPage — organizational access', () => {
 describe('ProjectSettingsPage — ownership transfer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setPermissions([
+      'project.view',
+      'project.update',
+      'project.archive',
+      'project.delete',
+      'project.settings.manage',
+      'project.member.manage',
+      'task.view',
+    ]);
     mocks.activeWorkspace = { id: 'ws-1', name: 'Alpha', type: 'COMPANY', role: 'OWNER', organizationRole: null };
     mocks.getProject.mockResolvedValue(makeProject({ visibility: 'WORKSPACE' }));
     mocks.listTeams.mockResolvedValue([]);

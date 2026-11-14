@@ -15,8 +15,12 @@ import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Textarea } from '@/components/ui/Textarea';
 import { AccessState } from '@/components/shared/AccessState';
+import { Can } from '@/components/shared/Can';
+import { PageAccessState } from '@/components/shared/PageAccessState';
+import { PermissionButton } from '@/components/shared/PermissionButton';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import {
   getTask,
@@ -40,6 +44,13 @@ import {
   type TaskComment,
 } from '@/services/tasks';
 import { listProjectMembers, type ProjectMember } from '@/services/projects';
+import {
+  deleteFile,
+  formatBytes,
+  listFiles,
+  uploadFile,
+  type FileSummary,
+} from '@/services/files';
 
 // ---------------------------------------------------------------------------
 // Validation schemas
@@ -115,8 +126,24 @@ const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
 export default function TaskDetailPage() {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
   const { activeWorkspace, user } = useWorkspaceContext();
+  const { can, isLoading: permissionsLoading } = usePermissions();
   const router = useRouter();
   useWorkspaceRedirect();
+
+  const canView = can('task.view');
+  const canUpdate = can('task.update');
+  const canAssign = can('task.assign');
+  const canReassign = can('task.reassign');
+  const canComment = can('task.comment');
+  const canUpload = can('file.upload');
+  const canDeleteAnyFile = can('file.delete.any');
+  const canDeleteOwnFile = can('file.delete.own');
+  const canSubmit = can('submission.submit');
+  const canReview = can('submission.review');
+  const canApprove = can('submission.approve');
+  const canReject = can('submission.reject');
+  const canRequestRevision = can('submission.request_revision');
+  const hasReviewControls = canReview || canApprove || canReject || canRequestRevision;
 
   // Core task state
   const [task, setTask] = useState<TaskSummary | null>(null);
@@ -168,24 +195,35 @@ export default function TaskDetailPage() {
   // Action confirm dialogs
   const [confirmAction, setConfirmAction] = useState<'complete' | 'reopen' | 'archive' | 'restore' | 'delete' | null>(null);
 
+  // Attachments
+  const [files, setFiles] = useState<FileSummary[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [deleteFileTarget, setDeleteFileTarget] = useState<FileSummary | null>(null);
+  const uploadAbortRef = useRef<{ abort: () => void } | null>(null);
+
+  // Submission / review actions
+  const [submissionBusy, setSubmissionBusy] = useState(false);
+
   // ---------------------------------------------------------------------------
   // Data loading
   // ---------------------------------------------------------------------------
 
   const load = useCallback(async () => {
-    if (!activeWorkspace) return;
+    if (!activeWorkspace || !canView) {
+      setLoading(false);
+      return;
+    }
     const seq = ++latestLoad.current;
     setLoading(true); setError(null); setAccessStatus(null);
     try {
-      const [data, memberData] = await Promise.all([
-        getTask(activeWorkspace.id, projectId, taskId),
-        listProjectMembers(activeWorkspace.id, projectId),
-      ]);
+      const data = await getTask(activeWorkspace.id, projectId, taskId);
       if (seq !== latestLoad.current) return;
       if (loadedWorkspaceId.current !== null && loadedWorkspaceId.current !== activeWorkspace.id) return;
       loadedWorkspaceId.current = activeWorkspace.id;
       setTask(data);
-      setMembers(memberData);
     } catch (cause) {
       if (seq !== latestLoad.current) return;
       if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
@@ -198,7 +236,7 @@ export default function TaskDetailPage() {
     } finally {
       if (seq === latestLoad.current) setLoading(false);
     }
-  }, [activeWorkspace, projectId, taskId]);
+  }, [activeWorkspace, projectId, taskId, canView]);
 
   const loadComments = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -218,6 +256,39 @@ export default function TaskDetailPage() {
     void Promise.resolve().then(() => { if (active) { void load(); void loadComments(); } });
     return () => { active = false; };
   }, [load, loadComments]);
+
+  // Load project members only when the caller can change assignees.
+  useEffect(() => {
+    if (!activeWorkspace || (!canAssign && !canReassign)) return;
+    let active = true;
+    void listProjectMembers(activeWorkspace.id, projectId)
+      .then((list) => { if (active) setMembers(list); })
+      .catch(() => { /* The assignee picker stays empty; the task remains usable. */ });
+    return () => { active = false; };
+  }, [activeWorkspace, projectId, canAssign, canReassign]);
+
+  const loadFiles = useCallback(async () => {
+    if (!activeWorkspace || !canView) return;
+    setFilesLoading(true); setFileError(null);
+    try {
+      const result = await listFiles(activeWorkspace.id, { taskId, limit: 50 });
+      setFiles(result.items);
+    } catch (cause) {
+      setFileError(requestError(cause, 'Attachments could not be loaded.'));
+    } finally {
+      setFilesLoading(false);
+    }
+  }, [activeWorkspace, taskId, canView]);
+
+  useEffect(() => {
+    if (!activeWorkspace || !canView) return;
+    let active = true;
+    void Promise.resolve().then(() => { if (active) void loadFiles(); });
+    return () => { active = false; };
+  }, [activeWorkspace, canView, loadFiles]);
+
+  // Abort an in-flight upload when the page unmounts.
+  useEffect(() => () => { uploadAbortRef.current?.abort(); }, []);
 
   // ---------------------------------------------------------------------------
   // Edit form helpers
@@ -429,6 +500,78 @@ export default function TaskDetailPage() {
   }
 
   // ---------------------------------------------------------------------------
+  // Attachment handlers
+  // ---------------------------------------------------------------------------
+
+  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!activeWorkspace || !task || !file) return;
+    setUploadBusy(true); setFileError(null); setUploadProgress(0);
+    try {
+      const request = uploadFile({
+        workspaceId: activeWorkspace.id,
+        file,
+        projectId,
+        taskId: task.id,
+        onProgress: setUploadProgress,
+      });
+      uploadAbortRef.current = request;
+      const uploaded = await request.promise;
+      setFiles((current) => [uploaded, ...current]);
+      setTask((current) => current ? { ...current, attachmentCount: current.attachmentCount + 1 } : current);
+      setNotice('Attachment uploaded.');
+    } catch (cause) {
+      if (!(cause instanceof ApiRequestError && cause.code === 'UPLOAD_ABORTED')) {
+        setFileError(requestError(cause, 'Attachment could not be uploaded.'));
+      }
+    } finally {
+      uploadAbortRef.current = null;
+      setUploadBusy(false);
+      setUploadProgress(null);
+    }
+  }
+
+  async function handleDeleteFile() {
+    if (!activeWorkspace || !task || !deleteFileTarget) return;
+    setUploadBusy(true); setFileError(null);
+    try {
+      await deleteFile(activeWorkspace.id, deleteFileTarget.id);
+      setFiles((current) => current.filter((entry) => entry.id !== deleteFileTarget.id));
+      setTask((current) => current ? { ...current, attachmentCount: Math.max(0, current.attachmentCount - 1) } : current);
+      setDeleteFileTarget(null);
+      setNotice('Attachment deleted.');
+    } catch (cause) {
+      setFileError(requestError(cause, 'Attachment could not be deleted.'));
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
+  function canDeleteFile(file: FileSummary): boolean {
+    if (canDeleteAnyFile) return true;
+    return canDeleteOwnFile && file.uploadedById === user?.id;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Submission / review handlers
+  // ---------------------------------------------------------------------------
+
+  async function handleSubmission(nextStatus: TaskStatus, message: string) {
+    if (!activeWorkspace || !task) return;
+    setSubmissionBusy(true); setError(null);
+    try {
+      const updated = await updateTask(activeWorkspace.id, projectId, task.id, { status: nextStatus });
+      setTask(updated);
+      setNotice(message);
+    } catch (cause) {
+      setError(requestError(cause, 'The task status could not be updated.'));
+    } finally {
+      setSubmissionBusy(false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Render states
   // ---------------------------------------------------------------------------
 
@@ -442,7 +585,7 @@ export default function TaskDetailPage() {
     );
   }
 
-  if (loading) {
+  if (loading || permissionsLoading) {
     return (
       <div className="space-y-4 mx-auto max-w-5xl" role="status" aria-label="Loading task">
         <Skeleton className="h-8 w-1/3 rounded-lg" />
@@ -454,6 +597,15 @@ export default function TaskDetailPage() {
   }
 
   if (accessStatus) return <AccessState status={accessStatus} onRetry={() => void load()} />;
+  if (!canView) {
+    return (
+      <PageAccessState
+        description="Your project role does not include access to this task."
+        backHref={`/app/projects/${encodeURIComponent(projectId)}/tasks`}
+        backLabel="Back to tasks"
+      />
+    );
+  }
   if (error && !task) return <Alert variant="error" title="Task unavailable">{error}</Alert>;
   if (!task) return null;
 
@@ -466,6 +618,20 @@ export default function TaskDetailPage() {
 
   const isCompleted = task.status === 'APPROVED';
   const isArchived = Boolean(task.archivedAt);
+  const isAssignedToMe = Boolean(user && task.assignees.some((assignee) => assignee.userId === user.id));
+  // A submission belongs to its assignees. Reviewers must never approve or
+  // reject their own submitted work.
+  const isOwnSubmission = isAssignedToMe;
+  const canSubmitForReview = canSubmit && isAssignedToMe
+    && (task.status === 'ASSIGNED' || task.status === 'IN_PROGRESS' || task.status === 'CHANGES_REQUESTED');
+  const canStartReview = canReview && !isOwnSubmission && task.status === 'SUBMITTED';
+  const canApproveSubmission = canApprove && !isOwnSubmission
+    && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW');
+  const canRejectSubmission = canReject && !isOwnSubmission
+    && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW');
+  const canRequestRevisionAction = canRequestRevision && !isOwnSubmission
+    && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW');
+  const showSubmissionSection = (canSubmit && isAssignedToMe) || hasReviewControls;
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -618,18 +784,30 @@ export default function TaskDetailPage() {
               {/* Header actions */}
               {!editing && (
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={startEdit} aria-label="Edit task">
+                  <PermissionButton
+                    size="sm"
+                    variant="secondary"
+                    permission="task.update"
+                    onClick={startEdit}
+                    aria-label="Edit task"
+                    deniedReason="Your project role cannot edit this task."
+                  >
                     Edit
-                  </Button>
-                  {isCompleted
-                    ? <Button size="sm" variant="secondary" onClick={() => setConfirmAction('reopen')} disabled={busy}>Reopen</Button>
-                    : <Button size="sm" onClick={() => setConfirmAction('complete')} disabled={busy}>Mark complete</Button>
-                  }
-                  {isArchived
-                    ? <Button size="sm" variant="secondary" onClick={() => setConfirmAction('restore')} disabled={busy}>Restore</Button>
-                    : <Button size="sm" variant="ghost" onClick={() => setConfirmAction('archive')} disabled={busy}>Archive</Button>
-                  }
-                  <Button size="sm" variant="destructive" onClick={() => setConfirmAction('delete')} disabled={busy}>Delete</Button>
+                  </PermissionButton>
+                  {can('task.complete') && isAssignedToMe && (
+                    isCompleted
+                      ? <Button size="sm" variant="secondary" onClick={() => setConfirmAction('reopen')} disabled={busy}>Reopen</Button>
+                      : <Button size="sm" onClick={() => setConfirmAction('complete')} disabled={busy}>Mark complete</Button>
+                  )}
+                  <Can permission="task.update">
+                    {isArchived
+                      ? <Button size="sm" variant="secondary" onClick={() => setConfirmAction('restore')} disabled={busy}>Restore</Button>
+                      : <Button size="sm" variant="ghost" onClick={() => setConfirmAction('archive')} disabled={busy}>Archive</Button>
+                    }
+                  </Can>
+                  <Can permission="task.delete">
+                    <Button size="sm" variant="destructive" onClick={() => setConfirmAction('delete')} disabled={busy}>Delete</Button>
+                  </Can>
                 </div>
               )}
             </div>
@@ -657,21 +835,29 @@ export default function TaskDetailPage() {
                         <p className="text-xs text-[var(--color-text-muted)] truncate">{a.user.email}</p>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setRemoveAssigneeTarget(a.userId)}
-                      aria-label={`Remove ${a.user.name} as assignee`}
-                      disabled={assigneeBusy}
-                    >
-                      Remove
-                    </Button>
+                    {canReassign && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setRemoveAssigneeTarget(a.userId)}
+                        aria-label={`Remove ${a.user.name} as assignee`}
+                        disabled={assigneeBusy}
+                      >
+                        Remove
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
 
-            {memberOptions.length > 0 && (
+            {!canAssign && !canReassign && (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                You can view assignees, but your project role cannot change them.
+              </p>
+            )}
+
+            {canAssign && memberOptions.length > 0 && (
               <form onSubmit={(e) => void handleAddAssignee(e)} className="flex gap-2 items-end flex-wrap" aria-label="Add assignee">
                 <div className="flex-1 min-w-[160px]">
                   <Select
@@ -685,6 +871,12 @@ export default function TaskDetailPage() {
                 </div>
                 <Button type="submit" size="sm" loading={assigneeBusy} disabled={!addAssigneeId}>Add</Button>
               </form>
+            )}
+
+            {canAssign && memberOptions.length === 0 && members.length > 0 && (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Every available project member is already assigned to this task.
+              </p>
             )}
           </Card>
 
@@ -704,32 +896,40 @@ export default function TaskDetailPage() {
                       <span className="text-sm truncate">{dep.dependsOnTask.title}</span>
                       <Badge variant={dep.dependsOnTask.status}>{statusLabel(dep.dependsOnTask.status)}</Badge>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setRemoveDepTarget(dep.dependsOnTaskId)}
-                      aria-label={`Remove dependency on ${dep.dependsOnTask.key}`}
-                      disabled={depBusy}
-                    >
-                      Remove
-                    </Button>
+                    {canUpdate && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setRemoveDepTarget(dep.dependsOnTaskId)}
+                        aria-label={`Remove dependency on ${dep.dependsOnTask.key}`}
+                        disabled={depBusy}
+                      >
+                        Remove
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
-            <form onSubmit={(e) => void handleAddDependency(e)} className="flex gap-2 items-end flex-wrap" aria-label="Add dependency">
-              <div className="flex-1 min-w-[160px]">
-                <Input
-                  id="dep-task-id"
-                  label="Depends on (task ID)"
-                  value={depTaskId}
-                  onChange={(e) => setDepTaskId(e.target.value)}
-                  placeholder="Paste task UUID…"
-                  helperText="Enter the ID of the task this task depends on."
-                />
-              </div>
-              <Button type="submit" size="sm" loading={depBusy} disabled={!depTaskId.trim()}>Add dependency</Button>
-            </form>
+            {canUpdate ? (
+              <form onSubmit={(e) => void handleAddDependency(e)} className="flex gap-2 items-end flex-wrap" aria-label="Add dependency">
+                <div className="flex-1 min-w-[160px]">
+                  <Input
+                    id="dep-task-id"
+                    label="Depends on (task ID)"
+                    value={depTaskId}
+                    onChange={(e) => setDepTaskId(e.target.value)}
+                    placeholder="Paste task UUID…"
+                    helperText="Enter the ID of the task this task depends on."
+                  />
+                </div>
+                <Button type="submit" size="sm" loading={depBusy} disabled={!depTaskId.trim()}>Add dependency</Button>
+              </form>
+            ) : (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Your project role cannot change task dependencies.
+              </p>
+            )}
           </Card>
 
           {/* Blockers — read-only */}
@@ -779,7 +979,7 @@ export default function TaskDetailPage() {
                           <span className="text-xs text-[var(--color-text-muted)] italic">(edited)</span>
                         )}
                       </div>
-                      {user?.id === c.authorId && (
+                      {canComment && user?.id === c.authorId && (
                         <div className="flex gap-1">
                           <Button
                             size="sm"
@@ -826,19 +1026,179 @@ export default function TaskDetailPage() {
             )}
 
             {/* Add comment form */}
-            <form onSubmit={(e) => void handleAddComment(e)} className="space-y-2" aria-label="Add comment">
-              <Textarea
-                id="new-comment"
-                label="Add a comment"
-                value={commentBody}
-                onChange={(e) => setCommentBody(e.target.value)}
-                placeholder="Write a comment…"
-                rows={3}
-                maxLength={10000}
-              />
-              <Button type="submit" size="sm" loading={commentBusy} disabled={!commentBody.trim()}>Post comment</Button>
-            </form>
+            {canComment ? (
+              <form onSubmit={(e) => void handleAddComment(e)} className="space-y-2" aria-label="Add comment">
+                <Textarea
+                  id="new-comment"
+                  label="Add a comment"
+                  value={commentBody}
+                  onChange={(e) => setCommentBody(e.target.value)}
+                  placeholder="Write a comment…"
+                  rows={3}
+                  maxLength={10000}
+                />
+                <Button type="submit" size="sm" loading={commentBusy} disabled={!commentBody.trim()}>Post comment</Button>
+              </form>
+            ) : (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Your project role can read comments but cannot post them.
+              </p>
+            )}
           </Card>
+
+          {/* Attachments */}
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h2 className="font-semibold">
+                Attachments <span className="text-[var(--color-text-muted)] font-normal">({files.length})</span>
+              </h2>
+              {canUpload && (
+                <label
+                  className={[
+                    'inline-flex h-8 cursor-pointer items-center rounded-[var(--radius-md)] px-3 text-sm font-medium',
+                    'bg-[var(--color-primary)] text-white transition-colors hover:bg-[var(--color-primary-hover)]',
+                    uploadBusy ? 'pointer-events-none opacity-50' : '',
+                  ].join(' ')}
+                >
+                  <input
+                    type="file"
+                    className="sr-only"
+                    onChange={(event) => void handleUpload(event)}
+                    disabled={uploadBusy}
+                    aria-label="Upload attachment"
+                  />
+                  {uploadBusy ? 'Uploading…' : 'Upload file'}
+                </label>
+              )}
+            </div>
+
+            {fileError && <Alert variant="error" className="mb-3">{fileError}</Alert>}
+
+            {uploadProgress !== null && (
+              <div className="mb-3" role="status" aria-live="polite">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-secondary)]">
+                  <div
+                    className="h-full bg-[var(--color-primary)] transition-[width]"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">Uploading… {uploadProgress}%</p>
+              </div>
+            )}
+
+            {filesLoading ? (
+              <div className="space-y-2" role="status" aria-label="Loading attachments">
+                <Skeleton className="h-10 w-full rounded-lg" />
+                <Skeleton className="h-10 w-full rounded-lg" />
+              </div>
+            ) : files.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                No attachments yet.
+                {!canUpload && ' Your project role cannot upload files.'}
+              </p>
+            ) : (
+              <ul className="divide-y divide-[var(--color-border)]" aria-label="Attachment list">
+                {files.map((file) => (
+                  <li key={file.id} className="flex flex-wrap items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{file.fileName}</p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        {formatBytes(file.sizeBytes)} · {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(file.createdAt))}
+                      </p>
+                    </div>
+                    {canDeleteFile(file) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={uploadBusy}
+                        onClick={() => setDeleteFileTarget(file)}
+                        aria-label={`Delete ${file.fileName}`}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {/* Submission and review */}
+          {showSubmissionSection && (
+            <Card className="p-5">
+              <h2 className="font-semibold mb-1">Submission &amp; review</h2>
+              <p className="text-xs text-[var(--color-text-muted)] mb-3">
+                Current status: <span className="font-medium">{statusLabel(task.status)}</span>
+              </p>
+
+              {isOwnSubmission && (
+                <p className="mb-3 text-xs text-[var(--color-text-muted)]">
+                  You are assigned to this task, so approval and rejection controls are hidden for your own submission.
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {canSubmitForReview && (
+                  <Button
+                    size="sm"
+                    loading={submissionBusy}
+                    disabled={submissionBusy}
+                    onClick={() => void handleSubmission('SUBMITTED', 'Work submitted for review.')}
+                  >
+                    Submit for review
+                  </Button>
+                )}
+                {canStartReview && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={submissionBusy}
+                    disabled={submissionBusy}
+                    onClick={() => void handleSubmission('UNDER_REVIEW', 'Review started.')}
+                  >
+                    Start review
+                  </Button>
+                )}
+                {canApproveSubmission && (
+                  <Button
+                    size="sm"
+                    loading={submissionBusy}
+                    disabled={submissionBusy}
+                    onClick={() => void handleSubmission('APPROVED', 'Submission approved.')}
+                  >
+                    Approve
+                  </Button>
+                )}
+                {canRequestRevisionAction && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={submissionBusy}
+                    disabled={submissionBusy}
+                    onClick={() => void handleSubmission('CHANGES_REQUESTED', 'Changes requested.')}
+                  >
+                    Request revision
+                  </Button>
+                )}
+                {canRejectSubmission && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    loading={submissionBusy}
+                    disabled={submissionBusy}
+                    onClick={() => void handleSubmission('CHANGES_REQUESTED', 'Submission rejected. Changes are required.')}
+                  >
+                    Reject
+                  </Button>
+                )}
+                {!canSubmitForReview && !canStartReview && !canApproveSubmission && !canRequestRevisionAction && !canRejectSubmission && (
+                  <p className="text-sm text-[var(--color-text-secondary)]">
+                    No submission or review action is available for your role in the current status.
+                  </p>
+                )}
+              </div>
+            </Card>
+          )}
         </div>
 
         {/* ------------------------------------------------------------------ */}
@@ -993,6 +1353,16 @@ export default function TaskDetailPage() {
         confirmLabel="Delete comment"
         destructive
         loading={commentBusy}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteFileTarget)}
+        onClose={() => setDeleteFileTarget(null)}
+        onConfirm={() => void handleDeleteFile()}
+        title={`Delete ${deleteFileTarget?.fileName ?? 'attachment'}?`}
+        description="This attachment will be permanently deleted. This cannot be undone."
+        confirmLabel="Delete attachment"
+        destructive
+        loading={uploadBusy}
       />
     </div>
   );

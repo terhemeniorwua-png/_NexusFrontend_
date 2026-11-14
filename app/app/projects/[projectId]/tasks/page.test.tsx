@@ -6,13 +6,37 @@ import TaskListPage from './page';
 const mocks = vi.hoisted(() => ({
   activeWorkspace: null as null | { id: string; name: string; type: string; role: string; organizationRole: null },
   user: null as null | { id: string; name: string; email: string },
+  permissionState: null as unknown,
   listTasks: vi.fn(),
   createTask: vi.fn(),
   archiveTask: vi.fn(),
   restoreTask: vi.fn(),
   completeTask: vi.fn(),
   reopenTask: vi.fn(),
+  deleteTask: vi.fn(),
+  addAssignee: vi.fn(),
+  removeAssignee: vi.fn(),
+  listProjectMembers: vi.fn(),
 }));
+
+function setPermissions(permissions: string[], overrides: Record<string, unknown> = {}) {
+  mocks.permissionState = {
+    permissions,
+    projectRole: 'PROJECT_MANAGER',
+    workspaceRole: 'OWNER',
+    accessSource: 'workspace_admin',
+    assignableRoles: ['PROJECT_MANAGER', 'MEMBER', 'COLLABORATOR', 'VIEWER'],
+    roleDefinitions: [],
+    isLoading: false,
+    accessStatus: null,
+    error: null,
+    can: (permission: string) => permissions.includes(permission),
+    canAny: (list: string[]) => list.some((permission) => permissions.includes(permission)),
+    canAll: (list: string[]) => list.every((permission) => permissions.includes(permission)),
+    refresh: vi.fn(),
+    ...overrides,
+  };
+}
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) =>
@@ -37,6 +61,10 @@ vi.mock('@/hooks/useWorkspaceRedirect', () => ({
   useWorkspaceRedirect: () => mocks.activeWorkspace?.id ?? null,
 }));
 
+vi.mock('@/providers/ProjectPermissionsProvider', () => ({
+  usePermissions: () => mocks.permissionState,
+}));
+
 vi.mock('@/services/tasks', () => ({
   listTasks: mocks.listTasks,
   createTask: mocks.createTask,
@@ -44,6 +72,13 @@ vi.mock('@/services/tasks', () => ({
   restoreTask: mocks.restoreTask,
   completeTask: mocks.completeTask,
   reopenTask: mocks.reopenTask,
+  deleteTask: mocks.deleteTask,
+  addAssignee: mocks.addAssignee,
+  removeAssignee: mocks.removeAssignee,
+}));
+
+vi.mock('@/services/projects', () => ({
+  listProjectMembers: mocks.listProjectMembers,
 }));
 
 const task1 = {
@@ -64,6 +99,17 @@ describe('TaskListPage', () => {
     mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
     mocks.user = { id: 'user-1', name: 'Alice', email: 'alice@example.com' };
     mocks.listTasks.mockResolvedValue({ items: [task1], nextCursor: null });
+    mocks.listProjectMembers.mockResolvedValue([]);
+    setPermissions([
+      'project.view',
+      'task.view',
+      'task.create',
+      'task.update',
+      'task.delete',
+      'task.assign',
+      'task.reassign',
+      'task.complete',
+    ]);
   });
 
   it('shows tasks loaded from the API', async () => {

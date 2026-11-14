@@ -39,6 +39,7 @@ import {
   unpinMessage,
   getReplies,
   addReaction,
+  removeReaction,
   getUnreadCount,
   type MessageSummary,
 } from '@/services/messages';
@@ -89,6 +90,33 @@ function requestError(cause: unknown, fallback: string): string {
 // ---------------------------------------------------------------------------
 // Main page component
 // ---------------------------------------------------------------------------
+
+type ReactionGroup = { emoji: string; userIds: string[] };
+const REACTION_CHOICES = ['👍', '❤️', '😂', '🎉'];
+
+function reactionsOf(m: MessageSummary): ReactionGroup[] {
+  return (m as MessageSummary & { reactions?: ReactionGroup[] }).reactions ?? [];
+}
+
+function applyReaction(list: MessageSummary[], messageId: string, emoji: string, userId: string, add: boolean): MessageSummary[] {
+  return list.map((m) => {
+    if (m.id !== messageId) return m;
+    const cur = reactionsOf(m);
+    const group = cur.find((r) => r.emoji === emoji);
+    let next: ReactionGroup[];
+    if (add) {
+      if (group?.userIds.includes(userId)) return m;
+      next = group
+        ? cur.map((r) => (r === group ? { ...r, userIds: [...r.userIds, userId] } : r))
+        : [...cur, { emoji, userIds: [userId] }];
+    } else {
+      next = cur
+        .map((r) => (r.emoji === emoji ? { ...r, userIds: r.userIds.filter((u) => u !== userId) } : r))
+        .filter((r) => r.userIds.length > 0);
+    }
+    return { ...m, reactions: next, reactionCount: next.reduce((n, r) => n + r.userIds.length, 0) } as MessageSummary;
+  });
+}
 
 export default function MessagesPage() {
   const { activeWorkspace, user } = useWorkspaceContext();
@@ -238,12 +266,31 @@ export default function MessagesPage() {
       if (data.channelId !== selectedChannel.id) return;
       setMessages((prev) => {
         if (prev.some((m) => m.id === data.message.id)) return prev;
+        if (user && data.message.authorId === user.id) {
+          const idx = prev.findIndex((m) => m.id.startsWith('temp-') && m.body === data.message.body);
+          if (idx !== -1) {
+            const copy = [...prev];
+            copy[idx] = data.message;
+            return copy;
+          }
+        }
         return [...prev, data.message];
       });
     };
     socket.on('message:new', onNewMessage);
     return () => { socket.off('message:new', onNewMessage); };
-  }, [socket, selectedChannel]);
+  }, [socket, selectedChannel, user]);
+
+  // Listen for reactions from other users
+  useEffect(() => {
+    if (!socket || !selectedChannel || !user) return;
+    const onReaction = (data: { channelId: string; messageId: string; userId: string; emoji: string; action: 'add' | 'remove' }) => {
+      if (data.channelId !== selectedChannel.id || data.userId === user.id) return;
+      setMessages((prev) => applyReaction(prev, data.messageId, data.emoji, data.userId, data.action === 'add'));
+    };
+    socket.on('message:reaction', onReaction);
+    return () => { socket.off('message:reaction', onReaction); };
+  }, [socket, selectedChannel, user]);
 
   // Listen for typing indicators
   useEffect(() => {
@@ -401,20 +448,50 @@ export default function MessagesPage() {
 
   async function handleSendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!activeWorkspace || !selectedChannel || socketStatus === 'disconnected') return;
+    if (!activeWorkspace || !selectedChannel || !user || socketStatus === 'disconnected') return;
     const parsed = messageSchema.safeParse({ body: messageBody });
     if (!parsed.success) return;
-    setMessageBusy(true); setMessageError(null);
+    const body = parsed.data.body;
+    const workspaceId = activeWorkspace.id;
+    const channelId = selectedChannel.id;
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    const optimistic = {
+      id: tempId,
+      channelId,
+      authorId: user.id,
+      authorName: (user as { name?: string }).name ?? 'You',
+      body,
+      parentId: null,
+      editedAt: null,
+      pinnedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      replyCount: 0,
+      reactionCount: 0,
+      type: 'TEXT',
+      audioMime: null,
+      audioDurationMs: null,
+    } as MessageSummary;
+
+    // Update the UI immediately, before the backend responds
+    setMessages((prev) => [...prev, optimistic]);
+    setMessageBody('');
+    setMessageError(null);
+    if (socket) socket.emit('typing:stop', channelId);
+
     try {
-      const sent = await sendMessage(activeWorkspace.id, selectedChannel.id, { body: parsed.data.body });
-      setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
-      setMessageBody('');
-      // Stop typing indicator
-      if (socket) socket.emit('typing:stop', selectedChannel.id);
+      const sent = await sendMessage(workspaceId, channelId, { body });
+      setMessages((prev) =>
+        prev.some((m) => m.id === sent.id)
+          ? prev.filter((m) => m.id !== tempId)
+          : prev.map((m) => (m.id === tempId ? sent : m)),
+      );
     } catch (cause) {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setMessageBody(body);
       setMessageError(requestError(cause, 'Message could not be sent.'));
-    } finally {
-      setMessageBusy(false);
     }
   }
 
@@ -503,12 +580,16 @@ export default function MessagesPage() {
   // ---------------------------------------------------------------------------
 
   async function handleAddReaction(msg: MessageSummary, emoji: string) {
-    if (!activeWorkspace || !selectedChannel) return;
+    if (!activeWorkspace || !selectedChannel || !user || msg.id.startsWith('temp-')) return;
+    const already = reactionsOf(msg).some((r) => r.emoji === emoji && r.userIds.includes(user.id));
+    // Toggle immediately, before the backend responds
+    setMessages((prev) => applyReaction(prev, msg.id, emoji, user.id, !already));
     try {
-      await addReaction(activeWorkspace.id, selectedChannel.id, msg.id, emoji);
-      await loadMessages(selectedChannel);
+      if (already) await removeReaction(activeWorkspace.id, selectedChannel.id, msg.id, emoji);
+      else await addReaction(activeWorkspace.id, selectedChannel.id, msg.id, emoji);
     } catch (cause) {
-      setMessageError(requestError(cause, 'Reaction could not be added.'));
+      setMessages((prev) => applyReaction(prev, msg.id, emoji, user.id, already));
+      setMessageError(requestError(cause, 'Reaction could not be updated.'));
     }
   }
 
@@ -675,8 +756,8 @@ export default function MessagesPage() {
               ) : (
                 <ul className="space-y-3" role="list">
                   {messages.map((msg) => (
-                    <li key={msg.id} className="group">
-                      <div className="flex gap-3">
+                    <li key={msg.id} className={`group ${msg.id.startsWith('temp-') ? 'opacity-60' : ''}`}>
+                      <div className={`flex gap-3 ${user?.id === msg.authorId ? 'flex-row-reverse' : ''}`}>
                         {/* Avatar */}
                         <span
                           aria-hidden="true"
@@ -685,8 +766,8 @@ export default function MessagesPage() {
                           {msg.authorName.charAt(0).toUpperCase()}
                         </span>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 text-sm">
+                        <div className={`min-w-0 flex-1 ${user?.id === msg.authorId ? 'text-right' : ''}`}>
+                          <div className={`flex items-center gap-2 text-sm ${user?.id === msg.authorId ? 'justify-end' : ''}`}>
                             <span className="font-medium">{msg.authorName}</span>
                             {onlineUsers.has(msg.authorId) && (
                               <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
@@ -696,9 +777,34 @@ export default function MessagesPage() {
                             {msg.pinnedAt && <Badge variant="outline">Pinned</Badge>}
                           </div>
                           {msg.type === 'VOICE' && activeWorkspace ? (
-                            <VoiceMessagePlayer workspaceId={activeWorkspace.id} channelId={msg.channelId} messageId={msg.id} durationMs={msg.audioDurationMs ?? null} />
+                            <div className={`mt-0.5 flex ${user?.id === msg.authorId ? 'justify-end' : 'justify-start'}`}>
+                              <div className="max-w-[75%] text-left">
+                                <VoiceMessagePlayer workspaceId={activeWorkspace.id} channelId={msg.channelId} messageId={msg.id} durationMs={msg.audioDurationMs ?? null} />
+                              </div>
+                            </div>
                           ) : (
-                            <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{msg.body}</p>
+                            <p className={`mt-0.5 inline-block max-w-[75%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-left text-sm ${user?.id === msg.authorId ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-primary)]'}`}>{msg.body}</p>
+                          )}
+
+                          {/* Reactions */}
+                          {reactionsOf(msg).length > 0 && (
+                            <div className={`mt-1 flex flex-wrap gap-1 ${user?.id === msg.authorId ? 'justify-end' : ''}`}>
+                              {reactionsOf(msg).map((r) => {
+                                const mine = Boolean(user && r.userIds.includes(user.id));
+                                return (
+                                  <button
+                                    key={r.emoji}
+                                    type="button"
+                                    onClick={() => void handleAddReaction(msg, r.emoji)}
+                                    aria-label={`${r.emoji} ${r.userIds.length}`}
+                                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${mine ? 'border-[var(--color-primary)] bg-[var(--color-surface-secondary)]' : 'border-[var(--color-border)]'}`}
+                                  >
+                                    <span>{r.emoji}</span>
+                                    <span>{r.userIds.length}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           )}
 
                           {/* Reply count */}
@@ -730,7 +836,7 @@ export default function MessagesPage() {
                           )}
 
                           {/* Message actions */}
-                          <div className="mt-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                          <div className={`mt-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 ${user?.id === msg.authorId ? 'justify-end' : ''}`}>
                             {user?.id === msg.authorId && (
                               <>
                                 <button
@@ -756,13 +862,16 @@ export default function MessagesPage() {
                             >
                               {msg.pinnedAt ? 'Unpin' : 'Pin'}
                             </button>
-                            <button
-                              onClick={() => void handleAddReaction(msg, '👍')}
-                              className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                              aria-label="React with thumbs up"
-                            >
-                              👍
-                            </button>
+                            {REACTION_CHOICES.map((emoji) => (
+                              <button
+                                key={emoji}
+                                onClick={() => void handleAddReaction(msg, emoji)}
+                                className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                                aria-label={`React with ${emoji}`}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
                           </div>
                         </div>
                       </div>
@@ -835,7 +944,6 @@ export default function MessagesPage() {
                   <Button
                     type="submit"
                     size="sm"
-                    loading={messageBusy}
                     disabled={socketStatus === 'disconnected' || !messageBody.trim()}
                   >
                     Send

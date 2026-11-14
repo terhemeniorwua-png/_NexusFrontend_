@@ -23,6 +23,18 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({ projectId: 'project-1' }),
 }));
 
+vi.mock('@/providers/ProjectPermissionsProvider', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    usePermissions: () => ({
+      permissions: [], projectRole: 'PROJECT_MANAGER', workspaceRole: 'OWNER', accessSource: 'project_member',
+      assignableRoles: [], roleDefinitions: [], isLoading: false, accessStatus: null, error: null,
+      can: () => true, canAny: () => true, canAll: () => true, refresh: vi.fn(),
+    }),
+  };
+});
+
 vi.mock('@/providers/WorkspaceProvider', () => ({
   useWorkspaceContext: () => ({ activeWorkspace: mocks.activeWorkspace, loading: mocks.loading }),
 }));

@@ -19,6 +19,7 @@ export interface MessageSummary {
   deletedAt: string | null;
   replyCount: number;
   reactionCount: number;
+  reactions?: { emoji: string; userIds: string[] }[];
   type?: 'TEXT' | 'VOICE';
   audioMime?: string | null;
   audioDurationMs?: number | null;

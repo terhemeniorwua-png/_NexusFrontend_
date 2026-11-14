@@ -25,19 +25,17 @@ interface MeetingRoomLiveProps {
 
 /** Fit the call to the area under the header and right of the sidebar. */
 function useContentInset() {
-  const [inset, setInset] = useState({ top: 56, left: 76 });
+  const [inset, setInset] = useState({ top: 56, left: 0 });
   useEffect(() => {
+    const main = document.getElementById('main-content');
     const measure = () => {
-      const header = document.querySelector('header');
-      const main = document.querySelector('main');
-      setInset({
-        top: header ? Math.max(header.getBoundingClientRect().bottom, 0) : 56,
-        left: main ? Math.max(main.getBoundingClientRect().left, 0) : 76,
-      });
+      if (!main) return;
+      const rect = main.getBoundingClientRect();
+      const padLeft = parseFloat(window.getComputedStyle(main).paddingLeft) || 0;
+      setInset({ top: Math.max(rect.top, 0), left: Math.max(rect.left + padLeft, 0) });
     };
     measure();
     window.addEventListener('resize', measure);
-    const main = document.querySelector('main');
     const observer = main ? new ResizeObserver(measure) : null;
     if (main && observer) observer.observe(main);
     return () => {

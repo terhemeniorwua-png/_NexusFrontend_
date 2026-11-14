@@ -1,4 +1,5 @@
 import type { ApiError } from '@/types/api';
+import { showToast } from '@/lib/toast';
 
 function getApiBaseUrl(): string | undefined {
   return '/api/backend';
@@ -31,6 +32,50 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
+export interface ApiRequestOptions extends RequestInit {
+  authenticated?: boolean;
+  /**
+   * Suppress the global PERMISSION_DENIED toast and permission-refresh event.
+   * Used by the permission fetch itself so a denied refresh cannot loop.
+   */
+  suppressPermissionEvents?: boolean;
+}
+
+type PermissionDeniedListener = () => void;
+
+const permissionDeniedListeners = new Set<PermissionDeniedListener>();
+
+/**
+ * Subscribe to backend PERMISSION_DENIED responses. The project permission
+ * provider uses this to re-fetch permissions after a role change.
+ */
+export function onPermissionDenied(listener: PermissionDeniedListener): () => void {
+  permissionDeniedListeners.add(listener);
+  return () => {
+    permissionDeniedListeners.delete(listener);
+  };
+}
+
+/** Notify subscribers that the backend denied an action for lack of permission. */
+export function notifyPermissionDenied(): void {
+  permissionDeniedListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // A stale subscriber must not break the API error path.
+    }
+  });
+}
+
+function handlePermissionDenied(): void {
+  showToast({
+    message: 'Your project role has changed or does not allow that action. Refreshing your permissions…',
+    variant: 'warning',
+  });
+  notifyPermissionDenied();
+}
+
+
 function readCsrfCookie(): string | undefined {
   if (typeof document === 'undefined') return undefined;
   const cookie = document.cookie
@@ -41,14 +86,14 @@ function readCsrfCookie(): string | undefined {
 
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit & { authenticated?: boolean } = {},
+  options: ApiRequestOptions = {},
 ): Promise<T> {
   const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
     throw new ApiRequestError('The API is not configured. Set NEXUS_API_URL on the server.', 0);
   }
 
-  const { authenticated = false, headers: inputHeaders, ...requestOptions } = options;
+  const { authenticated = false, suppressPermissionEvents = false, headers: inputHeaders, ...requestOptions } = options;
   const headers = new Headers(inputHeaders);
   // Only set the default JSON content-type when the body is a plain string or
   // Buffer. When it is a FormData the browser must set the content-type itself
@@ -91,6 +136,7 @@ export async function apiRequest<T>(
     };
     const message = body.error?.message ?? body.message ?? 'Something went wrong. Please try again.';
     const code = body.error?.code;
+    if (!suppressPermissionEvents && code === 'PERMISSION_DENIED') handlePermissionDenied();
     const error: ApiError = { status: response.status, message };
     throw new ApiRequestError(error.message, error.status, code);
   }
@@ -101,9 +147,9 @@ export async function apiRequest<T>(
 /** Authenticated raw-response request for private binary resources. */
 export async function apiRawRequest(
   path: string,
-  options: RequestInit & { authenticated?: boolean } = {},
+  options: ApiRequestOptions = {},
 ): Promise<Response> {
-  const { authenticated = false, headers: inputHeaders, ...requestOptions } = options;
+  const { authenticated = false, suppressPermissionEvents = false, headers: inputHeaders, ...requestOptions } = options;
   const headers = new Headers(inputHeaders);
   if (authenticated && accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   const csrfToken = readCsrfCookie();
@@ -122,6 +168,7 @@ export async function apiRawRequest(
       message = body.error?.message ?? body.message ?? message;
       code = body.error?.code;
     } catch { /* Binary endpoint may return an empty error body. */ }
+    if (!suppressPermissionEvents && code === 'PERMISSION_DENIED') handlePermissionDenied();
     throw new ApiRequestError(message, response.status, code);
   }
   return response;

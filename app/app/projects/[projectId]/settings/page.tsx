@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { Alert } from '@/components/ui/Alert';
@@ -13,11 +13,15 @@ import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Textarea } from '@/components/ui/Textarea';
 import { AccessState } from '@/components/shared/AccessState';
+import { PageAccessState } from '@/components/shared/PageAccessState';
+import { PermissionButton } from '@/components/shared/PermissionButton';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import {
   archiveProject,
+  deleteProject,
   getProject,
   restoreProject,
   transferProjectOwnership,
@@ -69,6 +73,8 @@ function requestError(cause: unknown, fallback: string): string {
 export default function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
+  const { can, isLoading: permissionsLoading } = usePermissions();
+  const router = useRouter();
   useWorkspaceRedirect();
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,6 +98,7 @@ export default function ProjectSettingsPage() {
   // Archive / restore
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Organizational access (department/team association for DEPARTMENT_TEAM visibility)
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -209,6 +216,19 @@ export default function ProjectSettingsPage() {
     finally { setBusy(false); }
   }
 
+  async function handleDelete() {
+    if (!activeWorkspace || !project) return;
+    setBusy(true); setError(null);
+    try {
+      await deleteProject(activeWorkspace.id, project.id);
+      setConfirmDelete(false);
+      router.push('/app/projects');
+    } catch (cause) {
+      setError(requestError(cause, 'Project could not be deleted.'));
+      setBusy(false);
+    }
+  }
+
   async function handleOrgAccess() {
     if (!activeWorkspace || !project) return;
     setOrgBusy(true); setOrgError(null); setOrgNotice(null);
@@ -236,7 +256,7 @@ export default function ProjectSettingsPage() {
     finally { setBusy(false); }
   }
 
-  if (loading) {
+  if (loading || permissionsLoading) {
     return (
       <div className="space-y-4" role="status" aria-label="Loading settings">
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -246,6 +266,14 @@ export default function ProjectSettingsPage() {
   }
 
   if (accessStatus) return <AccessState status={accessStatus} onRetry={() => void load()} />;
+  if (!can('project.settings.manage')) {
+    return (
+      <PageAccessState
+        description="Project settings are limited to project managers. Your project role can still view the overview, tasks, and members."
+        backHref={`/app/projects/${encodeURIComponent(projectId)}`}
+      />
+    );
+  }
   if (!project) return <Alert variant="error">{error ?? 'Project not found.'}</Alert>;
 
   return (
@@ -326,7 +354,14 @@ export default function ProjectSettingsPage() {
             </p>
           </div>
           <div className="flex justify-end">
-            <Button type="submit" loading={busy}>Save settings</Button>
+            <PermissionButton
+              type="submit"
+              permission="project.update"
+              loading={busy}
+              deniedReason="Your project role cannot edit project details."
+            >
+              Save settings
+            </PermissionButton>
           </div>
         </form>
       </Card>
@@ -419,17 +454,37 @@ export default function ProjectSettingsPage() {
             : 'Archiving hides the project from the default view. Existing data is preserved. The project can be restored.'}
         </p>
         <div className="mt-3">
-          {project.status === 'ARCHIVED' ? (
-            <Button variant="secondary" disabled={busy} onClick={() => setConfirmRestore(true)}>
-              Restore project
-            </Button>
+          {can('project.archive') ? (
+            project.status === 'ARCHIVED' ? (
+              <Button variant="secondary" disabled={busy} onClick={() => setConfirmRestore(true)}>
+                Restore project
+              </Button>
+            ) : (
+              <Button variant="destructive" disabled={busy} onClick={() => setConfirmArchive(true)}>
+                Archive project
+              </Button>
+            )
           ) : (
-            <Button variant="destructive" disabled={busy} onClick={() => setConfirmArchive(true)}>
-              Archive project
-            </Button>
+            <p className="text-sm text-[var(--color-text-muted)]">
+              Your project role cannot archive or restore this project.
+            </p>
           )}
         </div>
       </Card>
+
+      {can('project.delete') && (
+        <Card className="p-5 border-[var(--color-error)] border">
+          <h3 className="font-semibold">Delete project</h3>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            Permanently delete this project and its data. This cannot be undone.
+          </p>
+          <div className="mt-3">
+            <Button variant="destructive" disabled={busy} onClick={() => setConfirmDelete(true)}>
+              Delete project
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Visibility change confirmation */}
       <ConfirmDialog
@@ -462,6 +517,18 @@ export default function ProjectSettingsPage() {
         title="Restore project?"
         description={`Restore ${project.name} to its previous status?`}
         confirmLabel="Restore project"
+        loading={busy}
+      />
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => void handleDelete()}
+        title="Delete project?"
+        description={`Delete ${project.name} permanently? This cannot be undone.`}
+        confirmLabel="Delete project"
+        destructive
         loading={busy}
       />
 

@@ -17,6 +17,7 @@ import type {
   WorkspaceRole,
   WorkspaceType,
 } from '@/types/workspace';
+import type { Permission, ProjectRole } from '@/services/projects';
 
 export const WORKSPACE_CAPABILITIES = [
   'workspace:view',
@@ -243,6 +244,7 @@ export function assignableRoleOptions(actor: WorkspaceAccessShape | null | undef
   if (!actor) return [];
   const role = effectiveWorkspaceRole(actor.type, actor.role, actor.organizationRole);
 
+
   if (actor.type === 'COMPANY') {
     const candidates: OrganizationRole[] = [
       'COMPANY_ADMIN',
@@ -277,4 +279,83 @@ export function assignableRoleOptions(actor: WorkspaceAccessShape | null | undef
   return shared
     .filter((candidate) => canAssignWorkspaceRole(actor, candidate))
     .map((candidate) => ({ value: candidate, label: WORKSPACE_ROLE_LABELS[candidate] }));
+}
+
+// ---------------------------------------------------------------------------
+// Project-level permissions
+//
+// These helpers only format backend-provided data. They never decide access:
+// `usePermissions().can()` reads the permission list that the backend returned
+// for the active project. Keep the labels in sync with the backend catalogue.
+// ---------------------------------------------------------------------------
+
+export const PROJECT_PERMISSION_LABELS: Record<Permission, string> = {
+  'project.view': 'View the project',
+  'project.update': 'Edit project details',
+  'project.archive': 'Archive and restore the project',
+  'project.delete': 'Delete the project',
+  'project.settings.manage': 'Manage project settings',
+  'project.member.manage': 'Add, remove, and re-role project members',
+  'project.report.view': 'View project reports',
+  'task.view': 'View tasks',
+  'task.create': 'Create tasks',
+  'task.update': 'Edit tasks',
+  'task.delete': 'Delete tasks',
+  'task.assign': 'Assign tasks',
+  'task.reassign': 'Change or remove task assignees',
+  'task.complete': 'Complete tasks',
+  'task.comment': 'Comment on tasks',
+  'file.upload': 'Upload files',
+  'file.delete.own': 'Delete their own files',
+  'file.delete.any': 'Delete any project file',
+  'submission.submit': 'Submit work for review',
+  'submission.review': 'Review submitted work',
+  'submission.approve': 'Approve submitted work',
+  'submission.reject': 'Reject submitted work',
+  'submission.request_revision': 'Request revisions to submitted work',
+};
+
+/** Human label for a permission; falls back to a readable form for new values. */
+export function permissionLabel(permission: Permission | string): string {
+  const known = PROJECT_PERMISSION_LABELS[permission as Permission];
+  if (known) return known;
+  return permission
+    .replaceAll('.', ' ')
+    .replaceAll('_', ' ')
+    .replace(/^\w/, (character) => character.toUpperCase());
+}
+
+export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
+  PROJECT_MANAGER: 'Project manager',
+  MEMBER: 'Member',
+  COLLABORATOR: 'Collaborator',
+  VIEWER: 'Viewer',
+};
+
+/** Display order for role pickers and confirmations. */
+export const PROJECT_ROLE_ORDER: readonly ProjectRole[] = [
+  'PROJECT_MANAGER',
+  'MEMBER',
+  'COLLABORATOR',
+  'VIEWER',
+];
+
+export function projectRoleLabel(role: ProjectRole | string): string {
+  return PROJECT_ROLE_LABELS[role as ProjectRole] ?? role.replaceAll('_', ' ').toLowerCase();
+}
+
+/**
+ * Compare two backend-provided permission sets so a role change dialog can
+ * explain exactly what the member gains and loses.
+ */
+export function permissionDiff(
+  current: readonly string[],
+  next: readonly string[],
+): { gained: Permission[]; lost: Permission[] } {
+  const currentSet = new Set(current);
+  const nextSet = new Set(next);
+  return {
+    gained: [...nextSet].filter((permission) => !currentSet.has(permission)) as Permission[],
+    lost: [...currentSet].filter((permission) => !nextSet.has(permission)) as Permission[],
+  };
 }

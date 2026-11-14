@@ -17,13 +17,13 @@ const mocks = vi.hoisted(() => ({
 function setRole(role: 'PROJECT_MANAGER' | 'MEMBER' | 'COLLABORATOR' | 'VIEWER') {
   const perms: Record<string, string[]> = {
     PROJECT_MANAGER: ['project.view', 'project.member.manage'],
-    MEMBER: ['project.view', 'project.member.manage'],
+    MEMBER: ['project.view'],
     COLLABORATOR: ['project.view'],
     VIEWER: ['project.view'],
   };
   const assignable: Record<string, string[]> = {
     PROJECT_MANAGER: ['PROJECT_MANAGER', 'MEMBER', 'COLLABORATOR', 'VIEWER'],
-    MEMBER: ['MEMBER', 'COLLABORATOR', 'VIEWER'],
+    MEMBER: [],
     COLLABORATOR: ['COLLABORATOR', 'VIEWER'],
     VIEWER: [],
   };
@@ -143,13 +143,15 @@ describe('ProjectMembersPage — four roles', () => {
   });
 
   it('does not allow adding a role that is not assignable', async () => {
-    setRole('MEMBER');
+    setRole('PROJECT_MANAGER');
+    // A manager whose assignable roles exclude PROJECT_MANAGER
+    (mocks.permissionState as { assignableRoles: string[] }).assignableRoles = ['MEMBER', 'COLLABORATOR', 'VIEWER'];
     render(<ProjectMembersPage />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Add member' })).toBeInTheDocument());
 
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Workspace member'), 'user-3');
-    // MEMBER cannot assign PROJECT_MANAGER - not in assignableRoles
+    // PROJECT_MANAGER is not in assignableRoles, so it is not offered
     expect(screen.queryByRole('option', { name: 'Project manager' })).not.toBeInTheDocument();
   });
 

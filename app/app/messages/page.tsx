@@ -39,6 +39,7 @@ import {
   unpinMessage,
   getReplies,
   addReaction,
+  removeReaction,
   getUnreadCount,
   type MessageSummary,
 } from '@/services/messages';
@@ -541,12 +542,16 @@ export default function MessagesPage() {
   // ---------------------------------------------------------------------------
 
   async function handleAddReaction(msg: MessageSummary, emoji: string) {
-    if (!activeWorkspace || !selectedChannel) return;
+    if (!activeWorkspace || !selectedChannel || !user || msg.id.startsWith('temp-')) return;
+    const already = reactionsOf(msg).some((r) => r.emoji === emoji && r.userIds.includes(user.id));
+    // Toggle immediately, before the backend responds
+    setMessages((prev) => applyReaction(prev, msg.id, emoji, user.id, !already));
     try {
-      await addReaction(activeWorkspace.id, selectedChannel.id, msg.id, emoji);
-      await loadMessages(selectedChannel);
+      if (already) await removeReaction(activeWorkspace.id, selectedChannel.id, msg.id, emoji);
+      else await addReaction(activeWorkspace.id, selectedChannel.id, msg.id, emoji);
     } catch (cause) {
-      setMessageError(requestError(cause, 'Reaction could not be added.'));
+      setMessages((prev) => applyReaction(prev, msg.id, emoji, user.id, already));
+      setMessageError(requestError(cause, 'Reaction could not be updated.'));
     }
   }
 

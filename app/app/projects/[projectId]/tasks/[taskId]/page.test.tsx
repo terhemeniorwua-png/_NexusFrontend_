@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskDetailPage from './page';
@@ -232,8 +232,8 @@ describe('TaskDetailPage — four roles', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Mark complete' })).toBeInTheDocument());
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Mark complete' }));
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: 'Mark complete' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Mark complete' }));
     await waitFor(() => expect(mocks.completeTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1'));
   });
 });

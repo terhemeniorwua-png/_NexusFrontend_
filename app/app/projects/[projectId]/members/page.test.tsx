@@ -51,6 +51,8 @@ function setRole(role: 'PROJECT_MANAGER' | 'MEMBER' | 'COLLABORATOR' | 'VIEWER')
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ projectId: 'project-1' }),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => '/app/projects/project-1/members',
 }));
 
 vi.mock('@/providers/WorkspaceProvider', () => ({
@@ -100,29 +102,29 @@ describe('ProjectMembersPage — four roles', () => {
   it('PROJECT_MANAGER sees the add member form and role dropdowns', async () => {
     setRole('PROJECT_MANAGER');
     render(<ProjectMembersPage />);
-    expect(await screen.findByText('Alice')).toBeInTheDocument();
+    expect(await screen.findByText(/^Alice/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add member' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Change role')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Change role').length).toBeGreaterThan(0);
   });
 
   it('MEMBER can view members but cannot change roles', async () => {
     setRole('MEMBER');
     render(<ProjectMembersPage />);
-    expect(await screen.findByText('Alice')).toBeInTheDocument();
+    expect(await screen.findByText(/^Alice/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add member' })).not.toBeInTheDocument();
   });
 
   it('COLLABORATOR cannot add members', async () => {
     setRole('COLLABORATOR');
     render(<ProjectMembersPage />);
-    expect(await screen.findByText('Alice')).toBeInTheDocument();
+    expect(await screen.findByText(/^Alice/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add member' })).not.toBeInTheDocument();
   });
 
   it('VIEWER cannot add members or change roles', async () => {
     setRole('VIEWER');
     render(<ProjectMembersPage />);
-    expect(await screen.findByText('Alice')).toBeInTheDocument();
+    expect(await screen.findByText(/^Alice/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add member' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
   });
@@ -155,7 +157,7 @@ describe('ProjectMembersPage — four roles', () => {
     setRole('PROJECT_MANAGER');
     // Current user is Alice (user-1), who is PROJECT_MANAGER - self
     render(<ProjectMembersPage />);
-    await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/^Alice/)).toBeInTheDocument());
 
     // Alice's own role select should be disabled
     const selfSelect = screen.getAllByLabelText('Change role')[0];

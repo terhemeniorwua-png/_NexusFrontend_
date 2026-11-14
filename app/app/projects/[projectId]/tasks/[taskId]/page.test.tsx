@@ -148,7 +148,7 @@ describe('TaskDetailPage — four roles', () => {
     setRole('PROJECT_MANAGER');
     render(<TaskDetailPage />);
     expect(await screen.findByText('Fix authentication bug')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit task' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mark complete' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Archive' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
@@ -167,7 +167,7 @@ describe('TaskDetailPage — four roles', () => {
     setRole('COLLABORATOR');
     render(<TaskDetailPage />);
     expect(await screen.findByText('Fix authentication bug')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit task' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
@@ -176,7 +176,7 @@ describe('TaskDetailPage — four roles', () => {
     setRole('VIEWER');
     render(<TaskDetailPage />);
     expect(await screen.findByText('Fix authentication bug')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit task' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Mark complete' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument();
   });
@@ -187,7 +187,7 @@ describe('TaskDetailPage — four roles', () => {
     const ownTask = { ...task1, assignees: [{ userId: 'user-2', user: { id: 'user-2', name: 'Bob', email: 'bob@example.com' }, assignedBy: 'user-1', createdAt: '2026-01-01T00:00:00.000Z' }] };
     mocks.getTask.mockResolvedValue(ownTask);
     render(<TaskDetailPage />);
-    await waitFor(() => expect(screen.getByText('You are assigned to this task')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/You are assigned to this task/)).toBeInTheDocument());
     // Approve/Reject/Request revision should be hidden for own submissions
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument();

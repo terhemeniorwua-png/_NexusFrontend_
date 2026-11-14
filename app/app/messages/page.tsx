@@ -734,7 +734,11 @@ export default function MessagesPage() {
                             {msg.pinnedAt && <Badge variant="outline">Pinned</Badge>}
                           </div>
                           {msg.type === 'VOICE' && activeWorkspace ? (
-                            <VoiceMessagePlayer workspaceId={activeWorkspace.id} channelId={msg.channelId} messageId={msg.id} durationMs={msg.audioDurationMs ?? null} />
+                            <div className={`mt-0.5 flex ${user?.id === msg.authorId ? 'justify-end' : 'justify-start'}`}>
+                              <div className="max-w-[75%] text-left">
+                                <VoiceMessagePlayer workspaceId={activeWorkspace.id} channelId={msg.channelId} messageId={msg.id} durationMs={msg.audioDurationMs ?? null} />
+                              </div>
+                            </div>
                           ) : (
                             <p className={`mt-0.5 inline-block max-w-[75%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-left text-sm ${user?.id === msg.authorId ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-primary)]'}`}>{msg.body}</p>
                           )}

@@ -35,6 +35,11 @@ export function useCall(): CallContextValue {
   return ctx;
 }
 
+/** Like useCall, but returns null instead of throwing when there is no CallProvider (safe in isolated tests). */
+export function useOptionalCall(): CallContextValue | null {
+  return useContext(CallContext);
+}
+
 export function CallProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);

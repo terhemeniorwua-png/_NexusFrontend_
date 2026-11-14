@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useRingtone } from '@/hooks/useRingtone';
 import { getSocket } from '@/lib/socket';
+import { useOptionalCall } from '@/providers/CallProvider';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { declineMeeting } from '@/services/meetings';
 
@@ -31,6 +32,7 @@ const NOTICE_MS = 8_000;
 export function IncomingCallListener() {
   const router = useRouter();
   const { activeWorkspace, user, switchToWorkspace } = useWorkspaceContext();
+  const activeCall = useOptionalCall()?.activeCall ?? null;
   const [call, setCall] = useState<IncomingCall | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const userIdRef = useRef(user?.id);
@@ -42,7 +44,8 @@ export function IncomingCallListener() {
   useEffect(() => {
     const socket = getSocket();
 
-    const onIncoming = (payload: IncomingCall) => setCall(payload);
+    // Keep the first popup; a second call is left to time out as missed.
+    const onIncoming = (payload: IncomingCall) => setCall((current) => current ?? payload);
 
     // Caller side: the other person declined.
     const onDeclined = (e: CallEvent) => {
@@ -61,13 +64,23 @@ export function IncomingCallListener() {
       }
     };
 
+    // Caller hung up before anyone answered (needs the backend to emit call:cancelled).
+    const onCancelled = (e: CallEvent) => {
+      if (callRef.current?.meetingId === e.meetingId) {
+        setCall(null);
+        setNotice(`Missed call: ${e.title}`);
+      }
+    };
+
     socket.on('call:incoming', onIncoming);
     socket.on('call:declined', onDeclined);
     socket.on('call:missed', onMissed);
+    socket.on('call:cancelled', onCancelled);
     return () => {
       socket.off('call:incoming', onIncoming);
       socket.off('call:declined', onDeclined);
       socket.off('call:missed', onMissed);
+      socket.off('call:cancelled', onCancelled);
     };
   }, []);
 
@@ -77,7 +90,8 @@ export function IncomingCallListener() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  useRingtone(!!call);
+  // Stay quiet when the person is already in a call.
+  useRingtone(!!call && !activeCall);
 
   async function accept() {
     if (!call) return;
@@ -117,6 +131,11 @@ export function IncomingCallListener() {
             Incoming call from {call.callerName}{call.workspaceName && <> · {call.workspaceName}</>}
           </p>
           <p className="mt-0.5 truncate text-xs text-[var(--color-text-secondary)]">{call.title}</p>
+          {activeCall && (
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              Accepting will leave your current call.
+            </p>
+          )}
           <div className="mt-3 flex gap-2">
             <button
               type="button"

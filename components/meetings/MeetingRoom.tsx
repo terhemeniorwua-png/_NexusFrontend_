@@ -1,23 +1,12 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiRequestError } from '@/lib/api';
-import {
-  getMeetingToken,
-  joinMeeting,
-  leaveMeeting,
-  type MeetingToken,
-} from '@/services/meetings';
-
-const LiveRoom = dynamic(() => import('./MeetingRoomLive'), {
-  ssr: false,
-  loading: () => <Skeleton className="h-[70vh] min-h-[420px] w-full" />,
-});
+import { useCall } from '@/providers/CallProvider';
+import { getMeetingToken, joinMeeting } from '@/services/meetings';
 
 export function meetingJoinErrorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) {
@@ -57,54 +46,44 @@ export function MeetingRoom({
   audioOnly = false,
   onParticipationChange,
 }: MeetingRoomProps) {
-  const [phase, setPhase] = useState<'idle' | 'joining' | 'live'>('idle');
+  const { activeCall, error: callError, startCall } = useCall();
+  const [joining, setJoining] = useState(false);
   const [audio, setAudio] = useState(true);
   const [video, setVideo] = useState(!audioOnly);
-  const [session, setSession] = useState<MeetingToken | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const joinedRef = useRef(false);
   const notifyRef = useRef(onParticipationChange);
   useEffect(() => {
     notifyRef.current = onParticipationChange;
   }, [onParticipationChange]);
 
-  const leave = useCallback(async () => {
-    if (!joinedRef.current) return;
-    joinedRef.current = false;
-    try {
-      await leaveMeeting(workspaceId, meetingId);
-    } catch {
-      // Non-fatal: the participant record is corrected on the next join.
-    }
-    notifyRef.current?.();
-  }, [workspaceId, meetingId]);
-
-  // Record the leave if the user navigates away while connected.
-  useEffect(() => {
-    return () => {
-      if (joinedRef.current) {
-        joinedRef.current = false;
-        void leaveMeeting(workspaceId, meetingId).catch(() => undefined);
-      }
-    };
-  }, [workspaceId, meetingId]);
+  // The room itself lives in CallProvider, so it keeps running when this page unmounts.
+  const live = activeCall?.meetingId === meetingId;
 
   async function handleJoin() {
-    if (phase !== 'idle') return;
+    if (joining || live) return;
     setError(null);
-    setPhase('joining');
+    setJoining(true);
     try {
       // Token first, so no participant record is created when access is refused.
       const next = await getMeetingToken(workspaceId, meetingId);
       await joinMeeting(workspaceId, meetingId);
-      joinedRef.current = true;
-      setSession(next);
-      setPhase('live');
+      startCall({
+        workspaceId,
+        meetingId,
+        title,
+        isHost: Boolean(isHost),
+        url: next.url,
+        token: next.token,
+        audio,
+        video,
+        onParticipationChange: () => notifyRef.current?.(),
+      });
       notifyRef.current?.();
     } catch (err) {
       setError(meetingJoinErrorMessage(err));
-      setPhase('idle');
+    } finally {
+      setJoining(false);
     }
   }
 
@@ -116,27 +95,9 @@ export function MeetingRoom({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoJoin]);
 
-  function handleDisconnected() {
-    setSession(null);
-    setPhase('idle');
-    void leave();
-  }
-
-  if (phase === 'live' && session) {
-    return (
-      <div className="space-y-3">
-        {error && <Alert variant="error">{error}</Alert>}
-        <LiveRoom
-          host={isHost ? { workspaceId, meetingId } : undefined}
-          serverUrl={session.url}
-          token={session.token}
-          audio={audio}
-          video={video}
-          onDisconnected={handleDisconnected}
-          onError={(err) => setError(meetingJoinErrorMessage(err))}
-        />
-      </div>
-    );
+  if (live) {
+    const message = error ?? callError;
+    return <div className="space-y-3">{message && <Alert variant="error">{message}</Alert>}</div>;
   }
 
   return (
@@ -158,7 +119,7 @@ export function MeetingRoom({
             type="checkbox"
             checked={audio}
             onChange={(e) => setAudio(e.target.checked)}
-            disabled={phase === 'joining'}
+            disabled={joining}
             className="rounded border-[var(--color-border)]"
           />
           Microphone on
@@ -168,7 +129,7 @@ export function MeetingRoom({
             type="checkbox"
             checked={video}
             onChange={(e) => setVideo(e.target.checked)}
-            disabled={phase === 'joining'}
+            disabled={joining}
             className="rounded border-[var(--color-border)]"
           />
           Camera on
@@ -180,8 +141,8 @@ export function MeetingRoom({
         onClick={() => {
           void handleJoin();
         }}
-        loading={phase === 'joining'}
-        disabled={phase === 'joining'}
+        loading={joining}
+        disabled={joining}
       >
         Join meeting
       </Button>

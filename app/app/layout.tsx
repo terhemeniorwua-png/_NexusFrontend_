@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { AuthenticatedShell } from '@/components/layout/AuthenticatedShell';
 import { AvatarUrlProvider } from '@/providers/AvatarUrlProvider';
+import { CallProvider } from '@/providers/CallProvider';
 import { SocketProvider } from '@/providers/SocketProvider';
 import { WorkspaceProvider } from '@/providers/WorkspaceProvider';
 
@@ -11,7 +12,9 @@ export default function AuthenticatedAppLayout({ children }: { children: React.R
     <WorkspaceProvider>
       <AvatarUrlProvider>
         <SocketProvider>
-          <AuthenticatedShell>{children}</AuthenticatedShell>
+          <CallProvider>
+            <AuthenticatedShell>{children}</AuthenticatedShell>
+          </CallProvider>
         </SocketProvider>
       </AvatarUrlProvider>
     </WorkspaceProvider>

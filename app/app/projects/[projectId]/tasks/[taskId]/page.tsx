@@ -799,7 +799,7 @@ export default function TaskDetailPage() {
                       ? <Button size="sm" variant="secondary" onClick={() => setConfirmAction('reopen')} disabled={busy}>Reopen</Button>
                       : <Button size="sm" onClick={() => setConfirmAction('complete')} disabled={busy}>Mark complete</Button>
                   )}
-                  <Can permission="task.update">
+                  <Can permission="task.delete">
                     {isArchived
                       ? <Button size="sm" variant="secondary" onClick={() => setConfirmAction('restore')} disabled={busy}>Restore</Button>
                       : <Button size="sm" variant="ghost" onClick={() => setConfirmAction('archive')} disabled={busy}>Archive</Button>

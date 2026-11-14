@@ -4,8 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiRequestError } from '@/lib/api';
 import { MeetingRoom, meetingJoinErrorMessage } from '../MeetingRoom';
 
-vi.mock('next/dynamic', () => ({
-  default: () => () => <div data-testid="live-room" />,
+const callMock = vi.hoisted(() => ({
+  startCall: vi.fn(),
+  activeCall: null as { meetingId: string } | null,
+}));
+vi.mock('@/providers/CallProvider', () => ({
+  useCall: () => ({ activeCall: callMock.activeCall, error: null, startCall: callMock.startCall }),
 }));
 
 const getMeetingToken = vi.fn();
@@ -24,6 +28,7 @@ function setup() {
 describe('MeetingRoom', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    callMock.activeCall = null;
     joinMeeting.mockResolvedValue({ ok: true });
     leaveMeeting.mockResolvedValue({ ok: true });
   });
@@ -36,18 +41,36 @@ describe('MeetingRoom', () => {
     expect(getMeetingToken).not.toHaveBeenCalled();
   });
 
-  it('requests the token before recording the join, then shows the room', async () => {
+  it('requests the token before recording the join, then starts the call', async () => {
     getMeetingToken.mockResolvedValue({ token: 't', url: 'wss://x', room: 'r' });
     const user = userEvent.setup();
     setup();
     await user.click(screen.getByRole('button', { name: 'Join meeting' }));
 
-    await waitFor(() => expect(screen.getByTestId('live-room')).toBeInTheDocument());
+    await waitFor(() => expect(callMock.startCall).toHaveBeenCalledTimes(1));
+    expect(callMock.startCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws-1',
+        meetingId: 'm-1',
+        title: 'Standup',
+        isHost: false,
+        url: 'wss://x',
+        token: 't',
+        audio: true,
+        video: true,
+      }),
+    );
     expect(getMeetingToken).toHaveBeenCalledWith('ws-1', 'm-1');
     expect(joinMeeting).toHaveBeenCalledWith('ws-1', 'm-1');
     expect(getMeetingToken.mock.invocationCallOrder[0]).toBeLessThan(
       joinMeeting.mock.invocationCallOrder[0],
     );
+  });
+
+  it('hides the pre-join screen when this meeting is already live', () => {
+    callMock.activeCall = { meetingId: 'm-1' };
+    setup();
+    expect(screen.queryByRole('button', { name: 'Join meeting' })).not.toBeInTheDocument();
   });
 
   it.each([
@@ -62,6 +85,7 @@ describe('MeetingRoom', () => {
 
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(joinMeeting).not.toHaveBeenCalled();
+    expect(callMock.startCall).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Join meeting' })).toBeInTheDocument();
   });
 

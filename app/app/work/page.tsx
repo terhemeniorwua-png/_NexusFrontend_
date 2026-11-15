@@ -47,7 +47,7 @@ export default function WorkOverviewPage() {
         setCompleted(countCompleted);
         highlightTaskId;
       } catch (e) {
-        // Non-fatal — counts will update on next poll
+        setError('Your work summary could not be loaded. Retrying shortly.');
       }
     }
     void poll().finally(() => { if (active) setLoading(false); });

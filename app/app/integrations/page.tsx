@@ -29,6 +29,12 @@ import {
   type IntegrationStatus,
   type IntegrationSummary,
 } from '@/services/integrations';
+import {
+  listDevConnections,
+  getGithubConnectUrl,
+  disconnectDevConnection,
+  type DevConnectionSummary,
+} from '@/services/dev-integrations';
 
 // ─── Provider metadata ────────────────────────────────────────────────────────
 
@@ -175,18 +181,42 @@ export default function IntegrationsPage() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Workspace-level dev/source-control connections (Feature A: GitHub App)
+  const [devConnections, setDevConnections] = useState<DevConnectionSummary[]>([]);
+  const [devLoading, setDevLoading] = useState(false);
+  const [devError, setDevError] = useState<string | null>(null);
+  const [devConnecting, setDevConnecting] = useState(false);
+  const [devDisconnectTarget, setDevDisconnectTarget] = useState<DevConnectionSummary | null>(null);
+  const [devDisconnecting, setDevDisconnecting] = useState(false);
+
   const latestLoad = useRef(0);
 
   const load = useCallback(async (wsId: string) => {
     const seq = ++latestLoad.current;
     setLoading(true);
+    setDevLoading(Boolean(wsId));
     setError(null);
+    setDevError(null);
     setAccessError(null);
     try {
       // Load personal + workspace integrations
       const all = await listIntegrations(wsId || undefined);
       if (seq !== latestLoad.current) return;
       setIntegrations(all);
+      if (wsId) {
+        try {
+          const dev = await listDevConnections(wsId);
+          if (seq === latestLoad.current) setDevConnections(dev);
+        } catch (err) {
+          if (seq === latestLoad.current) {
+            // Non-fatal for users without manage permission; show message but keep page usable
+            setDevError(err instanceof ApiRequestError ? err.message : 'Could not load source control connections.');
+            setDevConnections([]);
+          }
+        }
+      } else {
+        setDevConnections([]);
+      }
     } catch (err) {
       if (seq !== latestLoad.current) return;
       if (err instanceof ApiRequestError && (err.status === 401 || err.status === 403)) {
@@ -195,7 +225,10 @@ export default function IntegrationsPage() {
         setError(err instanceof ApiRequestError ? err.message : 'Could not load integrations.');
       }
     } finally {
-      if (seq === latestLoad.current) setLoading(false);
+      if (seq === latestLoad.current) {
+        setLoading(false);
+        setDevLoading(false);
+      }
     }
   }, []);
 
@@ -209,8 +242,17 @@ export default function IntegrationsPage() {
   useEffect(() => {
     void Promise.resolve().then(() => {
       const params = new URLSearchParams(window.location.search);
+      const devIntegration = params.get('devIntegration');
       const integration = params.get('integration');
       const status = params.get('status');
+      if (status && devIntegration) {
+        const name = devIntegration.toLowerCase() === 'github' ? 'GitHub' : devIntegration;
+        if (status === 'connected') setNotice({ type: 'success', text: `${name} source control connected for this workspace.` });
+        else if (status === 'denied') setNotice({ type: 'error', text: `${name} authorization was cancelled.` });
+        else setNotice({ type: 'error', text: `Could not connect ${name}. Please try again.` });
+        window.history.replaceState(null, '', window.location.pathname);
+        return;
+      }
       if (!integration || !status) return;
       const name = PROVIDER_META[integration.toUpperCase() as IntegrationProvider]?.name ?? 'Integration';
       if (status === 'connected') setNotice({ type: 'success', text: `${name} connected.` });
@@ -230,6 +272,7 @@ export default function IntegrationsPage() {
       setDisconnectTarget(null);
     } catch (err) {
       setDisconnectError(err instanceof ApiRequestError ? err.message : 'Could not disconnect.');
+    } finally {
       setDisconnecting(false);
     }
   }
@@ -249,6 +292,34 @@ export default function IntegrationsPage() {
           : `Could not start ${PROVIDER_META[provider].name} authorization.`,
       );
       setConnectingProvider(null);
+    }
+  }
+
+  async function handleGithubDevConnect() {
+    if (!workspaceId || devConnecting) return;
+    setDevConnecting(true);
+    setConnectError(null);
+    try {
+      const { url } = await getGithubConnectUrl(workspaceId);
+      window.location.href = url;
+    } catch (err) {
+      setConnectError(err instanceof ApiRequestError ? err.message : 'Could not start GitHub authorization.');
+      setDevConnecting(false);
+    }
+  }
+
+  async function handleDevDisconnect() {
+    if (!workspaceId || !devDisconnectTarget || devDisconnecting) return;
+    setDevDisconnecting(true);
+    setDisconnectError(null);
+    try {
+      await disconnectDevConnection(workspaceId, devDisconnectTarget.id);
+      setDevConnections((prev) => prev.filter((c) => c.id !== devDisconnectTarget.id));
+      setDevDisconnectTarget(null);
+    } catch (err) {
+      setDisconnectError(err instanceof ApiRequestError ? err.message : 'Could not disconnect source control.');
+    } finally {
+      setDevDisconnecting(false);
     }
   }
 
@@ -297,6 +368,7 @@ export default function IntegrationsPage() {
       {notice && <Alert variant={notice.type} className="mb-4">{notice.text}</Alert>}
       {connectError && <Alert variant="error" className="mb-4">{connectError}</Alert>}
       {disconnectError && <Alert variant="error" className="mb-4">{disconnectError}</Alert>}
+      {devError && <Alert variant="warning" className="mb-4">{devError}</Alert>}
 
       {loading ? (
         <div className="space-y-3" aria-busy="true" aria-label="Loading integrations">
@@ -304,6 +376,65 @@ export default function IntegrationsPage() {
         </div>
       ) : (
         <div className="space-y-8">
+          {/* Workspace source control (Feature A: GitHub App) */}
+          <section>
+            <h2 className="mb-3 text-base font-semibold text-[var(--color-text-primary)]">
+              Source control (workspace)
+            </h2>
+            <p className="mb-3 text-sm text-[var(--color-text-secondary)]">
+              Connect GitHub once for this workspace to link repositories to projects. Nexus links to GitHub and shows development status; it does not host or edit code.
+            </p>
+            {!workspaceId ? (
+              <EmptyState title="Select a workspace" description="Choose a workspace to manage source control connections." />
+            ) : devLoading ? (
+              <Skeleton className="h-20 w-full" />
+            ) : (
+              <div className="space-y-3">
+                {devConnections.length === 0 ? (
+                  <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 gap-3">
+                      <span className="text-2xl" aria-hidden="true">🐙</span>
+                      <div className="min-w-0">
+                        <p className="font-medium text-[var(--color-text-primary)]">GitHub</p>
+                        <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+                          No workspace GitHub connection. Connect a GitHub App installation to link repositories to projects.
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" className="shrink-0" onClick={() => void handleGithubDevConnect()} loading={devConnecting} disabled={devConnecting}>
+                      Connect GitHub
+                    </Button>
+                  </Card>
+                ) : (
+                  devConnections.map((conn) => (
+                    <Card key={conn.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 gap-3">
+                        <span className="text-2xl" aria-hidden="true">🐙</span>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-[var(--color-text-primary)]">GitHub</span>
+                            <Badge variant={conn.status === 'ACTIVE' ? 'success' : conn.status === 'ERROR' ? 'error' : 'warning'}>{conn.status}</Badge>
+                            <Badge variant="outline">Workspace</Badge>
+                          </div>
+                          {(conn.externalAccount.login || conn.externalAccount.name) && (
+                            <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+                              {conn.externalAccount.login ?? conn.externalAccount.name}
+                              {conn.externalAccount.name && conn.externalAccount.login ? ` (${conn.externalAccount.name})` : ''}
+                            </p>
+                          )}
+                          {conn.lastError && <p className="mt-1 text-xs text-[var(--color-error)]">{conn.lastError}</p>}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setDevDisconnectTarget(conn)}>
+                        Disconnect
+                      </Button>
+                    </Card>
+                  ))
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Connected */}
           <section>
             <h2 className="mb-3 text-base font-semibold text-[var(--color-text-primary)]">
@@ -367,6 +498,17 @@ export default function IntegrationsPage() {
         onConfirm={() => { void handleDisconnect(); }}
         onClose={() => { setDisconnectTarget(null); setDisconnectError(null); }}
         loading={disconnecting}
+      />
+
+      <ConfirmDialog
+        open={!!devDisconnectTarget}
+        title="Disconnect source control"
+        description="Disconnect GitHub from this workspace? Stored credentials will be removed. Linked project repositories will need to be reconnected to sync in future. Your data in GitHub will not be deleted."
+        confirmLabel="Disconnect"
+        destructive
+        onConfirm={() => { void handleDevDisconnect(); }}
+        onClose={() => { setDevDisconnectTarget(null); setDisconnectError(null); }}
+        loading={devDisconnecting}
       />
     </PageContainer>
   );

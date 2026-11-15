@@ -52,7 +52,7 @@ function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/** All 18 notification types supported by the backend. */
+/** Supported notification types (backend contract). */
 export type NotificationType =
   | 'MENTION'
   | 'TASK_ASSIGNED'
@@ -71,7 +71,11 @@ export type NotificationType =
   | 'MEETING_INVITE'
   | 'MEETING_RESCHEDULED'
   | 'MEETING_CANCELLED'
-  | 'PROJECT_UPDATE';
+  | 'PROJECT_UPDATE'
+  | 'TASK_BLOCKER_REPORTED'
+  | 'TASK_BLOCKER_RESOLVED'
+  | 'TASK_DUE_SOON'
+  | 'TASK_OVERDUE';
 
 export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   'MENTION',
@@ -92,6 +96,10 @@ export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   'MEETING_RESCHEDULED',
   'MEETING_CANCELLED',
   'PROJECT_UPDATE',
+  'TASK_BLOCKER_REPORTED',
+  'TASK_BLOCKER_RESOLVED',
+  'TASK_DUE_SOON',
+  'TASK_OVERDUE',
 ];
 
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
@@ -113,12 +121,40 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   MEETING_RESCHEDULED: 'Meeting rescheduled',
   MEETING_CANCELLED: 'Meeting cancelled',
   PROJECT_UPDATE: 'Project updates',
+  TASK_BLOCKER_REPORTED: 'Task blocker reported',
+  TASK_BLOCKER_RESOLVED: 'Task blocker resolved',
+  TASK_DUE_SOON: 'Task due soon',
+  TASK_OVERDUE: 'Task overdue',
 };
 
 export const NOTIFICATION_TYPE_GROUPS: { label: string; types: NotificationType[] }[] = [
-  { label: 'Tasks', types: ['TASK_ASSIGNED', 'TASK_REASSIGNED', 'TASK_SUBMITTED', 'TASK_APPROVED', 'CHANGES_REQUESTED'] },
+  {
+    label: 'Tasks',
+    types: [
+      'TASK_ASSIGNED',
+      'TASK_REASSIGNED',
+      'TASK_SUBMITTED',
+      'TASK_APPROVED',
+      'CHANGES_REQUESTED',
+      'TASK_BLOCKER_REPORTED',
+      'TASK_BLOCKER_RESOLVED',
+      'TASK_DUE_SOON',
+      'TASK_OVERDUE',
+    ],
+  },
   { label: 'Comments and mentions', types: ['MENTION', 'COMMENT_REPLY'] },
-  { label: 'Membership', types: ['MEMBERSHIP_CHANGED', 'MEMBERSHIP_SUSPENDED', 'MEMBERSHIP_RESTORED', 'INVITATION_ACCEPTED', 'JOIN_REQUEST_RECEIVED', 'JOIN_REQUEST_APPROVED', 'JOIN_REQUEST_REJECTED'] },
+  {
+    label: 'Membership',
+    types: [
+      'MEMBERSHIP_CHANGED',
+      'MEMBERSHIP_SUSPENDED',
+      'MEMBERSHIP_RESTORED',
+      'INVITATION_ACCEPTED',
+      'JOIN_REQUEST_RECEIVED',
+      'JOIN_REQUEST_APPROVED',
+      'JOIN_REQUEST_REJECTED',
+    ],
+  },
   { label: 'Meetings', types: ['MEETING_INVITE', 'MEETING_RESCHEDULED', 'MEETING_CANCELLED'] },
   { label: 'Projects', types: ['PROJECT_UPDATE'] },
 ];

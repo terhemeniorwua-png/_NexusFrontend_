@@ -4,8 +4,17 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
-import type { TaskActivityItem, TaskAssignee, TaskPersonRef, TaskSummary } from '@/services/tasks';
+import type { TaskActivityItem, TaskAssignee, TaskPersonRef } from '@/services/tasks';
 import { TaskWorkspaceSidebar, type WorkspaceSection } from './TaskWorkspaceSidebar';
+
+function formatMinutes(total: number): string {
+  if (total <= 0) return '0m';
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
 
 export function TaskWorkspaceLayout({
   activeSection,
@@ -22,6 +31,11 @@ export function TaskWorkspaceLayout({
   overdue,
   recentActivity,
   onContactOwner,
+  onReportBlocker,
+  canReportBlocker,
+  timeTrackingEnabled,
+  totalTimeMinutes,
+  onLogTime,
 }: {
   activeSection: WorkspaceSection;
   onSectionChange: (s: WorkspaceSection) => void;
@@ -37,6 +51,11 @@ export function TaskWorkspaceLayout({
   overdue: boolean;
   recentActivity: TaskActivityItem[];
   onContactOwner: () => void;
+  onReportBlocker?: () => void;
+  canReportBlocker?: boolean;
+  timeTrackingEnabled?: boolean;
+  totalTimeMinutes?: number;
+  onLogTime?: () => void;
 }) {
   return (
     <div className="flex min-h-[70vh] flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -50,9 +69,11 @@ export function TaskWorkspaceLayout({
           options={[
             { value: 'overview', label: 'Overview' },
             { value: 'subtasks', label: 'Subtasks' },
+            { value: 'documents', label: 'Work documents' },
             { value: 'attachments', label: 'Attachments' },
             { value: 'discussion', label: 'Discussion' },
             { value: 'activity', label: 'Activity' },
+            { value: 'time', label: 'Time tracking' },
           ]}
         />
       </div>
@@ -83,6 +104,14 @@ export function TaskWorkspaceLayout({
               </dl>
             </Card>
             <Card className="p-4">
+              <h2 className="mb-2 text-sm font-semibold">Time</h2>
+              {timeTrackingEnabled ? (
+                <p className="text-sm"><span className="text-[var(--color-text-secondary)]">Total logged: </span><span className="font-medium">{formatMinutes(totalTimeMinutes ?? 0)}</span></p>
+              ) : (
+                <p className="text-sm text-[var(--color-text-secondary)]">Time tracking is disabled for this workspace.</p>
+              )}
+            </Card>
+            <Card className="p-4">
               <h2 className="mb-2 text-sm font-semibold">Recent activity</h2>
               {recentActivity.length === 0 ? <p className="text-sm text-[var(--color-text-secondary)]">No recent activity.</p> : (
                 <ul className="space-y-2" role="list">
@@ -99,8 +128,24 @@ export function TaskWorkspaceLayout({
               <h2 className="mb-2 text-sm font-semibold">Quick actions</h2>
               <div className="flex flex-col gap-2">
                 <Button size="sm" variant="secondary" onClick={onContactOwner}>Contact task owner</Button>
-                <Button size="sm" variant="secondary" disabled title="Coming soon">Log time (Coming soon)</Button>
-                <Button size="sm" variant="secondary" disabled title="Coming soon">Report blocker (Coming soon)</Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={onLogTime}
+                  disabled={!timeTrackingEnabled || !onLogTime}
+                  title={!timeTrackingEnabled ? 'Time tracking is disabled for this workspace' : 'Log time'}
+                >
+                  Log time
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={onReportBlocker}
+                  disabled={!canReportBlocker || !onReportBlocker}
+                  title={!canReportBlocker ? 'Only assigned members can report blockers' : 'Report a blocker'}
+                >
+                  Report a blocker
+                </Button>
               </div>
             </Card>
           </div>

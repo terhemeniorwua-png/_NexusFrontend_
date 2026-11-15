@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 
-export type WorkspaceSection = 'overview' | 'subtasks' | 'attachments' | 'discussion' | 'activity';
+export type WorkspaceSection = 'overview' | 'subtasks' | 'documents' | 'attachments' | 'discussion' | 'activity' | 'time';
 
 const SECTIONS: Array<{ id: WorkspaceSection; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'subtasks', label: 'Subtasks' },
+  { id: 'documents', label: 'Work documents' },
   { id: 'attachments', label: 'Attachments' },
   { id: 'discussion', label: 'Discussion' },
   { id: 'activity', label: 'Activity' },
+  { id: 'time', label: 'Time tracking' },
 ];
 
 export function TaskWorkspaceSidebar({

@@ -13,7 +13,7 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   CHANGES_REQUESTED: 'Changes requested',
 };
 
-export type SaveSyncState = 'idle' | 'saving' | 'saved' | 'failed';
+export type SaveSyncState = 'idle' | 'saving' | 'saved' | 'failed' | 'conflict';
 
 export function TaskWorkspaceHeader({
   workspaceName,
@@ -22,6 +22,7 @@ export function TaskWorkspaceHeader({
   taskTitle,
   status,
   saveState,
+  blocked,
 }: {
   workspaceName?: string;
   projectId: string;
@@ -29,15 +30,18 @@ export function TaskWorkspaceHeader({
   taskTitle: string;
   status: TaskStatus;
   saveState: SaveSyncState;
+  blocked?: boolean;
 }) {
   const syncText =
     saveState === 'saving'
       ? 'Saving…'
       : saveState === 'saved'
         ? 'Saved'
-        : saveState === 'failed'
-          ? 'Failed'
-          : null;
+        : saveState === 'conflict'
+          ? 'Conflict'
+          : saveState === 'failed'
+            ? 'Failed'
+            : null;
 
   return (
     <header className="flex flex-col gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -58,13 +62,14 @@ export function TaskWorkspaceHeader({
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="truncate text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">{taskTitle}</h1>
           <Badge>{STATUS_LABEL[status] ?? status}</Badge>
+          {blocked ? <Badge variant="error">Blocked</Badge> : null}
         </div>
       </div>
       <div className="flex items-center gap-3 text-sm" aria-live="polite">
         {syncText ? (
           <span
             className={
-              saveState === 'failed'
+              saveState === 'failed' || saveState === 'conflict'
                 ? 'text-[var(--color-danger)]'
                 : saveState === 'saving'
                   ? 'text-[var(--color-text-secondary)]'

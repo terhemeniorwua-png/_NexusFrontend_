@@ -31,6 +31,7 @@ export interface Workspace {
   role: WorkspaceRole;
   organizationRole: OrganizationRole | null;
   joinCodeEnabled: boolean;
+  timeTrackingEnabled?: boolean;
   memberCount: number;
   projectCount: number;
   teamCount: number;
@@ -59,9 +60,10 @@ export interface CreateWorkspaceInput {
 }
 
 export interface UpdateWorkspaceInput {
-  name: string;
-  description: string | null;
-  visibility: WorkspaceVisibility;
+  name?: string;
+  description?: string | null;
+  visibility?: WorkspaceVisibility;
+  timeTrackingEnabled?: boolean;
 }
 
 export interface OwnershipTransferCreated {

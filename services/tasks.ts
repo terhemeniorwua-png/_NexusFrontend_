@@ -31,10 +31,29 @@ export interface TaskDependency {
   dependsOnTask: { id: string; key: string; title: string; status: TaskStatus };
 }
 
+// Dependency blocker (existing) - kept for backward compatibility.
 export interface TaskBlocker {
   taskId: string;
   dependsOnTaskId: string;
   task: { id: string; key: string; title: string; status: TaskStatus };
+}
+
+export type TaskReportedBlockerStatus = 'OPEN' | 'RESOLVED';
+
+export interface TaskReportedBlocker {
+  id: string;
+  taskId: string;
+  status: TaskReportedBlockerStatus;
+  description: string;
+  reportedById: string;
+  reportedBy: { id: string; name: string };
+  notifyUserId: string | null;
+  notifyUser: { id: string; name: string } | null;
+  resolvedAt: string | null;
+  resolvedById: string | null;
+  resolvedBy: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TaskComment {
@@ -78,6 +97,8 @@ export interface TaskSummary {
   assignees: TaskAssignee[];
   dependencies: TaskDependency[];
   blockers: TaskBlocker[];
+  reportedBlockers?: TaskReportedBlocker[];
+  hasOpenBlocker?: boolean;
   subTaskCount: number;
   commentCount: number;
   attachmentCount: number;
@@ -85,6 +106,7 @@ export interface TaskSummary {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  weight?: number;
   requiresApproval?: boolean;
   expectedDeliverables?: TaskDeliverable[] | null;
   submissionSummary?: string | null;
@@ -133,6 +155,50 @@ export interface TaskWorkspaceData {
   recentActivity: TaskActivityItem[];
 }
 
+// ---------------------------------------------------------------------------
+// Task work documents (Phase 4A)
+// ---------------------------------------------------------------------------
+
+export interface TaskWorkDocumentSummary {
+  id: string;
+  taskId: string;
+  title: string;
+  createdById: string;
+  createdBy: { id: string; name: string };
+  currentVersion: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskWorkDocumentDetail extends TaskWorkDocumentSummary {
+  content: unknown;
+}
+
+export interface TaskWorkDocumentVersion {
+  id: string;
+  version: number;
+  savedById: string;
+  savedBy: { id: string; name: string };
+  createdAt: string;
+}
+
+export interface TaskWorkDocumentConflict {
+  currentVersion: number;
+  latestContent: unknown;
+  document: TaskWorkDocumentSummary;
+}
+
+export function getWorkDocumentConflict(error: unknown): TaskWorkDocumentConflict | null {
+  if (!(error instanceof ApiRequestError) || error.status !== 409) return null;
+  const details = error.details as { currentVersion?: unknown; latestContent?: unknown; document?: unknown } | undefined;
+  if (!details || typeof details.currentVersion !== 'number' || !details.document) return null;
+  return {
+    currentVersion: details.currentVersion,
+    latestContent: details.latestContent,
+    document: details.document as TaskWorkDocumentSummary,
+  };
+}
+
 export interface TaskPage {
   items: TaskSummary[];
   nextCursor: string | null;
@@ -157,6 +223,7 @@ export interface CreateTaskInput {
   dueDate?: string | null;
   position?: number;
   parentTaskId?: string | null;
+  weight?: number;
   assigneeIds?: string[];
   requiresApproval?: boolean;
   expectedDeliverables?: TaskDeliverable[] | null;
@@ -173,6 +240,7 @@ export interface UpdateTaskInput {
   dueDate?: string | null;
   position?: number;
   parentTaskId?: string | null;
+  weight?: number;
   requiresApproval?: boolean;
   expectedDeliverables?: TaskDeliverable[] | null;
 }
@@ -517,4 +585,206 @@ function normalizeTaskInput<T extends object>(input: T): T {
     out.labels = out.labels.split(',').map((x: string) => x.trim()).filter(Boolean);
   }
   return out as T;
+}
+
+const workDocsPath = (workspaceId: string, projectId: string, taskId: string, suffix = '') =>
+  taskPath(workspaceId, projectId, taskId, `/work-documents${suffix}`);
+
+export function listTaskWorkDocuments(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ items: TaskWorkDocumentSummary[] }> {
+  return request<{ items: TaskWorkDocumentSummary[] }>(workDocsPath(workspaceId, projectId, taskId));
+}
+
+export function createTaskWorkDocument(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: { title: string; content?: unknown },
+): Promise<TaskWorkDocumentDetail> {
+  return request<TaskWorkDocumentDetail>(workDocsPath(workspaceId, projectId, taskId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function getTaskWorkDocument(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+): Promise<TaskWorkDocumentDetail> {
+  return request<TaskWorkDocumentDetail>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}`),
+  );
+}
+
+export function updateTaskWorkDocument(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+  input: { baseVersion: number; content: unknown; title?: string; mode?: 'autosave' | 'manual' },
+): Promise<TaskWorkDocumentDetail & { throttled?: boolean }> {
+  return request<TaskWorkDocumentDetail & { throttled?: boolean }>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}`),
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+}
+
+export function listTaskWorkDocumentVersions(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+): Promise<{ items: TaskWorkDocumentVersion[]; currentVersion: number }> {
+  return request<{ items: TaskWorkDocumentVersion[]; currentVersion: number }>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}/versions`),
+  );
+}
+
+export function getTaskWorkDocumentVersion(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+  version: number,
+): Promise<{ id: string; version: number; savedBy: { id: string; name: string }; createdAt: string; content: unknown }> {
+  return request(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}/versions/${version}`),
+  );
+}
+
+export function restoreTaskWorkDocumentVersion(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+  version: number,
+): Promise<TaskWorkDocumentDetail> {
+  return request<TaskWorkDocumentDetail>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}/versions/${version}/restore`),
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+}
+
+export function deleteTaskWorkDocument(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+): Promise<{ id: string; deleted: true }> {
+  return request<{ id: string; deleted: true }>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}`),
+    { method: 'DELETE' },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Task time tracking (Phase 4C)
+// ---------------------------------------------------------------------------
+
+export interface TaskTimeEntry {
+  id: string;
+  taskId: string;
+  userId: string;
+  user: { id: string; name: string };
+  startedAt: string;
+  durationMinutes: number;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const timeEntriesPath = (workspaceId: string, projectId: string, taskId: string, suffix = '') =>
+  taskPath(workspaceId, projectId, taskId, `/time-entries${suffix}`);
+
+export function listTaskTimeEntries(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ items: TaskTimeEntry[]; totalMinutes: number }> {
+  return request<{ items: TaskTimeEntry[]; totalMinutes: number }>(
+    timeEntriesPath(workspaceId, projectId, taskId),
+  );
+}
+
+export function createTaskTimeEntry(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: { startedAt: string; durationMinutes: number; note?: string | null },
+): Promise<TaskTimeEntry> {
+  return request<TaskTimeEntry>(timeEntriesPath(workspaceId, projectId, taskId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateTaskTimeEntry(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  entryId: string,
+  input: { startedAt?: string; durationMinutes?: number; note?: string | null },
+): Promise<TaskTimeEntry> {
+  return request<TaskTimeEntry>(
+    timeEntriesPath(workspaceId, projectId, taskId, `/${encodeURIComponent(entryId)}`),
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+}
+
+export function deleteTaskTimeEntry(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  entryId: string,
+): Promise<{ id: string; deleted: true }> {
+  return request<{ id: string; deleted: true }>(
+    timeEntriesPath(workspaceId, projectId, taskId, `/${encodeURIComponent(entryId)}`),
+    { method: 'DELETE' },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Task blockers (Phase 4B, reported blockers/issues)
+// ---------------------------------------------------------------------------
+
+const blockersPath = (workspaceId: string, projectId: string, taskId: string, suffix = '') =>
+  taskPath(workspaceId, projectId, taskId, `/blockers${suffix}`);
+
+export function listTaskBlockers(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ items: TaskReportedBlocker[]; hasOpenBlocker: boolean }> {
+  return request<{ items: TaskReportedBlocker[]; hasOpenBlocker: boolean }>(
+    blockersPath(workspaceId, projectId, taskId),
+  );
+}
+
+export function reportTaskBlocker(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: { description: string; notifyUserId?: string | null },
+): Promise<TaskReportedBlocker> {
+  return request<TaskReportedBlocker>(blockersPath(workspaceId, projectId, taskId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function resolveTaskBlocker(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  blockerId: string,
+): Promise<TaskReportedBlocker> {
+  return request<TaskReportedBlocker>(
+    blockersPath(workspaceId, projectId, taskId, `/${encodeURIComponent(blockerId)}/resolve`),
+    { method: 'POST', body: JSON.stringify({}) },
+  );
 }

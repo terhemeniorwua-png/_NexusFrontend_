@@ -48,6 +48,17 @@ export interface TaskComment {
   updatedAt: string;
 }
 
+export interface TaskPersonRef {
+  id: string;
+  name: string;
+}
+
+export interface TaskDeliverable {
+  id?: string;
+  label: string;
+  required?: boolean;
+}
+
 export interface TaskSummary {
   id: string;
   projectId: string;
@@ -74,6 +85,52 @@ export interface TaskSummary {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  requiresApproval?: boolean;
+  expectedDeliverables?: TaskDeliverable[] | null;
+  submissionSummary?: string | null;
+  submittedAt?: string | null;
+  submittedById?: string | null;
+  submittedBy?: TaskPersonRef | null;
+  reviewFeedback?: string | null;
+  reviewedAt?: string | null;
+  reviewedById?: string | null;
+  reviewedBy?: TaskPersonRef | null;
+}
+
+export interface TaskProgress {
+  percent: number;
+  completed: number;
+  total: number;
+}
+
+export interface TaskActivityItem {
+  id: string;
+  action: string;
+  actorId: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface TaskActivityPage {
+  items: TaskActivityItem[];
+  nextCursor: string | null;
+}
+
+export interface TaskWorkspaceData {
+  task: TaskSummary;
+  subtasks: TaskSummary[];
+  progress: TaskProgress;
+  people: {
+    assignees: TaskAssignee[];
+    assignedBy: string | null;
+    reviewer: TaskPersonRef | null;
+  };
+  schedule: {
+    startDate: string | null;
+    dueDate: string | null;
+    overdue: boolean;
+  };
+  recentActivity: TaskActivityItem[];
 }
 
 export interface TaskPage {
@@ -101,6 +158,8 @@ export interface CreateTaskInput {
   position?: number;
   parentTaskId?: string | null;
   assigneeIds?: string[];
+  requiresApproval?: boolean;
+  expectedDeliverables?: TaskDeliverable[] | null;
 }
 
 export interface UpdateTaskInput {
@@ -114,7 +173,11 @@ export interface UpdateTaskInput {
   dueDate?: string | null;
   position?: number;
   parentTaskId?: string | null;
+  requiresApproval?: boolean;
+  expectedDeliverables?: TaskDeliverable[] | null;
 }
+
+export type TaskReviewDecision = 'START_REVIEW' | 'APPROVE' | 'REQUEST_CHANGES';
 
 export interface ListTasksQuery {
   cursor?: string;
@@ -342,10 +405,75 @@ export function addComment(
   taskId: string,
   body: string,
   parentId?: string | null,
+  mentionedUserIds?: string[],
 ): Promise<TaskComment> {
   return request<TaskComment>(taskPath(workspaceId, projectId, taskId, '/comments'), {
     method: 'POST',
-    body: JSON.stringify({ body, parentId: parentId ?? null }),
+    body: JSON.stringify({
+      body,
+      parentId: parentId ?? null,
+      ...(mentionedUserIds && mentionedUserIds.length ? { mentionedUserIds } : {}),
+    }),
+  });
+}
+
+export function getTaskWorkspace(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<TaskWorkspaceData> {
+  return request<TaskWorkspaceData>(taskPath(workspaceId, projectId, taskId, '/workspace'));
+}
+
+export function listTaskActivity(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  opts: { cursor?: string; limit?: number } = {},
+): Promise<TaskActivityPage> {
+  const params = new URLSearchParams();
+  if (opts.cursor) params.set('cursor', opts.cursor);
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+  return request<TaskActivityPage>(
+    taskPath(workspaceId, projectId, taskId, '/activity') + (params.size ? `?${params}` : ''),
+  );
+}
+
+export function submitTask(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  workSummary: string,
+): Promise<TaskSummary> {
+  return request<TaskSummary>(taskPath(workspaceId, projectId, taskId, '/submit'), {
+    method: 'POST',
+    body: JSON.stringify({ workSummary }),
+  });
+}
+
+export function reviewTask(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  decision: TaskReviewDecision,
+  feedback?: string | null,
+): Promise<TaskSummary> {
+  return request<TaskSummary>(taskPath(workspaceId, projectId, taskId, '/review'), {
+    method: 'POST',
+    body: JSON.stringify({ decision, ...(feedback != null ? { feedback } : {}) }),
+  });
+}
+
+export function completeSubtask(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  subtaskId: string,
+  workSummary?: string,
+): Promise<{ subtask: TaskSummary; progress: TaskProgress; requiresApproval: boolean; submissionCreated: boolean }> {
+  return request(taskPath(workspaceId, projectId, taskId, `/subtasks/${encodeURIComponent(subtaskId)}/complete`), {
+    method: 'POST',
+    body: JSON.stringify(workSummary ? { workSummary } : {}),
   });
 }
 

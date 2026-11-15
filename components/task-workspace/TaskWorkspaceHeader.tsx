@@ -22,6 +22,7 @@ export function TaskWorkspaceHeader({
   taskTitle,
   status,
   saveState,
+  blocked,
 }: {
   workspaceName?: string;
   projectId: string;
@@ -29,6 +30,7 @@ export function TaskWorkspaceHeader({
   taskTitle: string;
   status: TaskStatus;
   saveState: SaveSyncState;
+  blocked?: boolean;
 }) {
   const syncText =
     saveState === 'saving'
@@ -60,6 +62,7 @@ export function TaskWorkspaceHeader({
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="truncate text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">{taskTitle}</h1>
           <Badge>{STATUS_LABEL[status] ?? status}</Badge>
+          {blocked ? <Badge variant="error">Blocked</Badge> : null}
         </div>
       </div>
       <div className="flex items-center gap-3 text-sm" aria-live="polite">

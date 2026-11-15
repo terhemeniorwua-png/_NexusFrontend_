@@ -22,6 +22,8 @@ export function TaskWorkspaceLayout({
   overdue,
   recentActivity,
   onContactOwner,
+  onReportBlocker,
+  canReportBlocker,
 }: {
   activeSection: WorkspaceSection;
   onSectionChange: (s: WorkspaceSection) => void;
@@ -37,6 +39,8 @@ export function TaskWorkspaceLayout({
   overdue: boolean;
   recentActivity: TaskActivityItem[];
   onContactOwner: () => void;
+  onReportBlocker?: () => void;
+  canReportBlocker?: boolean;
 }) {
   return (
     <div className="flex min-h-[70vh] flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -101,7 +105,15 @@ export function TaskWorkspaceLayout({
               <div className="flex flex-col gap-2">
                 <Button size="sm" variant="secondary" onClick={onContactOwner}>Contact task owner</Button>
                 <Button size="sm" variant="secondary" disabled title="Coming soon">Log time (Coming soon)</Button>
-                <Button size="sm" variant="secondary" disabled title="Coming soon">Report blocker (Coming soon)</Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={onReportBlocker}
+                  disabled={!canReportBlocker || !onReportBlocker}
+                  title={!canReportBlocker ? 'Only assigned members can report blockers' : 'Report a blocker'}
+                >
+                  Report a blocker
+                </Button>
               </div>
             </Card>
           </div>

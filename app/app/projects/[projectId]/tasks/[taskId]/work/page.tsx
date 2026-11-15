@@ -19,10 +19,13 @@ import {
   getTaskWorkspace,
   listComments,
   listTaskActivity,
+  reportTaskBlocker,
+  resolveTaskBlocker,
   submitTask,
   type TaskActivityItem,
   type TaskComment,
   type TaskProgress,
+  type TaskReportedBlocker,
   type TaskSummary,
   type TaskWorkspaceData,
 } from '@/services/tasks';
@@ -86,6 +89,9 @@ export default function TaskWorkPage() {
   const [submissionBusy, setSubmissionBusy] = useState(false);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [subtaskBusyId, setSubtaskBusyId] = useState<string | null>(null);
+  const [showBlockerForm, setShowBlockerForm] = useState(false);
+  const [blockerBusyId, setBlockerBusyId] = useState<string | null>(null);
+  const [blockerError, setBlockerError] = useState<string | null>(null);
 
   const loadedKeyRef = useRef<string | null>(null);
 
@@ -209,6 +215,13 @@ export default function TaskWorkPage() {
   }
 
   const progress = workspaceData.progress;
+  const canResolveBlocker = (blocker: TaskReportedBlocker) =>
+    blocker.status === 'OPEN' &&
+    (blocker.reportedById === currentUserId ||
+      task.creatorId === currentUserId ||
+      can('task.update') ||
+      can('project.settings.manage'));
+
   const header = (
     <TaskWorkspaceHeader
       workspaceName={activeWorkspace?.name}
@@ -217,6 +230,7 @@ export default function TaskWorkPage() {
       taskTitle={task.title}
       status={task.status}
       saveState={saveState}
+      blocked={Boolean(task.hasOpenBlocker)}
     />
   );
 
@@ -224,7 +238,37 @@ export default function TaskWorkPage() {
   if (section === 'overview') {
     sectionContent = (
       <div className="space-y-4">
-        <TaskOverview task={task} progress={progress} projectName={project?.name} />
+        <TaskOverview
+          task={task}
+          progress={progress}
+          projectName={project?.name}
+          reportedBlockers={task.reportedBlockers}
+          canReportBlocker={isAssignee}
+          canResolveBlocker={canResolveBlocker}
+          showReportForm={showBlockerForm}
+          onOpenReport={() => { setBlockerError(null); setShowBlockerForm(true); }}
+          onCancelReport={() => { setShowBlockerForm(false); setBlockerError(null); }}
+          onReport={async (description) => {
+            setBlockerError(null);
+            try {
+              await refreshAfterMutation(async () => { await reportTaskBlocker(activeWorkspaceId, projectId, taskId, { description }); });
+              setShowBlockerForm(false);
+            } catch (e) {
+              setBlockerError(e instanceof ApiRequestError ? e.message : 'Failed to report blocker.');
+              throw e;
+            }
+          }}
+          onResolve={async (blockerId) => {
+            setBlockerBusyId(blockerId); setBlockerError(null);
+            try {
+              await refreshAfterMutation(async () => { await resolveTaskBlocker(activeWorkspaceId, projectId, taskId, blockerId); });
+            } catch (e) {
+              setBlockerError(e instanceof ApiRequestError ? e.message : 'Failed to resolve blocker.');
+            } finally { setBlockerBusyId(null); }
+          }}
+          busyBlockerId={blockerBusyId}
+          blockerError={blockerError}
+        />
         <TaskSubmissionPanel
           task={task}
           busy={submissionBusy}
@@ -330,6 +374,8 @@ export default function TaskWorkPage() {
         overdue={workspaceData.schedule.overdue}
         recentActivity={workspaceData.recentActivity}
         onContactOwner={() => { if (task.creatorId) router.push(`/app/messages?userId=${encodeURIComponent(task.creatorId)}`); }}
+        onReportBlocker={() => { updateSection('overview'); setShowBlockerForm(true); setBlockerError(null); setTimeout(() => document.getElementById('blockers')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
+        canReportBlocker={isAssignee}
       >
         {sectionContent}
       </TaskWorkspaceLayout>

@@ -31,10 +31,29 @@ export interface TaskDependency {
   dependsOnTask: { id: string; key: string; title: string; status: TaskStatus };
 }
 
+// Dependency blocker (existing) - kept for backward compatibility.
 export interface TaskBlocker {
   taskId: string;
   dependsOnTaskId: string;
   task: { id: string; key: string; title: string; status: TaskStatus };
+}
+
+export type TaskReportedBlockerStatus = 'OPEN' | 'RESOLVED';
+
+export interface TaskReportedBlocker {
+  id: string;
+  taskId: string;
+  status: TaskReportedBlockerStatus;
+  description: string;
+  reportedById: string;
+  reportedBy: { id: string; name: string };
+  notifyUserId: string | null;
+  notifyUser: { id: string; name: string } | null;
+  resolvedAt: string | null;
+  resolvedById: string | null;
+  resolvedBy: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TaskComment {
@@ -78,6 +97,8 @@ export interface TaskSummary {
   assignees: TaskAssignee[];
   dependencies: TaskDependency[];
   blockers: TaskBlocker[];
+  reportedBlockers?: TaskReportedBlocker[];
+  hasOpenBlocker?: boolean;
   subTaskCount: number;
   commentCount: number;
   attachmentCount: number;
@@ -655,5 +676,46 @@ export function deleteTaskWorkDocument(
   return request<{ id: string; deleted: true }>(
     workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}`),
     { method: 'DELETE' },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Task blockers (Phase 4B, reported blockers/issues)
+// ---------------------------------------------------------------------------
+
+const blockersPath = (workspaceId: string, projectId: string, taskId: string, suffix = '') =>
+  taskPath(workspaceId, projectId, taskId, `/blockers${suffix}`);
+
+export function listTaskBlockers(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ items: TaskReportedBlocker[]; hasOpenBlocker: boolean }> {
+  return request<{ items: TaskReportedBlocker[]; hasOpenBlocker: boolean }>(
+    blockersPath(workspaceId, projectId, taskId),
+  );
+}
+
+export function reportTaskBlocker(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: { description: string; notifyUserId?: string | null },
+): Promise<TaskReportedBlocker> {
+  return request<TaskReportedBlocker>(blockersPath(workspaceId, projectId, taskId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function resolveTaskBlocker(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  blockerId: string,
+): Promise<TaskReportedBlocker> {
+  return request<TaskReportedBlocker>(
+    blockersPath(workspaceId, projectId, taskId, `/${encodeURIComponent(blockerId)}/resolve`),
+    { method: 'POST', body: JSON.stringify({}) },
   );
 }

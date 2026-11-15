@@ -100,7 +100,7 @@ export function ProjectPermissionsProvider({
         setRoleDefinitions(roles);
       } catch (cause) {
         if (!active) return;
-        if (cause instanceof ApiRequestError && cause.status === 404) {
+        if (cause instanceof ApiRequestError && (cause.status === 404 || cause.status === 400)) {
           setAccessStatus(404);
         } else if (cause instanceof ApiRequestError && cause.status === 403) {
           setAccessStatus(403);

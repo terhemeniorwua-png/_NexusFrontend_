@@ -18,12 +18,14 @@ export function getAccessToken(): string | null {
 export class ApiRequestError extends Error {
   readonly status: number;
   readonly code?: string;
+  readonly details?: unknown;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, details?: unknown) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -131,14 +133,15 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     const body = payload as {
-      error?: { message?: string; code?: string };
+      error?: { message?: string; code?: string; details?: unknown };
       message?: string;
     };
     const message = body.error?.message ?? body.message ?? 'Something went wrong. Please try again.';
     const code = body.error?.code;
+    const details = body.error?.details;
     if (!suppressPermissionEvents && code === 'PERMISSION_DENIED') handlePermissionDenied();
     const error: ApiError = { status: response.status, message };
-    throw new ApiRequestError(error.message, error.status, code);
+    throw new ApiRequestError(error.message, error.status, code, details);
   }
 
   return (payload as ApiEnvelope<T>).data;

@@ -13,7 +13,7 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   CHANGES_REQUESTED: 'Changes requested',
 };
 
-export type SaveSyncState = 'idle' | 'saving' | 'saved' | 'failed';
+export type SaveSyncState = 'idle' | 'saving' | 'saved' | 'failed' | 'conflict';
 
 export function TaskWorkspaceHeader({
   workspaceName,
@@ -35,9 +35,11 @@ export function TaskWorkspaceHeader({
       ? 'Saving…'
       : saveState === 'saved'
         ? 'Saved'
-        : saveState === 'failed'
-          ? 'Failed'
-          : null;
+        : saveState === 'conflict'
+          ? 'Conflict'
+          : saveState === 'failed'
+            ? 'Failed'
+            : null;
 
   return (
     <header className="flex flex-col gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -64,7 +66,7 @@ export function TaskWorkspaceHeader({
         {syncText ? (
           <span
             className={
-              saveState === 'failed'
+              saveState === 'failed' || saveState === 'conflict'
                 ? 'text-[var(--color-danger)]'
                 : saveState === 'saving'
                   ? 'text-[var(--color-text-secondary)]'

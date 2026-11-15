@@ -133,6 +133,50 @@ export interface TaskWorkspaceData {
   recentActivity: TaskActivityItem[];
 }
 
+// ---------------------------------------------------------------------------
+// Task work documents (Phase 4A)
+// ---------------------------------------------------------------------------
+
+export interface TaskWorkDocumentSummary {
+  id: string;
+  taskId: string;
+  title: string;
+  createdById: string;
+  createdBy: { id: string; name: string };
+  currentVersion: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskWorkDocumentDetail extends TaskWorkDocumentSummary {
+  content: unknown;
+}
+
+export interface TaskWorkDocumentVersion {
+  id: string;
+  version: number;
+  savedById: string;
+  savedBy: { id: string; name: string };
+  createdAt: string;
+}
+
+export interface TaskWorkDocumentConflict {
+  currentVersion: number;
+  latestContent: unknown;
+  document: TaskWorkDocumentSummary;
+}
+
+export function getWorkDocumentConflict(error: unknown): TaskWorkDocumentConflict | null {
+  if (!(error instanceof ApiRequestError) || error.status !== 409) return null;
+  const details = error.details as { currentVersion?: unknown; latestContent?: unknown; document?: unknown } | undefined;
+  if (!details || typeof details.currentVersion !== 'number' || !details.document) return null;
+  return {
+    currentVersion: details.currentVersion,
+    latestContent: details.latestContent,
+    document: details.document as TaskWorkDocumentSummary,
+  };
+}
+
 export interface TaskPage {
   items: TaskSummary[];
   nextCursor: string | null;
@@ -517,4 +561,99 @@ function normalizeTaskInput<T extends object>(input: T): T {
     out.labels = out.labels.split(',').map((x: string) => x.trim()).filter(Boolean);
   }
   return out as T;
+}
+
+const workDocsPath = (workspaceId: string, projectId: string, taskId: string, suffix = '') =>
+  taskPath(workspaceId, projectId, taskId, `/work-documents${suffix}`);
+
+export function listTaskWorkDocuments(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ items: TaskWorkDocumentSummary[] }> {
+  return request<{ items: TaskWorkDocumentSummary[] }>(workDocsPath(workspaceId, projectId, taskId));
+}
+
+export function createTaskWorkDocument(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: { title: string; content?: unknown },
+): Promise<TaskWorkDocumentDetail> {
+  return request<TaskWorkDocumentDetail>(workDocsPath(workspaceId, projectId, taskId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function getTaskWorkDocument(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+): Promise<TaskWorkDocumentDetail> {
+  return request<TaskWorkDocumentDetail>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}`),
+  );
+}
+
+export function updateTaskWorkDocument(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+  input: { baseVersion: number; content: unknown; title?: string; mode?: 'autosave' | 'manual' },
+): Promise<TaskWorkDocumentDetail & { throttled?: boolean }> {
+  return request<TaskWorkDocumentDetail & { throttled?: boolean }>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}`),
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+}
+
+export function listTaskWorkDocumentVersions(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+): Promise<{ items: TaskWorkDocumentVersion[]; currentVersion: number }> {
+  return request<{ items: TaskWorkDocumentVersion[]; currentVersion: number }>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}/versions`),
+  );
+}
+
+export function getTaskWorkDocumentVersion(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+  version: number,
+): Promise<{ id: string; version: number; savedBy: { id: string; name: string }; createdAt: string; content: unknown }> {
+  return request(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}/versions/${version}`),
+  );
+}
+
+export function restoreTaskWorkDocumentVersion(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+  version: number,
+): Promise<TaskWorkDocumentDetail> {
+  return request<TaskWorkDocumentDetail>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}/versions/${version}/restore`),
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+}
+
+export function deleteTaskWorkDocument(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  documentId: string,
+): Promise<{ id: string; deleted: true }> {
+  return request<{ id: string; deleted: true }>(
+    workDocsPath(workspaceId, projectId, taskId, `/${encodeURIComponent(documentId)}`),
+    { method: 'DELETE' },
+  );
 }

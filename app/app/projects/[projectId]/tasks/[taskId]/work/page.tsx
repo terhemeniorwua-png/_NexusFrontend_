@@ -36,9 +36,10 @@ import { TaskDiscussion } from '@/components/task-workspace/TaskDiscussion';
 import { TaskActivityTimeline } from '@/components/task-workspace/TaskActivityTimeline';
 import { TaskSubmissionPanel } from '@/components/task-workspace/TaskSubmissionPanel';
 import { TaskProgressTracker } from '@/components/task-workspace/TaskProgressTracker';
+import { WorkDocuments } from '@/components/task-workspace/WorkDocuments';
 import type { WorkspaceSection } from '@/components/task-workspace/TaskWorkspaceSidebar';
 
-const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'attachments', 'discussion', 'activity'];
+const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'documents', 'attachments', 'discussion', 'activity'];
 
 function parseSection(hash: string, search: string): WorkspaceSection {
   const h = hash.replace(/^#/, '').toLowerCase();
@@ -255,6 +256,17 @@ export default function TaskWorkPage() {
             setError(e instanceof ApiRequestError ? e.message : 'Could not complete subtask.');
           } finally { setSubtaskBusyId(null); }
         }}
+      />
+    );
+  } else if (section === 'documents') {
+    sectionContent = (
+      <WorkDocuments
+        workspaceId={activeWorkspaceId}
+        projectId={projectId}
+        taskId={taskId}
+        canEdit={can('task.update') || isAssignee}
+        canDelete={can('task.update')}
+        onSaveStateChange={setSaveState}
       />
     );
   } else if (section === 'attachments') {

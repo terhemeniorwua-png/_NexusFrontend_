@@ -50,6 +50,7 @@ export function TaskWorkspaceLayout({
           options={[
             { value: 'overview', label: 'Overview' },
             { value: 'subtasks', label: 'Subtasks' },
+            { value: 'documents', label: 'Work documents' },
             { value: 'attachments', label: 'Attachments' },
             { value: 'discussion', label: 'Discussion' },
             { value: 'activity', label: 'Activity' },

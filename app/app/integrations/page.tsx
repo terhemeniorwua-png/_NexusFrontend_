@@ -32,8 +32,10 @@ import {
 import {
   listDevConnections,
   getGithubConnectUrl,
+  getGitlabConnectUrl,
   disconnectDevConnection,
   type DevConnectionSummary,
+  type DevIntegrationProvider,
 } from '@/services/dev-integrations';
 
 // ─── Provider metadata ────────────────────────────────────────────────────────
@@ -185,7 +187,7 @@ export default function IntegrationsPage() {
   const [devConnections, setDevConnections] = useState<DevConnectionSummary[]>([]);
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
-  const [devConnecting, setDevConnecting] = useState(false);
+  const [devConnecting, setDevConnecting] = useState<DevIntegrationProvider | null>(null);
   const [devDisconnectTarget, setDevDisconnectTarget] = useState<DevConnectionSummary | null>(null);
   const [devDisconnecting, setDevDisconnecting] = useState(false);
 
@@ -246,7 +248,8 @@ export default function IntegrationsPage() {
       const integration = params.get('integration');
       const status = params.get('status');
       if (status && devIntegration) {
-        const name = devIntegration.toLowerCase() === 'github' ? 'GitHub' : devIntegration;
+        const p = devIntegration.toLowerCase();
+        const name = p === 'gitlab' ? 'GitLab' : p === 'github' ? 'GitHub' : devIntegration;
         if (status === 'connected') setNotice({ type: 'success', text: `${name} source control connected for this workspace.` });
         else if (status === 'denied') setNotice({ type: 'error', text: `${name} authorization was cancelled.` });
         else setNotice({ type: 'error', text: `Could not connect ${name}. Please try again.` });
@@ -295,16 +298,19 @@ export default function IntegrationsPage() {
     }
   }
 
-  async function handleGithubDevConnect() {
+  async function handleDevConnect(provider: DevIntegrationProvider) {
     if (!workspaceId || devConnecting) return;
-    setDevConnecting(true);
+    setDevConnecting(provider);
     setConnectError(null);
     try {
-      const { url } = await getGithubConnectUrl(workspaceId);
+      const { url } = provider === 'GITLAB'
+        ? await getGitlabConnectUrl(workspaceId)
+        : await getGithubConnectUrl(workspaceId);
       window.location.href = url;
     } catch (err) {
-      setConnectError(err instanceof ApiRequestError ? err.message : 'Could not start GitHub authorization.');
-      setDevConnecting(false);
+      const name = provider === 'GITLAB' ? 'GitLab' : 'GitHub';
+      setConnectError(err instanceof ApiRequestError ? err.message : `Could not start ${name} authorization.`);
+      setDevConnecting(null);
     }
   }
 
@@ -376,13 +382,13 @@ export default function IntegrationsPage() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Workspace source control (Feature A: GitHub App) */}
+          {/* Workspace source control (GitHub App + GitLab OAuth) */}
           <section>
             <h2 className="mb-3 text-base font-semibold text-[var(--color-text-primary)]">
               Source control (workspace)
             </h2>
             <p className="mb-3 text-sm text-[var(--color-text-secondary)]">
-              Connect GitHub once for this workspace to link repositories to projects. Nexus links to GitHub and shows development status; it does not host or edit code.
+              Connect GitHub or GitLab once for this workspace to link repositories to projects. Nexus links to providers and shows development status; it does not host or edit code.
             </p>
             {!workspaceId ? (
               <EmptyState title="Select a workspace" description="Choose a workspace to manage source control connections." />
@@ -390,47 +396,48 @@ export default function IntegrationsPage() {
               <Skeleton className="h-20 w-full" />
             ) : (
               <div className="space-y-3">
-                {devConnections.length === 0 ? (
-                  <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex min-w-0 gap-3">
-                      <span className="text-2xl" aria-hidden="true">🐙</span>
-                      <div className="min-w-0">
-                        <p className="font-medium text-[var(--color-text-primary)]">GitHub</p>
-                        <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
-                          No workspace GitHub connection. Connect a GitHub App installation to link repositories to projects.
-                        </p>
-                      </div>
-                    </div>
-                    <Button size="sm" className="shrink-0" onClick={() => void handleGithubDevConnect()} loading={devConnecting} disabled={devConnecting}>
-                      Connect GitHub
-                    </Button>
-                  </Card>
-                ) : (
-                  devConnections.map((conn) => (
-                    <Card key={conn.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+                {(['GITHUB', 'GITLAB'] as const).map((provider) => {
+                  const conn = devConnections.find((c) => c.provider === provider) ?? null;
+                  const isGitLab = provider === 'GITLAB';
+                  const name = isGitLab ? 'GitLab' : 'GitHub';
+                  const icon = isGitLab ? '🦊' : '🐙';
+                  return (
+                    <Card key={provider} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex min-w-0 gap-3">
-                        <span className="text-2xl" aria-hidden="true">🐙</span>
+                        <span className="text-2xl" aria-hidden="true">{icon}</span>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium text-[var(--color-text-primary)]">GitHub</span>
-                            <Badge variant={conn.status === 'ACTIVE' ? 'success' : conn.status === 'ERROR' ? 'error' : 'warning'}>{conn.status}</Badge>
+                            <span className="font-medium text-[var(--color-text-primary)]">{name}</span>
+                            {conn ? <Badge variant={conn.status === 'ACTIVE' ? 'success' : conn.status === 'ERROR' ? 'error' : 'warning'}>{conn.status}</Badge> : <Badge variant="outline">Not connected</Badge>}
                             <Badge variant="outline">Workspace</Badge>
                           </div>
-                          {(conn.externalAccount.login || conn.externalAccount.name) && (
+                          {conn ? (
+                            <>
+                              {(conn.externalAccount.login || conn.externalAccount.name) && (
+                                <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+                                  {conn.externalAccount.login ?? conn.externalAccount.name}
+                                  {conn.externalAccount.name && conn.externalAccount.login ? ` (${conn.externalAccount.name})` : ''}
+                                </p>
+                              )}
+                              {conn.lastError && <p className="mt-1 text-xs text-[var(--color-error)]">{conn.lastError}</p>}
+                            </>
+                          ) : (
                             <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
-                              {conn.externalAccount.login ?? conn.externalAccount.name}
-                              {conn.externalAccount.name && conn.externalAccount.login ? ` (${conn.externalAccount.name})` : ''}
+                              {isGitLab ? 'Connect GitLab to link projects and merge requests to tasks.' : 'Connect a GitHub App installation to link repositories to projects.'}
                             </p>
                           )}
-                          {conn.lastError && <p className="mt-1 text-xs text-[var(--color-error)]">{conn.lastError}</p>}
                         </div>
                       </div>
-                      <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setDevDisconnectTarget(conn)}>
-                        Disconnect
-                      </Button>
+                      {conn ? (
+                        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setDevDisconnectTarget(conn)}>Disconnect</Button>
+                      ) : (
+                        <Button size="sm" className="shrink-0" onClick={() => void handleDevConnect(provider)} loading={devConnecting === provider} disabled={!!devConnecting}>
+                          Connect {name}
+                        </Button>
+                      )}
                     </Card>
-                  ))
-                )}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -503,7 +510,7 @@ export default function IntegrationsPage() {
       <ConfirmDialog
         open={!!devDisconnectTarget}
         title="Disconnect source control"
-        description="Disconnect GitHub from this workspace? Stored credentials will be removed. Linked project repositories will need to be reconnected to sync in future. Your data in GitHub will not be deleted."
+        description={`Disconnect ${devDisconnectTarget?.provider === "GITLAB" ? "GitLab" : "GitHub"} from this workspace? Stored credentials will be removed. Linked project repositories may need to be reconnected. Your data in the provider will not be deleted.`}
         confirmLabel="Disconnect"
         destructive
         onConfirm={() => { void handleDevDisconnect(); }}

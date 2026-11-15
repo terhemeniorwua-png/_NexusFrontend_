@@ -47,9 +47,20 @@ import { TaskSubmissionPanel } from '@/components/task-workspace/TaskSubmissionP
 import { TaskProgressTracker } from '@/components/task-workspace/TaskProgressTracker';
 import { WorkDocuments } from '@/components/task-workspace/WorkDocuments';
 import { TaskTimeTracking } from '@/components/task-workspace/TaskTimeTracking';
+import { TaskDevelopment } from '@/components/task-workspace/TaskDevelopment';
 import type { WorkspaceSection } from '@/components/task-workspace/TaskWorkspaceSidebar';
+import {
+  listProjectRepositories,
+  listRepositoryBranches,
+  listRepositoryPullRequests,
+  listTaskDevLinks,
+  linkTaskDevLink,
+  unlinkTaskDevLink,
+  type LinkedProjectRepository,
+  type TaskDevLink,
+} from '@/services/dev-integrations';
 
-const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'documents', 'attachments', 'discussion', 'activity', 'time'];
+const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'documents', 'attachments', 'development', 'discussion', 'activity', 'time'];
 
 function parseSection(hash: string, search: string): WorkspaceSection {
   const h = hash.replace(/^#/, '').toLowerCase();
@@ -105,6 +116,12 @@ export default function TaskWorkPage() {
   const [timeLoading, setTimeLoading] = useState(false);
   const [timeError, setTimeError] = useState<string | null>(null);
   const [timeBusy, setTimeBusy] = useState(false);
+
+  const [devLinks, setDevLinks] = useState<TaskDevLink[]>([]);
+  const [linkedProjectRepos, setLinkedProjectRepos] = useState<LinkedProjectRepository[]>([]);
+  const [devLoading, setDevLoading] = useState(false);
+  const [devError, setDevError] = useState<string | null>(null);
+  const [devBusy, setDevBusy] = useState(false);
 
   const loadedKeyRef = useRef<string | null>(null);
 
@@ -198,13 +215,31 @@ export default function TaskWorkPage() {
     }
   }, [activeWorkspaceId, projectId, taskId, timeTrackingEnabled]);
 
+  const loadDevelopment = useCallback(async () => {
+    if (!activeWorkspaceId) return;
+    setDevLoading(true); setDevError(null);
+    try {
+      const [links, repos] = await Promise.all([
+        listTaskDevLinks(activeWorkspaceId, projectId, taskId),
+        listProjectRepositories(activeWorkspaceId, projectId),
+      ]);
+      setDevLinks(links);
+      setLinkedProjectRepos(repos);
+    } catch (e) {
+      setDevError(e instanceof ApiRequestError ? e.message : 'Failed to load development links.');
+    } finally {
+      setDevLoading(false);
+    }
+  }, [activeWorkspaceId, projectId, taskId]);
+
   useEffect(() => {
     if (!workspaceData || !activeWorkspaceId) return;
     if (section === 'discussion') void loadComments();
     if (section === 'attachments') void loadFiles();
     if (section === 'activity') void loadActivity(true);
     if (section === 'time') void loadTimeEntries();
-  }, [section, workspaceData, activeWorkspaceId, loadComments, loadFiles, loadActivity, loadTimeEntries]);
+    if (section === 'development') void loadDevelopment();
+  }, [section, workspaceData, activeWorkspaceId, loadComments, loadFiles, loadActivity, loadTimeEntries, loadDevelopment]);
 
   useEffect(() => {
     if (!workspaceData || !activeWorkspaceId || !timeTrackingEnabled) return;
@@ -399,6 +434,46 @@ export default function TaskWorkPage() {
         hasMore={Boolean(activityCursor)}
         loadingMore={activityLoadingMore}
         onLoadMore={() => void loadActivity(false)}
+      />
+    );
+  } else if (section === 'development') {
+    sectionContent = (
+      <TaskDevelopment
+        linkedRepos={linkedProjectRepos}
+        devLinks={devLinks}
+        loading={devLoading}
+        error={devError}
+        canLink={can('task.update')}
+        busy={devBusy}
+        onReload={loadDevelopment}
+        onLoadBranches={async (repositoryId, search) => {
+          const res = await listRepositoryBranches(activeWorkspaceId, projectId, repositoryId, { search, perPage: 50 });
+          return res.items;
+        }}
+        onLoadPullRequests={async (repositoryId, search, state) => {
+          const res = await listRepositoryPullRequests(activeWorkspaceId, projectId, repositoryId, { search, state: state ?? 'open', perPage: 50 });
+          return res.items;
+        }}
+        onLink={async (input) => {
+          setDevBusy(true); setDevError(null);
+          try {
+            await linkTaskDevLink(activeWorkspaceId, projectId, taskId, input);
+            await loadDevelopment();
+          } catch (e) {
+            setDevError(e instanceof ApiRequestError ? e.message : 'Failed to link development item.');
+            throw e;
+          } finally { setDevBusy(false); }
+        }}
+        onUnlink={async (devLinkId) => {
+          setDevBusy(true); setDevError(null);
+          try {
+            await unlinkTaskDevLink(activeWorkspaceId, projectId, taskId, devLinkId);
+            await loadDevelopment();
+          } catch (e) {
+            setDevError(e instanceof ApiRequestError ? e.message : 'Failed to unlink development item.');
+            throw e;
+          } finally { setDevBusy(false); }
+        }}
       />
     );
   } else if (section === 'time') {

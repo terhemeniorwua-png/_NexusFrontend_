@@ -46,6 +46,48 @@ export interface LinkedProjectRepository {
   updatedAt: string;
 }
 
+export interface DevBranchSummary {
+  name: string;
+  commitSha?: string | null;
+  protected?: boolean;
+  url?: string | null;
+}
+
+export interface DevPullRequestSummary {
+  externalId: string;
+  number: number;
+  title: string;
+  state: string;
+  url: string | null;
+  headRef: string | null;
+  baseRef: string | null;
+  authorLogin?: string | null;
+  updatedAt?: string | null;
+}
+
+export type TaskDevLinkExternalType = 'BRANCH' | 'PULL_REQUEST' | 'COMMIT';
+
+export interface TaskDevLink {
+  id: string;
+  taskId: string;
+  projectId: string;
+  projectRepositoryId: string | null;
+  provider: DevIntegrationProvider;
+  externalType: TaskDevLinkExternalType;
+  externalId: string;
+  externalNumber: number | null;
+  title: string | null;
+  url: string | null;
+  ref: string | null;
+  headRef: string | null;
+  baseRef: string | null;
+  state: string | null;
+  repositoryFullName: string | null;
+  linkedById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
   return withAuthRetry(() => apiRequest<T>(path, { ...options, authenticated: true }));
 }
@@ -56,6 +98,10 @@ export async function listDevConnections(workspaceId: string): Promise<DevConnec
 
 export async function getGithubConnectUrl(workspaceId: string): Promise<{ url: string }> {
   return authed<{ url: string }>(`/workspaces/${workspaceId}/dev-integrations/github/start`);
+}
+
+export async function getGitlabConnectUrl(workspaceId: string): Promise<{ url: string }> {
+  return authed<{ url: string }>(`/workspaces/${workspaceId}/dev-integrations/gitlab/start`);
 }
 
 export async function disconnectDevConnection(
@@ -104,6 +150,82 @@ export async function unlinkProjectRepository(
 ): Promise<{ ok: true }> {
   return authed<{ ok: true }>(
     `/workspaces/${workspaceId}/projects/${projectId}/repositories/${repositoryId}`,
+    { method: 'DELETE' },
+  );
+}
+
+export async function listRepositoryBranches(
+  workspaceId: string,
+  projectId: string,
+  repositoryId: string,
+  params: { search?: string; page?: number; perPage?: number } = {},
+): Promise<{ items: DevBranchSummary[] }> {
+  const query = new URLSearchParams();
+  if (params.search) query.set('search', params.search);
+  if (params.page) query.set('page', String(params.page));
+  if (params.perPage) query.set('perPage', String(params.perPage));
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return authed<{ items: DevBranchSummary[] }>(
+    `/workspaces/${workspaceId}/projects/${projectId}/repositories/${repositoryId}/branches${suffix}`,
+  );
+}
+
+export async function listRepositoryPullRequests(
+  workspaceId: string,
+  projectId: string,
+  repositoryId: string,
+  params: { search?: string; page?: number; perPage?: number; state?: 'open' | 'closed' | 'all' } = {},
+): Promise<{ items: DevPullRequestSummary[] }> {
+  const query = new URLSearchParams();
+  if (params.search) query.set('search', params.search);
+  if (params.page) query.set('page', String(params.page));
+  if (params.perPage) query.set('perPage', String(params.perPage));
+  if (params.state) query.set('state', params.state);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return authed<{ items: DevPullRequestSummary[] }>(
+    `/workspaces/${workspaceId}/projects/${projectId}/repositories/${repositoryId}/pull-requests${suffix}`,
+  );
+}
+
+export async function listTaskDevLinks(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<TaskDevLink[]> {
+  return authed<TaskDevLink[]>(`/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/dev-links`);
+}
+
+export async function linkTaskDevLink(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: {
+    projectRepositoryId: string;
+    externalType: TaskDevLinkExternalType;
+    externalId: string;
+    externalNumber?: number | null;
+    title?: string | null;
+    url?: string | null;
+    ref?: string | null;
+    headRef?: string | null;
+    baseRef?: string | null;
+    state?: string | null;
+  },
+): Promise<TaskDevLink> {
+  return authed<TaskDevLink>(`/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/dev-links`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function unlinkTaskDevLink(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  devLinkId: string,
+): Promise<{ ok: true }> {
+  return authed<{ ok: true }>(
+    `/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/dev-links/${devLinkId}`,
     { method: 'DELETE' },
   );
 }

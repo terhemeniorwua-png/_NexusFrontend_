@@ -105,6 +105,57 @@ describe('dev-integrations service (Feature A)', () => {
     );
   });
 
+
+  it('listRepositoryBranches calls branches endpoint', async () => {
+    mocks.apiRequest.mockResolvedValue({ items: [{ name: 'main' }] });
+    const { listRepositoryBranches } = await import('../dev-integrations');
+    await listRepositoryBranches(WS, PID, 'repo-1', { search: 'ma', perPage: 20 });
+    const url = mocks.apiRequest.mock.calls[0][0] as string;
+    expect(url).toContain(`/workspaces/${WS}/projects/${PID}/repositories/repo-1/branches`);
+    expect(url).toContain('search=ma');
+    expect(url).toContain('perPage=20');
+  });
+
+  it('listRepositoryPullRequests calls pull-requests endpoint', async () => {
+    mocks.apiRequest.mockResolvedValue({ items: [{ externalId: '1', number: 2, title: 'PR' }] });
+    const { listRepositoryPullRequests } = await import('../dev-integrations');
+    await listRepositoryPullRequests(WS, PID, 'repo-1', { state: 'open', search: 'fix' });
+    const url = mocks.apiRequest.mock.calls[0][0] as string;
+    expect(url).toContain(`/workspaces/${WS}/projects/${PID}/repositories/repo-1/pull-requests`);
+    expect(url).toContain('state=open');
+    expect(url).toContain('search=fix');
+  });
+
+  it('listTaskDevLinks calls task dev-links endpoint', async () => {
+    mocks.apiRequest.mockResolvedValue([]);
+    const { listTaskDevLinks } = await import('../dev-integrations');
+    await listTaskDevLinks(WS, PID, 'task-1');
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/task-1/dev-links`,
+      expect.objectContaining({ authenticated: true }),
+    );
+  });
+
+  it('linkTaskDevLink posts payload', async () => {
+    mocks.apiRequest.mockResolvedValue({ id: 'l1' });
+    const { linkTaskDevLink } = await import('../dev-integrations');
+    await linkTaskDevLink(WS, PID, 'task-1', { projectRepositoryId: 'repo-1', externalType: 'PULL_REQUEST', externalId: '99', externalNumber: 12, title: 'PR', headRef: 'f', baseRef: 'm' });
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/task-1/dev-links`,
+      expect.objectContaining({ method: 'POST', authenticated: true }),
+    );
+  });
+
+  it('unlinkTaskDevLink deletes dev link', async () => {
+    mocks.apiRequest.mockResolvedValue({ ok: true });
+    const { unlinkTaskDevLink } = await import('../dev-integrations');
+    await unlinkTaskDevLink(WS, PID, 'task-1', 'link-1');
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/task-1/dev-links/link-1`,
+      expect.objectContaining({ method: 'DELETE', authenticated: true }),
+    );
+  });
+
   it('surfaces API failures', async () => {
     const { ApiRequestError } = await import('@/lib/api');
     mocks.apiRequest.mockRejectedValue(new ApiRequestError('Forbidden', 403, 'FORBIDDEN'));

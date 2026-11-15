@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 
-export type WorkspaceSection = 'overview' | 'subtasks' | 'documents' | 'attachments' | 'discussion' | 'activity' | 'time';
+export type WorkspaceSection = 'overview' | 'subtasks' | 'documents' | 'attachments' | 'development' | 'discussion' | 'activity' | 'time';
 
 const SECTIONS: Array<{ id: WorkspaceSection; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'subtasks', label: 'Subtasks' },
   { id: 'documents', label: 'Work documents' },
   { id: 'attachments', label: 'Attachments' },
+  { id: 'development', label: 'Development' },
   { id: 'discussion', label: 'Discussion' },
   { id: 'activity', label: 'Activity' },
   { id: 'time', label: 'Time tracking' },

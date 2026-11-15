@@ -71,6 +71,7 @@ export function TaskWorkspaceLayout({
             { value: 'subtasks', label: 'Subtasks' },
             { value: 'documents', label: 'Work documents' },
             { value: 'attachments', label: 'Attachments' },
+            { value: 'development', label: 'Development' },
             { value: 'discussion', label: 'Discussion' },
             { value: 'activity', label: 'Activity' },
             { value: 'time', label: 'Time tracking' },

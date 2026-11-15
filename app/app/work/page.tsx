@@ -1,5 +1,6 @@
 'use client';
 
+import { listMyTasks } from '@/lib/work-tasks';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
@@ -15,7 +16,7 @@ export default function WorkOverviewPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { activeWorkspace } = useWorkspaceContext();
+  const { activeWorkspace, user } = useWorkspaceContext();
   const [projects, setProjects] = useState<number>(0);
   const [tasks, setTasks] = useState<number>(0);
   const [submissions, setSubmissions] = useState<number>(0);
@@ -30,7 +31,8 @@ export default function WorkOverviewPage() {
     async function poll() {
       if (!active || !activeWorkspace) return;
       try {
-        const result = await listTasks(activeWorkspace.id, '', {
+        setError(null);
+        const result = await listMyTasks(activeWorkspace.id, user?.id ?? '', {
           assigneeId: '',
           limit: 1,
         });
@@ -45,13 +47,13 @@ export default function WorkOverviewPage() {
         setCompleted(countCompleted);
         highlightTaskId;
       } catch (e) {
-        // Non-fatal — counts will update on next poll
+        setError('Your work summary could not be loaded. Retrying shortly.');
       }
     }
-    poll();
+    void poll().finally(() => { if (active) setLoading(false); });
     const interval = setInterval(() => void poll(), 30_000);
     return () => { active = false; clearInterval(interval); };
-  }, [activeWorkspace]);
+  }, [activeWorkspace, user?.id]);
 
   if (loading || !activeWorkspace) {
     return (

@@ -1,5 +1,6 @@
 'use client';
 
+import { listMyTasks } from '@/lib/work-tasks';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
@@ -39,7 +40,7 @@ export default function WorkEnvironmentPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { activeWorkspace } = useWorkspaceContext();
+  const { activeWorkspace, user } = useWorkspaceContext();
   const [tasks, setTasks] = useState<Array<{
     id: string;
     key: string;
@@ -60,7 +61,8 @@ export default function WorkEnvironmentPage() {
     async function poll() {
       if (!active || !activeWorkspace) return;
       try {
-        const result = await listTasks(activeWorkspace.id, '', {
+        setError(null);
+        const result = await listMyTasks(activeWorkspace.id, user?.id ?? '', {
           assigneeId: '',
           limit: 100,
         });
@@ -81,13 +83,13 @@ export default function WorkEnvironmentPage() {
         }));
         highlightRef.current = highlightTaskId;
       } catch (e) {
-        // Non-fatal — tasks will update on next poll
+        setError('Your tasks could not be loaded. Retrying shortly.');
       }
     }
-    poll();
+    void poll().finally(() => { if (active) setLoading(false); });
     const interval = setInterval(() => void poll(), 30_000);
     return () => { active = false; clearInterval(interval); };
-  }, [activeWorkspace]);
+  }, [activeWorkspace, user?.id]);
 
   if (loading || !activeWorkspace) {
     return (

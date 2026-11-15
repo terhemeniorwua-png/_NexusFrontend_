@@ -28,10 +28,6 @@ const mocks = vi.hoisted(() => ({
   listProjectMembers: vi.fn(),
 }));
 
-const defaultPermissions = [
-  'project.view', 'task.view',
-];
-
 function setRole(role: 'PROJECT_MANAGER' | 'MEMBER' | 'COLLABORATOR' | 'VIEWER') {
   const perms: Record<string, string[]> = {
     PROJECT_MANAGER: [

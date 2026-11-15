@@ -1076,6 +1076,47 @@ Make the frontend reflect the user's actual permissions.
 - Evidence tests: `lib/__tests__/permissions.test.ts`, `lib/__tests__/navigation.test.ts`, `components/members/__tests__/MembersPanel.test.tsx`, `components/layout/__tests__/Sidebar.test.tsx`, and `components/layout/__tests__/AuthenticatedShell.test.tsx`; new ownership inbox tests are in `services/__tests__/ownership-inbox.test.ts` and `components/workspaces/__tests__/OwnershipLifecyclePanel.test.tsx`; privacy request tests are in `services/__tests__/privacy-requests.test.ts` and `app/app/privacy-requests/page.test.tsx`.
 - Remaining: live backend authorization verification and manual responsive review remain outstanding. Reviewer-only privacy workflows are out of scope. Phase 7 remains **In Progress**.
 
+#### Project-level permissions — 2026-11-14
+
+Added project-level permission awareness to project pages (`/app/projects/[projectId]/*`):
+
+- `services/projects.ts`: `ProjectRole` union (`PROJECT_MANAGER`, `MEMBER`, `COLLABORATOR`, `VIEWER`), `Permission` type (27 project/task/file/submission permissions), `ProjectPermissions`/`ProjectRoleDefinition` interfaces, normalisers (`normaliseProjectPermissions`, `normaliseRoleDefinition`, `unwrapItems`), `getProjectPermissions` (`GET /workspaces/:workspaceId/projects/:projectId/permissions`), `listProjectRoles` (`GET /workspaces/:workspaceId/project-roles`), `deleteProject` (`DELETE /workspaces/:workspaceId/projects/:projectId`), unwrapped members/milestones/activity. Normalisation fails closed (malformed/missing payload → empty permissions, `projectRole: null`, `assignableRoles: []`); unknown permission strings retained; no render-time throw.
+- `lib/permissions.ts`: `PROJECT_PERMISSION_LABELS`, `permissionLabel`, `PROJECT_ROLE_LABELS`, `PROJECT_ROLE_ORDER`, `projectRoleLabel`, `permissionDiff` (gained/lost privileges for role-change confirmations).
+- `lib/api.ts`: `onPermissionDenied`/`notifyPermissionDenied`/`handlePermissionDenied` subscribers; `PERMISSION_DENIED` shows a friendly warning toast and notifies subscribers without retrying; `suppressPermissionEvents` option on `apiRequest`/`apiRawRequest` so permission refreshes cannot loop.
+- `lib/toast.ts` + `components/ui/Toaster.tsx`: minimal toast store mounted in `AuthenticatedShell`.
+- `providers/ProjectPermissionsProvider.tsx` + `usePermissions`: fetches permissions + role catalogue once per workspace/project pair; `can`/`canAny`/`canAll`/`projectRole`/`isLoading`/`accessStatus`/`refresh`; fail-closed while loading (treat as no permissions, skeletons); re-fetches on `PERMISSION_DENIED` or project/workspace change; throws outside provider.
+- `components/shared/Can.tsx`, `PermissionButton.tsx`, `PageAccessState.tsx` (incl. `ProjectUnavailableState`): gating primitives — `Can` renders children only when permitted (fallback while loading), `PermissionButton` renders disabled with tooltip/aria explanation, route-level access states with back links.
+- `app/app/projects/[projectId]/layout.tsx`: provider mount; gated tabs (Overview/Tasks/Members/Milestones/Activity/Reports/Settings); loading skeleton tabs; 403/403 project-unavailable state.
+- `app/app/projects/[projectId]/page.tsx`: overview guard; Edit/Archive/Delete actions gated by `project.update`/`project.archive`/`project.delete`; confirm dialogs.
+- `app/app/projects/[projectId]/settings/page.tsx`: permissions loading + route gate; Save gated `project.update`; archive/restore gated `project.archive`; delete section/dialog gated `project.delete`.
+- `app/app/projects/[projectId]/members/page.tsx`: permission-aware add/remove/role change; assignable roles only from backend catalogue; self-role disabled; rich role-change modal showing gained/lost privileges via `permissionDiff`.
+- `app/app/projects/[projectId]/tasks/page.tsx`: permissions loading + `task.view` route gate; gated new-task button; per-task Actions dropdown (manage assignees, complete/reopen, archive/restore, delete); assignee modal; delete confirmation; members load only when assign/reassign allowed.
+- `app/app/projects/[projectId]/tasks/[taskId]/page.tsx`: `task.view` route gate; edit/delete/archive/complete/assignee/comment/dependency gating; attachments card (list/upload/progress/delete own or any); submission & review card (submit/start review/approve/request revision/reject) hiding approve/reject on own submissions; member load separated from task load.
+- `app/app/projects/[projectId]/reports/page.tsx`: gated by `project.report.view`; project metrics, task status breakdown, milestones; notes detailed exports unavailable.
+- `components/layout/AuthenticatedShell.tsx`: mounts `<Toaster />`.
+
+Tests:
+- `providers/__tests__/ProjectPermissionsProvider.test.tsx` — 9 tests (can/canAny/canAll, loading fail-closed, malformed payload, 403/404, PERMISSION_DENIED re-fetch, project change, catalogue failure, throws outside provider).
+- `components/shared/__tests__/Can.test.tsx` — 6 tests (grant/missing/fallback/all/any/loading).
+- `app/app/projects/[projectId]/tasks/[taskId]/page.test.tsx` — 9 tests (four roles on edit/complete/archive/delete, self-approval hidden, review controls for non-owner, 403/404 access states, complete flow).
+- `app/app/projects/[projectId]/members/page.test.tsx` — 8 tests (four roles, assignable roles, self-role disabled, gained/lost privileges modal, add member flow).
+- `app/app/projects/[projectId]/tasks/page.test.tsx` — updated with `ProjectPermissionsProvider` mock and `setPermissions` helper.
+- `app/app/projects/[projectId]/settings/page.test.tsx` — updated with `ProjectPermissionsProvider` mock and `deleteProject` mock.
+- `services/__tests__/projects.test.ts` — added normalise malformed-payload, getProjectPermissions, listProjectRoles (items/bare-array/malformed), deleteProject tests.
+
+`npx tsc --noEmit` passes. `npm run lint` shows only pre-existing unrelated issues (`hooks/useRingtone.ts` `any`, `components/meetings/MeetingRoomLive.tsx` setState-in-effect, `services/ai.ts` `_context` unused); all changed files are clean. All new and existing project/permission tests pass.
+
+Contract assumptions (not yet verified against backend):
+- `GET /workspaces/:workspaceId/projects/:projectId/permissions`, `GET /workspaces/:workspaceId/project-roles`, `DELETE /workspaces/:workspaceId/projects/:projectId` exist and match the assumed shapes.
+- Task submission/review actions use existing `updateTask` statuses (`SUBMITTED`/`UNDER_REVIEW`/`APPROVED`/`CHANGES_REQUESTED`); own submission = current user is a task assignee.
+- Detailed report exports are unavailable; reports page states this honestly.
+
+UI actions to double-check against backend:
+- Project delete route and `DELETE` response shape.
+- Task submission/review status transitions and permission codes.
+- Project roles/assignableRoles catalogue values returned by `/project-roles`.
+- Reports export availability.
+
 #### Phase 5–7 gap closure — 2026-11-05
 
 - FE-5 added `components/workspaces/WorkspaceLogoManager.tsx` and logo methods in `services/workspaces.ts`. Company/institution logo POST sends raw PNG/JPEG/WebP bytes with matching `Content-Type`; GET uses the authenticated API client and a revocable object URL; DELETE is confirmed. Contract limits and formats come from backend API.md (2 MB, PNG/JPEG/WebP). Workspace colour/theme branding is descoped pending a backend contract. Routes: `GET/POST/DELETE /workspaces/{workspaceId}/company-profile/logo` and the corresponding `institution-profile/logo` routes.

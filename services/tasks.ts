@@ -680,6 +680,72 @@ export function deleteTaskWorkDocument(
 }
 
 // ---------------------------------------------------------------------------
+// Task time tracking (Phase 4C)
+// ---------------------------------------------------------------------------
+
+export interface TaskTimeEntry {
+  id: string;
+  taskId: string;
+  userId: string;
+  user: { id: string; name: string };
+  startedAt: string;
+  durationMinutes: number;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const timeEntriesPath = (workspaceId: string, projectId: string, taskId: string, suffix = '') =>
+  taskPath(workspaceId, projectId, taskId, `/time-entries${suffix}`);
+
+export function listTaskTimeEntries(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ items: TaskTimeEntry[]; totalMinutes: number }> {
+  return request<{ items: TaskTimeEntry[]; totalMinutes: number }>(
+    timeEntriesPath(workspaceId, projectId, taskId),
+  );
+}
+
+export function createTaskTimeEntry(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: { startedAt: string; durationMinutes: number; note?: string | null },
+): Promise<TaskTimeEntry> {
+  return request<TaskTimeEntry>(timeEntriesPath(workspaceId, projectId, taskId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateTaskTimeEntry(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  entryId: string,
+  input: { startedAt?: string; durationMinutes?: number; note?: string | null },
+): Promise<TaskTimeEntry> {
+  return request<TaskTimeEntry>(
+    timeEntriesPath(workspaceId, projectId, taskId, `/${encodeURIComponent(entryId)}`),
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+}
+
+export function deleteTaskTimeEntry(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  entryId: string,
+): Promise<{ id: string; deleted: true }> {
+  return request<{ id: string; deleted: true }>(
+    timeEntriesPath(workspaceId, projectId, taskId, `/${encodeURIComponent(entryId)}`),
+    { method: 'DELETE' },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Task blockers (Phase 4B, reported blockers/issues)
 // ---------------------------------------------------------------------------
 

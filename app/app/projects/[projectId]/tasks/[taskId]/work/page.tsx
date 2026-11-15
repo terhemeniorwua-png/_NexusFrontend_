@@ -15,18 +15,23 @@ import { getProject, type ProjectSummary } from '@/services/projects';
 import {
   addComment,
   completeSubtask,
+  createTaskTimeEntry,
   deleteComment,
+  deleteTaskTimeEntry,
   getTaskWorkspace,
   listComments,
   listTaskActivity,
+  listTaskTimeEntries,
   reportTaskBlocker,
   resolveTaskBlocker,
   submitTask,
+  updateTaskTimeEntry,
   type TaskActivityItem,
   type TaskComment,
   type TaskProgress,
   type TaskReportedBlocker,
   type TaskSummary,
+  type TaskTimeEntry,
   type TaskWorkspaceData,
 } from '@/services/tasks';
 import { listFiles, type FileSummary } from '@/services/files';
@@ -40,9 +45,10 @@ import { TaskActivityTimeline } from '@/components/task-workspace/TaskActivityTi
 import { TaskSubmissionPanel } from '@/components/task-workspace/TaskSubmissionPanel';
 import { TaskProgressTracker } from '@/components/task-workspace/TaskProgressTracker';
 import { WorkDocuments } from '@/components/task-workspace/WorkDocuments';
+import { TaskTimeTracking } from '@/components/task-workspace/TaskTimeTracking';
 import type { WorkspaceSection } from '@/components/task-workspace/TaskWorkspaceSidebar';
 
-const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'documents', 'attachments', 'discussion', 'activity'];
+const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'documents', 'attachments', 'discussion', 'activity', 'time'];
 
 function parseSection(hash: string, search: string): WorkspaceSection {
   const h = hash.replace(/^#/, '').toLowerCase();
@@ -92,6 +98,12 @@ export default function TaskWorkPage() {
   const [showBlockerForm, setShowBlockerForm] = useState(false);
   const [blockerBusyId, setBlockerBusyId] = useState<string | null>(null);
   const [blockerError, setBlockerError] = useState<string | null>(null);
+
+  const [timeEntries, setTimeEntries] = useState<TaskTimeEntry[]>([]);
+  const [totalTimeMinutes, setTotalTimeMinutes] = useState(0);
+  const [timeLoading, setTimeLoading] = useState(false);
+  const [timeError, setTimeError] = useState<string | null>(null);
+  const [timeBusy, setTimeBusy] = useState(false);
 
   const loadedKeyRef = useRef<string | null>(null);
 
@@ -169,12 +181,34 @@ export default function TaskWorkPage() {
     finally { setActivityLoading(false); setActivityLoadingMore(false); }
   }, [activeWorkspaceId, projectId, taskId, activityCursor]);
 
+  const timeTrackingEnabled = Boolean(activeWorkspace?.timeTrackingEnabled);
+
+  const loadTimeEntries = useCallback(async () => {
+    if (!activeWorkspaceId || !timeTrackingEnabled) return;
+    setTimeLoading(true); setTimeError(null);
+    try {
+      const res = await listTaskTimeEntries(activeWorkspaceId, projectId, taskId);
+      setTimeEntries(res.items);
+      setTotalTimeMinutes(res.totalMinutes);
+    } catch (e) {
+      setTimeError(e instanceof ApiRequestError ? e.message : 'Failed to load time entries.');
+    } finally {
+      setTimeLoading(false);
+    }
+  }, [activeWorkspaceId, projectId, taskId, timeTrackingEnabled]);
+
   useEffect(() => {
     if (!workspaceData || !activeWorkspaceId) return;
     if (section === 'discussion') void loadComments();
     if (section === 'attachments') void loadFiles();
     if (section === 'activity') void loadActivity(true);
-  }, [section, workspaceData, activeWorkspaceId, loadComments, loadFiles, loadActivity]);
+    if (section === 'time') void loadTimeEntries();
+  }, [section, workspaceData, activeWorkspaceId, loadComments, loadFiles, loadActivity, loadTimeEntries]);
+
+  useEffect(() => {
+    if (!workspaceData || !activeWorkspaceId || !timeTrackingEnabled) return;
+    void loadTimeEntries();
+  }, [workspaceData, activeWorkspaceId, timeTrackingEnabled, loadTimeEntries]);
 
   const task = workspaceData?.task;
   const isAssignee = useMemo(() => Boolean(currentUserId && task?.assignees.some((a) => a.userId === currentUserId)), [currentUserId, task]);
@@ -356,7 +390,36 @@ export default function TaskWorkPage() {
         onLoadMore={() => void loadActivity(false)}
       />
     );
+  } else if (section === 'time') {
+    sectionContent = (
+      <TaskTimeTracking
+        enabled={timeTrackingEnabled}
+        currentUserId={currentUserId}
+        items={timeEntries}
+        totalMinutes={totalTimeMinutes}
+        loading={timeLoading}
+        error={timeError}
+        busy={timeBusy}
+        onCreate={async (input) => {
+          setTimeBusy(true);
+          try { await createTaskTimeEntry(activeWorkspaceId, projectId, taskId, input); await loadTimeEntries(); }
+          finally { setTimeBusy(false); }
+        }}
+        onUpdate={async (entryId, input) => {
+          setTimeBusy(true);
+          try { await updateTaskTimeEntry(activeWorkspaceId, projectId, taskId, entryId, input); await loadTimeEntries(); }
+          finally { setTimeBusy(false); }
+        }}
+        onDelete={async (entryId) => {
+          setTimeBusy(true);
+          try { await deleteTaskTimeEntry(activeWorkspaceId, projectId, taskId, entryId); await loadTimeEntries(); }
+          finally { setTimeBusy(false); }
+        }}
+      />
+    );
   }
+
+  const canLogTime = isAssignee || can('task.update');
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6">
@@ -376,6 +439,9 @@ export default function TaskWorkPage() {
         onContactOwner={() => { if (task.creatorId) router.push(`/app/messages?userId=${encodeURIComponent(task.creatorId)}`); }}
         onReportBlocker={() => { updateSection('overview'); setShowBlockerForm(true); setBlockerError(null); setTimeout(() => document.getElementById('blockers')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
         canReportBlocker={isAssignee}
+        timeTrackingEnabled={timeTrackingEnabled}
+        totalTimeMinutes={totalTimeMinutes}
+        onLogTime={timeTrackingEnabled && canLogTime ? () => updateSection('time') : undefined}
       >
         {sectionContent}
       </TaskWorkspaceLayout>

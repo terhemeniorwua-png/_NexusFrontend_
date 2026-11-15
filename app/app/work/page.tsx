@@ -1,0 +1,130 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { Alert } from '@/components/ui/Alert';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { listTasks } from '@/services/tasks';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
+
+export default function WorkOverviewPage() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { activeWorkspace } = useWorkspaceContext();
+  const [projects, setProjects] = useState<number>(0);
+  const [tasks, setTasks] = useState<number>(0);
+  const [submissions, setSubmissions] = useState<number>(0);
+  const [completed, setCompleted] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const highlightTaskId = searchParams.get('highlight') ?? undefined;
+
+  // Poll for task counts
+  useEffect(() => {
+    let active = true;
+    async function poll() {
+      if (!active || !activeWorkspace) return;
+      try {
+        const result = await listTasks(activeWorkspace.id, '', {
+          assigneeId: '',
+          limit: 1,
+        });
+        const allTasks = result.items.map((t) => t.status);
+        const countAssigned = allTasks.filter((s: string) => s === 'ASSIGNED').length;
+        const countInProgress = allTasks.filter((s: string) => s === 'IN_PROGRESS' || s === 'SUBMITTED' || s === 'UNDER_REVIEW').length;
+        const countSubmitted = allTasks.filter((s: string) => s === 'SUBMITTED').length;
+        const countCompleted = allTasks.filter((s: string) => s === 'APPROVED' || s === 'COMPLETED').length;
+        setProjects(1); // placeholder - would fetch from API
+        setTasks(countAssigned + countInProgress);
+        setSubmissions(countSubmitted);
+        setCompleted(countCompleted);
+        highlightTaskId;
+      } catch (e) {
+        // Non-fatal — counts will update on next poll
+      }
+    }
+    poll();
+    const interval = setInterval(() => void poll(), 30_000);
+    return () => { active = false; clearInterval(interval); };
+  }, [activeWorkspace]);
+
+  if (loading || !activeWorkspace) {
+    return (
+      <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
+        <Skeleton className="h-64 w-full rounded-lg" />
+        <Skeleton className="h-32 w-full rounded-lg" />
+        <Skeleton className="h-16 w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  if (error) return <Alert variant="error">{error}</Alert>;
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
+      <h2 className="text-2xl font-semibold mb-6">
+        Work Overview{' '}
+        {highlightTaskId && <span className="text-sm text-[var(--color-text-secondary)]">(highlighted: {highlightTaskId})</span>}
+      </h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Projects card */}
+        <Card>
+          <div className="p-6">
+            <div className="flex items-baseline gap-2">
+              <Badge variant="outline" className="text-4xl font-bold">{projects}</Badge>
+              <div>
+                <p className="text-sm text-[var(--color-text-secondary)]">Projects</p>
+                <p className="text-xs text-[var(--color-text-muted)]">Active workspaces</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Tasks card */}
+        <Card>
+          <div className="p-6">
+            <div className="flex items-baseline gap-2">
+              <Badge variant="outline" className="text-4xl font-bold">{tasks}</Badge>
+              <div>
+                <p className="text-sm text-[var(--color-text-secondary)]">Tasks</p>
+                <p className="text-xs text-[var(--color-text-muted)]">Assigned to me</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Submissions card */}
+        <Card>
+          <div className="p-6">
+            <div className="flex items-baseline gap-2">
+              <Badge variant="outline" className="text-4xl font-bold">{submissions}</Badge>
+              <div>
+                <p className="text-sm text-[var(--color-text-secondary)]">Submissions</p>
+                <p className="text-xs text-[var(--color-text-muted)]">Pending review</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Completed card */}
+        <Card>
+          <div className="p-6">
+            <div className="flex items-baseline gap-2">
+              <Badge variant="outline" className="text-4xl font-bold">{completed}</Badge>
+              <div>
+                <p className="text-sm text-[var(--color-text-secondary)]">Completed</p>
+                <p className="text-xs text-[var(--color-text-muted)]">Approved/completed work</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}

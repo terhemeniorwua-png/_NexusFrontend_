@@ -34,12 +34,10 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
       label: 'Work',
       items: [
         { id: 'projects', label: 'Projects', href: '/app/projects', permissions: ['workspace:view'] },
-        { id: 'files', label: 'Files', href: '/app/files', permissions: ['workspace:view'] },
-        { id: 'documents', label: 'Documents', href: '/app/documents', permissions: ['workspace:view'] },
-        { id: 'forms', label: 'Forms', href: '/app/forms', permissions: ['workspace:view'] },
-        { id: 'automations', label: 'Automations', href: '/app/automations', permissions: ['workspace:view'] },
-        { id: 'calendar', label: 'Calendar', href: '/app/calendar', permissions: ['workspace:view'] },
-        { id: 'insights', label: 'Insights', href: '/app/insights', permissions: ['workspace:view'] },
+        { id: 'tasks', label: 'My Tasks', href: '/app/work/tasks', permissions: ['workspace:view'] },
+        { id: 'environment', label: 'Working Environment', href: '/app/work/environment', permissions: ['workspace:view'] },
+        { id: 'submissions', label: 'My Submissions', href: '/app/work/submissions', permissions: ['workspace:view'] },
+        { id: 'completed', label: 'Completed Work', href: '/app/work/completed', permissions: ['workspace:view'] },
       ],
     },
     {

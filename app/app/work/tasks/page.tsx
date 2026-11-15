@@ -1,0 +1,229 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert } from '@/components/ui/Alert';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
+import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { listTasks, type TaskPriority } from '@/services/tasks';
+
+type TaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED';
+
+function statusLabel(s: TaskStatus): string {
+  return s.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function priorityLabel(p: string): string {
+  return p.charAt(0) + p.slice(1).toLowerCase();
+}
+
+export default function WorkMyTasksPage() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { activeWorkspace } = useWorkspaceContext();
+  const [tasks, setTasks] = useState<Array<{ id: string; key: string; title: string; status: TaskStatus; projectKey: string; dueDate: string | null }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<TaskStatus | ''>('');
+  const [filterPriority, setFilterPriority] = useState<string | ''>('');
+  const highlightTaskId = searchParams.get('highlight') ?? undefined;
+  const highlightRef = useRef<string | null>(highlightTaskId);
+
+  // Helper to get priority from search param safely
+  const getPriorityParam = (): TaskPriority | undefined => {
+    const p = searchParams.get('priority');
+    if (p && ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(p)) return p as TaskPriority;
+    return undefined;
+  };
+
+  // Poll for task updates
+  useEffect(() => {
+    let active = true;
+    async function poll() {
+      if (!active || !activeWorkspace) return;
+      try {
+        const result = await listTasks(activeWorkspace.id, '', {
+          assigneeId: '',
+          status: filterStatus || undefined,
+          priority: filterPriority as TaskPriority | undefined,
+          limit: 50,
+        });
+        setTasks(result.items.map((t) => ({
+          id: t.id,
+          key: t.key,
+          title: t.title,
+          status: t.status,
+          projectKey: t.projectId ? t.key?.split('-')[0] || '' : '',
+          dueDate: t.dueDate,
+        })));
+        highlightRef.current = highlightTaskId;
+      } catch (e) {
+        // Non-fatal — tasks will update on next poll
+      }
+    }
+    poll();
+    const interval = setInterval(() => void poll(), 30_000);
+    return () => { active = false; clearInterval(interval); };
+  }, [activeWorkspace, filterStatus, getPriorityParam()]);
+
+  if (loading || !activeWorkspace) {
+    return (
+      <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
+        <Skeleton className="h-64 w-full rounded-lg" />
+        <Skeleton className="h-32 w-full rounded-lg" />
+        <Skeleton className="h-16 w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  if (error) return <Alert variant="error">{error}</Alert>;
+
+  // Build status filter options from enum
+  const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
+    { value: 'ASSIGNED', label: 'Assigned' },
+    { value: 'IN_PROGRESS', label: 'In Progress' },
+    { value: 'SUBMITTED', label: 'Submitted' },
+    { value: 'UNDER_REVIEW', label: 'Under Review' },
+    { value: 'APPROVED', label: 'Approved' },
+    { value: 'CHANGES_REQUESTED', label: 'Changes Requested' },
+  ];
+
+  const hasHighlight = highlightTaskId && tasks.some((t) => t.id === highlightTaskId);
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
+      <h2 className="text-2xl font-semibold mb-6">
+        My Tasks{' '}
+        {highlightTaskId && <span className="text-sm text-[var(--color-text-secondary)]">(highlighted: {highlightTaskId})</span>}
+      </h2>
+
+      <Card>
+        <div className="p-4 mb-4">
+          <form
+            className="flex flex-wrap items-end gap-3"
+            role="search"
+            aria-label="Filter tasks"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const priorityParam = filterPriority && ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(filterPriority)
+                ? filterPriority
+                : '';
+              router.replace(`/app/work/tasks?status=${filterStatus}&priority=${priorityParam}&highlight=${highlightTaskId ?? ''}`);
+            }}
+          >
+            <div className="flex-1 min-w-48">
+              <select
+                onChange={(e) => setFilterStatus(e.target.value as TaskStatus | '')}
+                className="flex h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] placeholder-text-[var(--color-text-muted)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              >
+                <option value="">All statuses</option>
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-32">
+              <select
+                onChange={(e) => setFilterPriority(e.target.value)}
+                className="flex h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] placeholder-text-[var(--color-text-muted)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              >
+                <option value="">All priorities</option>
+                <option value="URGENT">Urgent</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+            </div>
+            <Button type="submit" variant="secondary" loading={false}>
+              Filter
+            </Button>
+          </form>
+        </div>
+      </Card>
+
+      {tasks.length === 0 && !error ? (
+        <EmptyState
+          title="No tasks found"
+          description="You don't have any tasks assigned yet. Create your first task to get started."
+          action={<Button onClick={() => router.push('/app/work/tasks')}>Create task</Button>}
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-md border border-[var(--color-border)]">
+            <thead>
+              <tr className="border-b border-[var(--color-border)]">
+                <th className="p-3 text-left text-xs font-medium text-[var(--color-text-secondary)]">Key</th>
+                <th className="p-3 text-left text-xs font-medium text-[var(--color-text-secondary)]">Title</th>
+                <th className="p-3 text-left text-xs font-medium text-[var(--color-text-secondary)]">Project</th>
+                <th className="p-3 text-left text-xs font-medium text-[var(--color-text-secondary)]">Status</th>
+                <th className="p-3 text-left text-xs font-medium text-[var(--color-text-secondary)]">Priority</th>
+                <th className="p-3 text-left text-xs font-medium text-[var(--color-text-secondary)]">Due</th>
+                <th className="p-3 text-left text-xs font-medium text-[var(--color-text-secondary)]"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map((task) => (
+                <tr key={task.id} className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-secondary)]">
+                  <td className="p-3 font-mono text-sm text-[var(--color-text-muted)]">{task.key}</td>
+                  <td className="p-3">
+                    <a
+                      href={`/app/projects/${task.projectKey}/tasks/${task.id}`}
+                      className="text-[var(--color-primary)] hover:underline"
+                    >
+                      {task.title}
+                    </a>
+                  </td>
+                  <td className="p-3 text-sm text-[var(--color-text-muted)]">{task.projectKey || '—'}</td>
+                  <td className="p-3">
+                    <Badge variant={task.status}>{statusLabel(task.status)}</Badge>
+                  </td>
+                  <td className="p-3 text-sm text-[var(--color-text-muted)]">
+                    {filterPriority && ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(filterPriority)
+                      ? priorityLabel(filterPriority)
+                      : '—'}
+                  </td>
+                  <td className="p-3 text-sm">
+                    {task.dueDate ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(task.dueDate)) : '—'}
+                  </td>
+                  <td className="p-3">
+                    <Button
+                      variant="ghost"
+                      aria-label="View task"
+                      onClick={() => router.push(`/app/projects/${task.projectKey}/tasks/${task.id}`)}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="m15 18-6-6 6-6"/>
+                      </svg>
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {hasHighlight && (
+        <Alert variant="success" className="mt-4" title="Task highlighted">
+          You are viewing a specific task. Use the filter controls to adjust your view.
+        </Alert>
+      )}
+    </div>
+  );
+}

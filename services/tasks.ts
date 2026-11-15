@@ -106,6 +106,7 @@ export interface TaskSummary {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  weight?: number;
   requiresApproval?: boolean;
   expectedDeliverables?: TaskDeliverable[] | null;
   submissionSummary?: string | null;
@@ -222,6 +223,7 @@ export interface CreateTaskInput {
   dueDate?: string | null;
   position?: number;
   parentTaskId?: string | null;
+  weight?: number;
   assigneeIds?: string[];
   requiresApproval?: boolean;
   expectedDeliverables?: TaskDeliverable[] | null;
@@ -238,6 +240,7 @@ export interface UpdateTaskInput {
   dueDate?: string | null;
   position?: number;
   parentTaskId?: string | null;
+  weight?: number;
   requiresApproval?: boolean;
   expectedDeliverables?: TaskDeliverable[] | null;
 }

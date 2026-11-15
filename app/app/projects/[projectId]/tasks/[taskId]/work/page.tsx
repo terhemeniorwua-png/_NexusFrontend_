@@ -25,6 +25,7 @@ import {
   reportTaskBlocker,
   resolveTaskBlocker,
   submitTask,
+  updateTask,
   updateTaskTimeEntry,
   type TaskActivityItem,
   type TaskComment,
@@ -326,12 +327,22 @@ export default function TaskWorkPage() {
         progress={progress}
         busyId={subtaskBusyId}
         isAssigneeOf={(st) => Boolean(currentUserId && st.assignees.some((a) => a.userId === currentUserId))}
+        canEditWeight={can('task.update')}
         onComplete={async (sub) => {
           setSubtaskBusyId(sub.id);
           try {
             await refreshAfterMutation(async () => { await completeSubtask(activeWorkspaceId, projectId, taskId, sub.id); });
           } catch (e) {
             setError(e instanceof ApiRequestError ? e.message : 'Could not complete subtask.');
+          } finally { setSubtaskBusyId(null); }
+        }}
+        onUpdateWeight={async (subtaskId, weight) => {
+          setSubtaskBusyId(subtaskId);
+          try {
+            await refreshAfterMutation(async () => { await updateTask(activeWorkspaceId, projectId, subtaskId, { weight }); });
+          } catch (e) {
+            setError(e instanceof ApiRequestError ? e.message : 'Could not update subtask weight.');
+            throw e;
           } finally { setSubtaskBusyId(null); }
         }}
       />

@@ -100,14 +100,18 @@ describe('Task workspace sections', () => {
         isAssigneeOf={() => true}
       />,
     );
-    // PermissionButton renders disabled wrapper for denied users
-    expect(screen.queryByRole('button', { name: /mark complete/i })).not.toBeInTheDocument();
-    expect(screen.getByText('Mark complete')).toBeInTheDocument();
+    // PermissionButton renders a disabled control with an accessible explanation
+    const btn = screen.getByRole('button', { name: /mark complete/i });
+    expect(btn).toBeDisabled();
   });
 
   it('AttachmentManager shows empty/loading/error states', () => {
     const { rerender } = render(
       <AttachmentManager workspaceId="w" projectId="p" taskId="t" files={[]} loading error={null} onReload={vi.fn()} />,
+    );
+    expect(screen.getByText(/loading attachments/i)).toBeInTheDocument();
+    rerender(
+      <AttachmentManager workspaceId="w" projectId="p" taskId="t" files={[]} loading={false} error={null} onReload={vi.fn()} />,
     );
     expect(screen.getByText('No attachments')).toBeInTheDocument();
     rerender(

@@ -38,6 +38,16 @@ import {
   type Team,
 } from '@/services/organization-structure';
 import { listWorkspaceMembers, type WorkspaceMember } from '@/services/workspaces';
+import {
+  listDevConnections,
+  listAvailableRepositories,
+  listProjectRepositories,
+  linkProjectRepository,
+  unlinkProjectRepository,
+  type DevConnectionSummary,
+  type DevRepositorySummary,
+  type LinkedProjectRepository,
+} from '@/services/dev-integrations';
 
 const editSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -114,15 +124,28 @@ export default function ProjectSettingsPage() {
   const [transferTargetId, setTransferTargetId] = useState('');
   const [confirmTransfer, setConfirmTransfer] = useState(false);
 
+  // Source control / linked repositories (Feature A)
+  const [devConnections, setDevConnections] = useState<DevConnectionSummary[]>([]);
+  const [linkedRepos, setLinkedRepos] = useState<LinkedProjectRepository[]>([]);
+  const [availableRepos, setAvailableRepos] = useState<DevRepositorySummary[]>([]);
+  const [repoLoading, setRepoLoading] = useState(false);
+  const [repoError, setRepoError] = useState<string | null>(null);
+  const [repoNotice, setRepoNotice] = useState<string | null>(null);
+  const [repoBusy, setRepoBusy] = useState(false);
+  const [selectedRepoId, setSelectedRepoId] = useState('');
+  const [unlinkTarget, setUnlinkTarget] = useState<LinkedProjectRepository | null>(null);
+
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
     setLoading(true); setError(null); setAccessStatus(null);
     try {
-      const [data, deptList, teamList, wsMembers] = await Promise.all([
+      const [data, deptList, teamList, wsMembers, linked, connections] = await Promise.all([
         getProject(activeWorkspace.id, projectId),
         activeWorkspace.type === 'INSTITUTION' ? listDepartments(activeWorkspace.id) : Promise.resolve([]),
         listTeams(activeWorkspace.id),
         listWorkspaceMembers(activeWorkspace.id),
+        listProjectRepositories(activeWorkspace.id, projectId).catch(() => [] as LinkedProjectRepository[]),
+        listDevConnections(activeWorkspace.id).catch(() => [] as DevConnectionSummary[]),
       ]);
       setProject(data);
       setName(data.name);
@@ -135,6 +158,8 @@ export default function ProjectSettingsPage() {
       setDepartments(deptList);
       setTeams(teamList);
       setWorkspaceMembers(wsMembers.filter((m) => m.membershipStatus === 'ACTIVE' && !m.owner));
+      setLinkedRepos(linked);
+      setDevConnections(connections);
     } catch (cause) {
       if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
         setAccessStatus(cause.status);
@@ -149,6 +174,59 @@ export default function ProjectSettingsPage() {
   }, [activeWorkspace, projectId]);
 
   useEffect(() => { let active = true; void Promise.resolve().then(() => active ? load() : undefined); return () => { active = false; }; }, [load]);
+
+  const activeGithubConnection = devConnections.find((c) => c.provider === 'GITHUB' && c.status === 'ACTIVE') ?? null;
+
+  async function loadAvailableRepos() {
+    if (!activeWorkspace || !activeGithubConnection) return;
+    setRepoLoading(true); setRepoError(null);
+    try {
+      const repos = await listAvailableRepositories(activeWorkspace.id, activeGithubConnection.id);
+      setAvailableRepos(repos);
+    } catch (cause) {
+      setRepoError(requestError(cause, 'Could not load available repositories.'));
+      setAvailableRepos([]);
+    } finally {
+      setRepoLoading(false);
+    }
+  }
+
+  async function handleLinkRepo() {
+    if (!activeWorkspace || !activeGithubConnection || !selectedRepoId) return;
+    const repo = availableRepos.find((r) => r.externalRepoId === selectedRepoId);
+    if (!repo) return;
+    setRepoBusy(true); setRepoError(null); setRepoNotice(null);
+    try {
+      const linked = await linkProjectRepository(activeWorkspace.id, projectId, {
+        connectionId: activeGithubConnection.id,
+        externalRepoId: repo.externalRepoId,
+        fullName: repo.fullName,
+        defaultBranch: repo.defaultBranch ?? null,
+      });
+      setLinkedRepos((prev) => [linked, ...prev.filter((r) => r.id !== linked.id)]);
+      setSelectedRepoId('');
+      setRepoNotice(`Linked ${linked.fullName}.`);
+    } catch (cause) {
+      setRepoError(requestError(cause, 'Could not link repository.'));
+    } finally {
+      setRepoBusy(false);
+    }
+  }
+
+  async function handleUnlinkRepo() {
+    if (!activeWorkspace || !unlinkTarget) return;
+    setRepoBusy(true); setRepoError(null); setRepoNotice(null);
+    try {
+      await unlinkProjectRepository(activeWorkspace.id, projectId, unlinkTarget.id);
+      setLinkedRepos((prev) => prev.filter((r) => r.id !== unlinkTarget.id));
+      setRepoNotice(`Unlinked ${unlinkTarget.fullName}.`);
+      setUnlinkTarget(null);
+    } catch (cause) {
+      setRepoError(requestError(cause, 'Could not unlink repository.'));
+    } finally {
+      setRepoBusy(false);
+    }
+  }
 
   function handleVisibilityChange(newVisibility: ProjectVisibility) {
     if (!project) return;
@@ -414,6 +492,94 @@ export default function ProjectSettingsPage() {
           </div>
         </Card>
       )}
+
+      {/* Source control / linked repositories (Feature A) */}
+      <Card className="p-5">
+        <h3 className="font-semibold">Source control</h3>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          Link a GitHub repository to this project. Nexus shows development status inside task workspaces; it does not host or edit code.
+        </p>
+        {repoError && <Alert className="mt-3" variant="error">{repoError}</Alert>}
+        {repoNotice && <Alert className="mt-3" variant="success">{repoNotice}</Alert>}
+
+        <div className="mt-4 space-y-4">
+          <div>
+            <h4 className="text-sm font-medium">Linked repositories</h4>
+            {linkedRepos.length === 0 ? (
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">No repositories linked to this project.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {linkedRepos.map((repo) => (
+                  <li key={repo.id} className="flex items-center justify-between gap-3 rounded border border-[var(--color-border)] p-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-[var(--color-text-primary)]">{repo.fullName}</p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        {repo.provider}{repo.defaultBranch ? ` · default: ${repo.defaultBranch}` : ''}
+                      </p>
+                    </div>
+                    {can('project.update') && (
+                      <Button size="sm" variant="secondary" onClick={() => setUnlinkTarget(repo)} disabled={repoBusy}>
+                        Unlink
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {can('project.update') ? (
+            <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
+              <h4 className="text-sm font-medium">Link a repository</h4>
+              {!activeGithubConnection ? (
+                <Alert variant="info">
+                  No active GitHub workspace connection. A workspace manager must connect GitHub in <a className="underline" href="/app/integrations">Integrations</a> first.
+                </Alert>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-[260px] flex-1">
+                      <Select
+                        id="repo-select"
+                        label="Repository"
+                        value={selectedRepoId}
+                        onChange={(event) => setSelectedRepoId(event.target.value)}
+                        options={[
+                          { value: '', label: availableRepos.length ? 'Select a repository…' : 'Load repositories to select' },
+                          ...availableRepos
+                            .filter((r) => !linkedRepos.some((lr) => lr.externalRepoId === r.externalRepoId && lr.provider === 'GITHUB'))
+                            .map((r) => ({ value: r.externalRepoId, label: r.fullName })),
+                        ]}
+                        disabled={repoLoading || repoBusy}
+                      />
+                    </div>
+                    <Button variant="secondary" onClick={() => void loadAvailableRepos()} loading={repoLoading} disabled={repoBusy}>
+                      {availableRepos.length ? 'Refresh repositories' : 'Load repositories'}
+                    </Button>
+                    <Button onClick={() => void handleLinkRepo()} disabled={!selectedRepoId || repoBusy} loading={repoBusy}>
+                      Link repository
+                    </Button>
+                  </div>
+                  <p className="text-xs text-[var(--color-text-muted)]">Connected as {activeGithubConnection.externalAccount.login ?? activeGithubConnection.externalAccount.name ?? 'GitHub account'}.</p>
+                </>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--color-text-muted)]">Your project role cannot link or unlink repositories.</p>
+          )}
+        </div>
+      </Card>
+
+      <ConfirmDialog
+        open={!!unlinkTarget}
+        onClose={() => setUnlinkTarget(null)}
+        onConfirm={() => void handleUnlinkRepo()}
+        title="Unlink repository?"
+        description={`Unlink ${unlinkTarget?.fullName ?? 'this repository'} from ${project.name}? This does not affect the repository in GitHub.`}
+        confirmLabel="Unlink"
+        destructive
+        loading={repoBusy}
+      />
 
       {/* Ownership transfer */}
       {workspaceMembers.length > 0 && (

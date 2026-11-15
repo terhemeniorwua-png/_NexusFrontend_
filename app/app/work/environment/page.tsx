@@ -46,6 +46,7 @@ export default function WorkEnvironmentPage() {
     key: string;
     title: string;
     status: TaskStatus;
+    projectId: string;
     projectKey: string;
     dueDate: string | null;
     progress: number;
@@ -71,7 +72,8 @@ export default function WorkEnvironmentPage() {
           key: t.key,
           title: t.title,
           status: t.status,
-          projectKey: t.projectId ? t.key?.split('-')[0] || '' : '',
+          projectId: t.projectId,
+          projectKey: t.projectName || (t.key?.split('-')[0] ?? ''),
           dueDate: t.dueDate,
           progress: t.subTaskCount > 0
             ? Math.round((t.commentCount / t.subTaskCount) * 100)
@@ -158,7 +160,7 @@ export default function WorkEnvironmentPage() {
                 variant="ghost"
                 className="mt-2 w-full"
                 onClick={() =>
-                  router.push(`/app/projects/${task.projectKey}/tasks/${task.id}`)
+                  router.push(`/app/projects/${task.projectId}/tasks/${task.id}`)
                 }
               >
                 View task

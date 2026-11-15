@@ -27,7 +27,7 @@ export default function WorkMyTasksPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { activeWorkspace, user } = useWorkspaceContext();
-  const [tasks, setTasks] = useState<Array<{ id: string; key: string; title: string; status: TaskStatus; projectKey: string; dueDate: string | null }>>([]);
+  const [tasks, setTasks] = useState<Array<{ id: string; key: string; title: string; status: TaskStatus; projectId: string; projectKey: string; dueDate: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<TaskStatus | ''>('');
@@ -60,7 +60,8 @@ export default function WorkMyTasksPage() {
           key: t.key,
           title: t.title,
           status: t.status,
-          projectKey: t.projectId ? t.key?.split('-')[0] || '' : '',
+          projectId: t.projectId,
+          projectKey: t.projectName || (t.key?.split('-')[0] ?? ''),
           dueDate: t.dueDate,
         })));
         highlightRef.current = highlightTaskId;
@@ -176,7 +177,7 @@ export default function WorkMyTasksPage() {
                   <td className="p-3 font-mono text-sm text-[var(--color-text-muted)]">{task.key}</td>
                   <td className="p-3">
                     <a
-                      href={`/app/projects/${task.projectKey}/tasks/${task.id}`}
+                      href={`/app/projects/${task.projectId}/tasks/${task.id}`}
                       className="text-[var(--color-primary)] hover:underline"
                     >
                       {task.title}
@@ -198,7 +199,7 @@ export default function WorkMyTasksPage() {
                     <Button
                       variant="ghost"
                       aria-label="View task"
-                      onClick={() => router.push(`/app/projects/${task.projectKey}/tasks/${task.id}`)}
+                      onClick={() => router.push(`/app/projects/${task.projectId}/tasks/${task.id}`)}
                     >
                       <svg
                         aria-hidden="true"

@@ -228,7 +228,7 @@ export default function TaskDetailPage() {
       if (seq !== latestLoad.current) return;
       if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
         setAccessStatus(cause.status);
-      } else if (cause instanceof ApiRequestError && cause.status === 404) {
+      } else if (cause instanceof ApiRequestError && (cause.status === 404 || cause.status === 400)) {
         setError('This task does not exist or you do not have access to it.');
       } else {
         setError(requestError(cause, 'Task could not be loaded.'));

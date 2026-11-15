@@ -32,6 +32,7 @@ export default function WorkSubmissionsPage() {
     key: string;
     title: string;
     status: TaskStatus;
+    projectId: string;
     projectKey: string;
     dueDate: string | null;
   }>>([]);
@@ -56,7 +57,8 @@ export default function WorkSubmissionsPage() {
           key: t.key,
           title: t.title,
           status: t.status,
-          projectKey: t.projectId ? t.key?.split('-')[0] || '' : '',
+          projectId: t.projectId,
+          projectKey: t.projectName || (t.key?.split('-')[0] ?? ''),
           dueDate: t.dueDate,
         }));
         setTasks(allTasks.filter(
@@ -117,7 +119,7 @@ export default function WorkSubmissionsPage() {
                 size="sm"
                 variant="ghost"
                 className="mt-2 w-full"
-                onClick={() => router.push(`/app/projects/${task.projectKey}/tasks/${task.id}`)}
+                onClick={() => router.push(`/app/projects/${task.projectId}/tasks/${task.id}`)}
               >
                 View task
               </Button>

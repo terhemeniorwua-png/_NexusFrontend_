@@ -61,6 +61,7 @@ export function TaskDevelopment({
   const [localNotice, setLocalNotice] = useState<string | null>(null);
 
   const selectedRepo = useMemo(() => linkedRepos.find((r) => r.id === selectedRepoId) ?? null, [linkedRepos, selectedRepoId]);
+  const providerName = selectedRepo?.provider === 'GITLAB' ? 'GitLab' : selectedRepo?.provider === 'GITHUB' ? 'GitHub' : 'provider';
 
   async function browse() {
     if (!selectedRepoId) return;
@@ -76,7 +77,7 @@ export function TaskDevelopment({
         setPrs(items);
       }
     } catch (e) {
-      setBrowseError(e instanceof Error ? e.message : 'Could not load development items from GitHub.');
+      setBrowseError(e instanceof Error ? e.message : `Could not load development items from ${providerName}.`);
     } finally {
       setBrowseLoading(false);
     }
@@ -144,7 +145,7 @@ export function TaskDevelopment({
           <div>
             <h2 className="text-lg font-semibold">Development</h2>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Link GitHub branches and pull requests to this task. Nexus links to GitHub and shows development status; it does not host or edit code.
+              Link branches and pull/merge requests to this task. Nexus links to source control providers and shows development status; it does not host or edit code.
             </p>
           </div>
           <Button size="sm" variant="secondary" onClick={() => void onReload()} disabled={loading || busy}>Refresh</Button>
@@ -197,7 +198,7 @@ export function TaskDevelopment({
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">Your task/project role cannot link or unlink development items.</p>
         ) : linkedRepos.length === 0 ? (
           <Alert className="mt-3" variant="info">
-            No repositories are linked to this project. Link a GitHub repository in Project Settings → Source control first.
+            No repositories are linked to this project. Link a GitHub or GitLab repository in Project Settings → Source control first.
           </Alert>
         ) : (
           <div className="mt-3 space-y-3">
@@ -228,16 +229,16 @@ export function TaskDevelopment({
               <div className="min-w-[220px] flex-1">
                 <Input id="dev-search" label="Search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={mode === 'PULL_REQUEST' ? 'Title, number, or branch' : 'Branch name'} />
               </div>
-              <Button variant="secondary" onClick={() => void browse()} loading={browseLoading} disabled={!selectedRepoId || busy}>Load from GitHub</Button>
+              <Button variant="secondary" onClick={() => void browse()} loading={browseLoading} disabled={!selectedRepoId || busy}>Load from {selectedRepo ? providerName : 'provider'}</Button>
             </div>
 
             {browseLoading ? (
               <div className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
             ) : mode === 'PULL_REQUEST' ? (
-              prs.length === 0 ? (selectedRepoId ? <p className="text-sm text-[var(--color-text-muted)]">No pull requests loaded. Click “Load from GitHub”.</p> : null) : (
+              prs.length === 0 ? (selectedRepoId ? <p className="text-sm text-[var(--color-text-muted)]">No pull requests or merge requests loaded. Click “Load from {providerName}”.</p> : null) : (
                 <ul className="space-y-2" role="list">
                   {prs.map((pr) => {
-                    const already = linkedKeys.has(`GITHUB:PULL_REQUEST:${pr.externalId}`);
+                    const already = linkedKeys.has(`${selectedRepo?.provider ?? 'GITHUB'}:PULL_REQUEST:${pr.externalId}`);
                     return (
                       <li key={pr.externalId} className="flex flex-col gap-2 rounded border border-[var(--color-border)] p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
@@ -251,10 +252,10 @@ export function TaskDevelopment({
                 </ul>
               )
             ) : (
-              branches.length === 0 ? (selectedRepoId ? <p className="text-sm text-[var(--color-text-muted)]">No branches loaded. Click “Load from GitHub”.</p> : null) : (
+              branches.length === 0 ? (selectedRepoId ? <p className="text-sm text-[var(--color-text-muted)]">No branches loaded. Click “Load from {providerName}”.</p> : null) : (
                 <ul className="space-y-2" role="list">
                   {branches.map((b) => {
-                    const already = linkedKeys.has(`GITHUB:BRANCH:${b.name}`);
+                    const already = linkedKeys.has(`${selectedRepo?.provider ?? 'GITHUB'}:BRANCH:${b.name}`);
                     return (
                       <li key={b.name} className="flex flex-col gap-2 rounded border border-[var(--color-border)] p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
@@ -275,7 +276,7 @@ export function TaskDevelopment({
       <ConfirmDialog
         open={!!unlinkTarget}
         title="Remove development link"
-        description={`Remove linked ${unlinkTarget?.externalType === 'PULL_REQUEST' ? 'pull request' : 'branch'} from this task? This does not affect GitHub.`}
+        description={`Remove linked ${unlinkTarget?.externalType === 'PULL_REQUEST' ? 'pull request or merge request' : 'branch'} from this task? This does not affect ${unlinkTarget?.provider === 'GITLAB' ? 'GitLab' : 'GitHub'}.`}
         confirmLabel="Remove"
         destructive
         loading={busy}

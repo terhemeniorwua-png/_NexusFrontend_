@@ -100,7 +100,8 @@ describe('IntegrationsPage', () => {
     await waitFor(() => expect(screen.queryByLabelText('Loading integrations')).not.toBeInTheDocument());
     expect(screen.getByText('Available integrations')).toBeInTheDocument();
     expect(screen.getByText('Slack')).toBeInTheDocument();
-    expect(screen.getByText('GitHub')).toBeInTheDocument();
+    // GitHub appears in both workspace source-control and personal integrations catalog
+    expect(screen.getAllByText('GitHub').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows error alert with Retry when loading fails', async () => {
@@ -150,10 +151,12 @@ describe('IntegrationsPage', () => {
   it('workspace switch reloads integrations', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([]));
     const { rerender } = render(<IntegrationsPage />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    // personal integrations + workspace dev connections load
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2));
+    const initialCalls = fetchMock.mock.calls.length;
 
     mockCtx.activeWorkspace = { id: 'ws-other', name: 'Other WS', type: 'COMPANY' };
     rerender(<IntegrationsPage />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(initialCalls));
   });
 });

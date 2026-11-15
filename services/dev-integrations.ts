@@ -100,6 +100,10 @@ export async function getGithubConnectUrl(workspaceId: string): Promise<{ url: s
   return authed<{ url: string }>(`/workspaces/${workspaceId}/dev-integrations/github/start`);
 }
 
+export async function getGitlabConnectUrl(workspaceId: string): Promise<{ url: string }> {
+  return authed<{ url: string }>(`/workspaces/${workspaceId}/dev-integrations/gitlab/start`);
+}
+
 export async function disconnectDevConnection(
   workspaceId: string,
   connectionId: string,

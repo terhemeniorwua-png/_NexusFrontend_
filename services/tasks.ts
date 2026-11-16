@@ -105,6 +105,9 @@ export interface TaskSummary {
   archivedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  customFields?: Record<string, unknown>;
+  customFieldValues?: TaskCustomFieldValue[];
+  recurrenceRule?: TaskRecurrenceRule | null;
   updatedAt: string;
   weight?: number;
   requiresApproval?: boolean;
@@ -786,5 +789,417 @@ export function resolveTaskBlocker(
   return request<TaskReportedBlocker>(
     blockersPath(workspaceId, projectId, taskId, `/${encodeURIComponent(blockerId)}/resolve`),
     { method: 'POST', body: JSON.stringify({}) },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Custom fields (project definitions + task values) — backend task-advanced contract
+// ---------------------------------------------------------------------------
+
+export type CustomFieldType = 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT' | 'MULTI_SELECT' | 'USER' | 'CHECKBOX';
+
+export interface CustomFieldOption {
+  value: string;
+  label: string;
+  color?: string;
+}
+
+export interface ProjectCustomField {
+  id: string;
+  projectId: string;
+  name: string;
+  key: string;
+  type: CustomFieldType;
+  description: string | null;
+  options: CustomFieldOption[] | null;
+  required: boolean;
+  position: number;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskCustomFieldValue {
+  taskId: string;
+  fieldId: string;
+  value: unknown;
+  createdAt: string;
+  updatedAt: string;
+  field: ProjectCustomField;
+}
+
+export interface CreateCustomFieldInput {
+  name: string;
+  key?: string;
+  type: CustomFieldType;
+  description?: string | null;
+  options?: CustomFieldOption[] | null;
+  required?: boolean;
+  position?: number;
+}
+
+export interface UpdateCustomFieldInput {
+  name?: string;
+  description?: string | null;
+  options?: CustomFieldOption[] | null;
+  required?: boolean;
+  position?: number;
+}
+
+const customFieldsPath = (workspaceId: string, projectId: string, suffix = '') =>
+  `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/custom-fields${suffix}`;
+
+export function listProjectCustomFields(workspaceId: string, projectId: string): Promise<ProjectCustomField[]> {
+  return request<ProjectCustomField[]>(customFieldsPath(workspaceId, projectId));
+}
+
+export function createProjectCustomField(
+  workspaceId: string,
+  projectId: string,
+  input: CreateCustomFieldInput,
+): Promise<ProjectCustomField> {
+  return request<ProjectCustomField>(customFieldsPath(workspaceId, projectId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateProjectCustomField(
+  workspaceId: string,
+  projectId: string,
+  fieldId: string,
+  input: UpdateCustomFieldInput,
+): Promise<ProjectCustomField> {
+  return request<ProjectCustomField>(customFieldsPath(workspaceId, projectId, `/${encodeURIComponent(fieldId)}`), {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteProjectCustomField(
+  workspaceId: string,
+  projectId: string,
+  fieldId: string,
+): Promise<{ id: string; deleted: true }> {
+  return request<{ id: string; deleted: true }>(
+    customFieldsPath(workspaceId, projectId, `/${encodeURIComponent(fieldId)}`),
+    { method: 'DELETE' },
+  );
+}
+
+export function getTaskCustomFieldValues(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<TaskCustomFieldValue[]> {
+  return request<TaskCustomFieldValue[]>(
+    taskPath(workspaceId, projectId, taskId, '/custom-fields'),
+    { method: 'GET' },
+  );
+}
+
+export function setTaskCustomFieldValues(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  values: Array<{ fieldId: string; value?: unknown }>,
+): Promise<{ taskId: string; values: TaskCustomFieldValue[] }> {
+  return request<{ taskId: string; values: TaskCustomFieldValue[] }>(
+    taskPath(workspaceId, projectId, taskId, '/custom-fields'),
+    { method: 'PUT', body: JSON.stringify({ values }) },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Saved views (project-scoped, versioned config)
+// ---------------------------------------------------------------------------
+
+export interface SavedViewConfigV1 {
+  version: 1;
+  filters: Record<string, unknown>;
+  sort: Record<string, unknown> | null;
+  group: Record<string, unknown> | null;
+}
+
+export interface TaskSavedView {
+  id: string;
+  projectId: string;
+  ownerId: string;
+  name: string;
+  isShared: boolean;
+  config: SavedViewConfigV1;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSavedViewInput {
+  name: string;
+  isShared?: boolean;
+  config?: SavedViewConfigV1;
+}
+
+export interface UpdateSavedViewInput {
+  name?: string;
+  isShared?: boolean;
+  config?: Partial<Omit<SavedViewConfigV1, 'version'>> & { version: 1 };
+}
+
+const savedViewsPath = (workspaceId: string, projectId: string, suffix = '') =>
+  `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/saved-views${suffix}`;
+
+export function listTaskSavedViews(workspaceId: string, projectId: string): Promise<TaskSavedView[]> {
+  return request<TaskSavedView[]>(savedViewsPath(workspaceId, projectId));
+}
+
+export function createTaskSavedView(
+  workspaceId: string,
+  projectId: string,
+  input: CreateSavedViewInput,
+): Promise<TaskSavedView> {
+  return request<TaskSavedView>(savedViewsPath(workspaceId, projectId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateTaskSavedView(
+  workspaceId: string,
+  projectId: string,
+  viewId: string,
+  input: UpdateSavedViewInput,
+): Promise<TaskSavedView> {
+  return request<TaskSavedView>(savedViewsPath(workspaceId, projectId, `/${encodeURIComponent(viewId)}`), {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteTaskSavedView(
+  workspaceId: string,
+  projectId: string,
+  viewId: string,
+): Promise<{ id: string; deleted: true }> {
+  return request<{ id: string; deleted: true }>(
+    savedViewsPath(workspaceId, projectId, `/${encodeURIComponent(viewId)}`),
+    { method: 'DELETE' },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Task recurrence
+// ---------------------------------------------------------------------------
+
+export type TaskRecurrenceFrequency = 'DAILY' | 'WEEKLY' | 'MONTHLY';
+
+export interface TaskRecurrenceRule {
+  id: string;
+  taskId: string;
+  frequency: TaskRecurrenceFrequency;
+  interval: number;
+  daysOfWeek: number[];
+  dayOfMonth: number | null;
+  endsAt: string | null;
+  maxOccurrences: number | null;
+  nextRunAt: string | null;
+  active: boolean;
+  occurrenceCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertTaskRecurrenceInput {
+  frequency: TaskRecurrenceFrequency;
+  interval?: number;
+  daysOfWeek?: number[];
+  dayOfMonth?: number | null;
+  endsAt?: string | null;
+  maxOccurrences?: number | null;
+  nextRunAt?: string | null;
+  active?: boolean;
+}
+
+const recurrencePath = (workspaceId: string, projectId: string, taskId: string, suffix = '') =>
+  taskPath(workspaceId, projectId, taskId, `/recurrence${suffix}`);
+
+export function getTaskRecurrence(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<TaskRecurrenceRule> {
+  return request<TaskRecurrenceRule>(recurrencePath(workspaceId, projectId, taskId));
+}
+
+export function upsertTaskRecurrence(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: UpsertTaskRecurrenceInput,
+): Promise<TaskRecurrenceRule> {
+  return request<TaskRecurrenceRule>(recurrencePath(workspaceId, projectId, taskId), {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteTaskRecurrence(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ taskId: string; deleted: true }> {
+  return request<{ taskId: string; deleted: true }>(recurrencePath(workspaceId, projectId, taskId), {
+    method: 'DELETE',
+  });
+}
+
+export function generateTaskRecurrenceInstance(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<TaskSummary> {
+  return request<TaskSummary>(recurrencePath(workspaceId, projectId, taskId, '/generate'), {
+    method: 'POST',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Task templates (project-scoped) and project templates (workspace-scoped)
+// ---------------------------------------------------------------------------
+
+export interface TaskTemplateDataV1 {
+  version: 1;
+  title?: string;
+  description?: string | null;
+  status?: string;
+  priority?: string;
+  category?: string | null;
+  labels?: string[];
+  startDate?: string | null;
+  dueDate?: string | null;
+  customFieldValues?: Array<{ fieldId: string; value?: unknown }>;
+  subtasks?: Array<Record<string, unknown>>;
+}
+
+export interface TaskTemplate {
+  id: string;
+  workspaceId: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  data: TaskTemplateDataV1;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const taskTemplatesPath = (workspaceId: string, projectId: string, suffix = '') =>
+  `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/task-templates${suffix}`;
+
+export function listTaskTemplates(workspaceId: string, projectId: string): Promise<TaskTemplate[]> {
+  return request<TaskTemplate[]>(taskTemplatesPath(workspaceId, projectId));
+}
+
+export function createTaskTemplate(
+  workspaceId: string,
+  projectId: string,
+  input: { name: string; description?: string | null; data?: TaskTemplateDataV1 },
+): Promise<TaskTemplate> {
+  return request<TaskTemplate>(taskTemplatesPath(workspaceId, projectId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateTaskTemplate(
+  workspaceId: string,
+  projectId: string,
+  templateId: string,
+  input: { name?: string; description?: string | null; data?: TaskTemplateDataV1 },
+): Promise<TaskTemplate> {
+  return request<TaskTemplate>(taskTemplatesPath(workspaceId, projectId, `/${encodeURIComponent(templateId)}`), {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteTaskTemplate(
+  workspaceId: string,
+  projectId: string,
+  templateId: string,
+): Promise<{ id: string; deleted: true }> {
+  return request<{ id: string; deleted: true }>(
+    taskTemplatesPath(workspaceId, projectId, `/${encodeURIComponent(templateId)}`),
+    { method: 'DELETE' },
+  );
+}
+
+export function createTaskFromTemplate(
+  workspaceId: string,
+  projectId: string,
+  templateId: string,
+  input: { title?: string; assigneeIds?: string[]; startDate?: string | null; dueDate?: string | null } = {},
+): Promise<TaskSummary> {
+  return request<TaskSummary>(
+    taskTemplatesPath(workspaceId, projectId, `/${encodeURIComponent(templateId)}/create-task`),
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export interface ProjectTemplate {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string | null;
+  data: Record<string, unknown>;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const projectTemplatesPath = (workspaceId: string, suffix = '') =>
+  `/workspaces/${encodeURIComponent(workspaceId)}/project-templates${suffix}`;
+
+export function listProjectTemplates(workspaceId: string): Promise<ProjectTemplate[]> {
+  return request<ProjectTemplate[]>(projectTemplatesPath(workspaceId));
+}
+
+export function createProjectTemplate(
+  workspaceId: string,
+  input: { name: string; description?: string | null; data?: Record<string, unknown> },
+): Promise<ProjectTemplate> {
+  return request<ProjectTemplate>(projectTemplatesPath(workspaceId), {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateProjectTemplate(
+  workspaceId: string,
+  templateId: string,
+  input: { name?: string; description?: string | null; data?: Record<string, unknown> },
+): Promise<ProjectTemplate> {
+  return request<ProjectTemplate>(projectTemplatesPath(workspaceId, `/${encodeURIComponent(templateId)}`), {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteProjectTemplate(
+  workspaceId: string,
+  templateId: string,
+): Promise<{ id: string; deleted: true }> {
+  return request<{ id: string; deleted: true }>(
+    projectTemplatesPath(workspaceId, `/${encodeURIComponent(templateId)}`),
+    { method: 'DELETE' },
+  );
+}
+
+export function createProjectFromTemplate(
+  workspaceId: string,
+  templateId: string,
+  input: { name: string; key: string; description?: string | null },
+): Promise<unknown> {
+  return request<unknown>(
+    projectTemplatesPath(workspaceId, `/${encodeURIComponent(templateId)}/create-project`),
+    { method: 'POST', body: JSON.stringify(input) },
   );
 }

@@ -678,6 +678,16 @@ export default function TaskDetailPage() {
                   <span className="font-mono text-xs bg-[var(--color-surface-secondary)] border border-[var(--color-border)] px-1.5 py-0.5 rounded text-[var(--color-text-secondary)]">
                     {task.key}
                   </span>
+                  {task?.customFields && Object.keys(task.customFields).length > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+                      <span className="font-medium">Custom:</span>
+                      {Object.entries(task.customFields ?? {}).map(([key, value]: [string, unknown]) => (
+                        <span key={key} className="mx-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[var(--color-text-secondary)] bg-[var(--color-surface-secondary)]">
+                          {key}: {String(value)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <Badge variant={task.status}>{statusLabel(task.status)}</Badge>
                   <Badge variant={task.priority}>{priorityLabel(task.priority)}</Badge>
                   {isArchived && <Badge variant="outline">Archived</Badge>}

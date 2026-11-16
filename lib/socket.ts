@@ -18,23 +18,29 @@ import { getAccessToken } from './api';
 import { refreshSession } from '@/services/auth';
 
 let socket: Socket | null = null;
+let configurationError: string | null = null;
 
 /**
  * Returns the singleton socket instance, creating it on first call.
  * The socket auto-connects when created.
+ *
+ * If NEXT_PUBLIC_SOCKET_URL is not set, the socket will not connect and a
+ * configuration error is available via `getConfigurationError()`.
  */
 export function getSocket(): Socket {
   if (socket) return socket;
 
-  // WebSockets cannot pass through the Vercel proxy, so connect directly to
-  // the backend. NEXT_PUBLIC_SOCKET_URL must be the Render URL, no trailing slash.
   const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
   if (!socketUrl) {
-    console.warn('NEXT_PUBLIC_SOCKET_URL is not set; realtime will not connect.');
+    configurationError =
+      'NEXT_PUBLIC_SOCKET_URL is not set. Real-time features will not work. ' +
+      'Set NEXT_PUBLIC_SOCKET_URL to the Socket.IO server origin (no trailing slash).';
+    // Return null so callers can check the error instead of connecting
+    return null as unknown as Socket;
   }
 
-  socket = io(socketUrl ?? '/api/backend', {
-    path: socketUrl ? '/socket.io' : '/api/backend/socket.io',
+  socket = io(socketUrl, {
+    path: '/socket.io',
     auth: (cb) => {
       void (async () => {
         let token = getAccessToken();
@@ -78,4 +84,13 @@ export function destroySocket(): void {
     socket.disconnect();
     socket = null;
   }
+}
+
+/**
+ * Returns the configuration error string if NEXT_PUBLIC_SOCKET_URL is missing,
+ * otherwise returns null. Consumers (e.g. SocketProvider, UI banner) can call
+ * this to surface a clear error to the user instead of silently broken realtime.
+ */
+export function getConfigurationError(): string | null {
+  return configurationError;
 }

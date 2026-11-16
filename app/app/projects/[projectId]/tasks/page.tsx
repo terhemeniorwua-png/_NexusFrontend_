@@ -67,7 +67,7 @@ const createSchema = z.object({
 // Helpers
 // ---------------------------------------------------------------------------
 
-type ViewMode = 'board' | 'list' | 'calendar' | 'timeline';
+type ViewMode = 'board' | 'list' | 'calendar' | 'timeline' | 'table' | 'gantt' | 'recurring' | 'template';
 
 const STATUS_COLUMNS: TaskStatus[] = [
   'ASSIGNED',
@@ -612,7 +612,7 @@ export default function ProjectTasksPage() {
       {/* ----------------------------------------------------------------- */}
       {!accessStatus && (
         <div className="flex flex-wrap gap-1" role="tablist" aria-label="Task view">
-          {(['board', 'list', 'calendar', 'timeline'] as ViewMode[]).map((mode) => (
+          {(['board', 'list', 'calendar', 'timeline', 'table', 'gantt', 'recurring', 'template'] as ViewMode[]).map((mode) => (
             <button
               key={mode}
               role="tab"
@@ -1107,6 +1107,38 @@ export default function ProjectTasksPage() {
                 <p className="mt-1 text-xs text-[var(--color-error)]">{createErrors.dueDate}</p>
               )}
             </div>
+          </div>
+          {/* Recurring task settings */}
+          <div className="mt-3">
+            <label htmlFor="create-task-recurrence" className="block text-sm font-medium text-[var(--color-text-primary)]">
+              Recurrence <span className="text-[var(--color-text-muted)] font-normal">(optional)</span>
+            </label>
+            <select
+              id="create-task-recurrence"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+            >
+              <option value="none" disabled>None</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+          {/* Template picker */}
+          <div className="mt-3">
+            <label htmlFor="create-task-template" className="block text-sm font-medium text-[var(--color-text-primary)]">
+              Template <span className="text-[var(--color-text-muted)] font-normal">(optional)</span>
+            </label>
+            <select
+              id="create-task-template"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+            >
+              <option value="" disabled>None</option>
+              <option value="sprint">Sprint setup</option>
+              <option value="bug-fix">Bug fix</option>
+              <option value="feature">Feature development</option>
+              <option value="onboarding">Onboarding</option>
+            </select>
           </div>
           <Input
             id="create-task-labels"

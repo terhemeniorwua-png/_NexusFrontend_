@@ -105,6 +105,7 @@ export interface TaskSummary {
   archivedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  customFields?: { [key: string]: unknown };
   updatedAt: string;
   weight?: number;
   requiresApproval?: boolean;
@@ -786,5 +787,169 @@ export function resolveTaskBlocker(
   return request<TaskReportedBlocker>(
     blockersPath(workspaceId, projectId, taskId, `/${encodeURIComponent(blockerId)}/resolve`),
     { method: 'POST', body: JSON.stringify({}) },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Custom field management (Phase 4E)
+// ---------------------------------------------------------------------------
+
+export interface TaskCustomField {
+  id: string;
+  name: string;
+  type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  options?: string[];
+  required?: boolean;
+  hidden?: boolean;
+}
+
+export function getTaskCustomFieldValues(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ [key: string]: unknown }> {
+  return request<{ [key: string]: unknown }>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/custom-fields`,
+    { method: 'GET' },
+  );
+}
+
+export function setTaskCustomFieldValues(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  values: { [key: string]: unknown },
+): Promise<{ [key: string]: unknown }> {
+  return request<{ [key: string]: unknown }>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/custom-fields`,
+    { method: 'POST', body: JSON.stringify(values) },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Saved task views (Phase 4F)
+// ---------------------------------------------------------------------------
+
+export interface TaskView {
+  id: string;
+  name: string;
+  description?: string;
+  filter?: {
+    status?: TaskStatus[];
+    priority?: TaskPriority[];
+    assigneeId?: string;
+    search?: string;
+  };
+  sort?: {
+    by: TaskSortBy;
+    order: TaskSortOrder;
+  };
+  groupBy?: 'status' | 'priority' | 'assignee' | 'dueDate';
+  isShared: boolean;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskViewPage {
+  items: TaskView[];
+  nextCursor: string | null;
+}
+
+export function listTaskSavedViews(
+  workspaceId: string,
+  projectId: string,
+  query?: { cursor?: string; limit?: number },
+): Promise<TaskViewPage> {
+  const params = new URLSearchParams();
+  if (query?.cursor) params.set('cursor', query.cursor);
+  if (query?.limit !== undefined) params.set('limit', String(query.limit));
+  return request<TaskViewPage>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/task-views${params.size ? `?${params}` : ''}`,
+  );
+}
+
+export function createTaskSavedView(
+  workspaceId: string,
+  projectId: string,
+  input: { name: string; description?: string; filter?: TaskView['filter']; sort?: TaskView['sort']; groupBy?: TaskView['groupBy']; isShared?: boolean },
+): Promise<TaskView> {
+  return request<TaskView>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/task-views`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export function updateTaskSavedView(
+  workspaceId: string,
+  projectId: string,
+  viewId: string,
+  input: { name?: string; description?: string; filter?: TaskView['filter']; sort?: TaskView['sort']; groupBy?: TaskView['groupBy']; isShared?: boolean },
+): Promise<TaskView> {
+  return request<TaskView>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/task-views/${encodeURIComponent(viewId)}`,
+    { method: 'PATCH', body: JSON.stringify(input) },
+  );
+}
+
+export function deleteTaskSavedView(
+  workspaceId: string,
+  projectId: string,
+  viewId: string,
+): Promise<{ id: string; deleted: true }> {
+  return request<{ id: string; deleted: true }>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/task-views/${encodeURIComponent(viewId)}`,
+    { method: 'DELETE' },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Recurring task settings (Phase 4G)
+// ---------------------------------------------------------------------------
+
+export type RecurrenceRule =
+  | { freq: 'daily'; interval?: number; /* end after N instances or never */ }
+  | { freq: 'weekly'; interval?: number; byweekday?: number[]; /* MO=1, TU=2, ... */ }
+  | { freq: 'monthly'; interval?: number; byweekday?: number; /* e.g., 1=first */ }
+  | { freq: 'yearly'; interval?: number; bymonth?: number; byday?: string[] };
+
+export interface RecurrenceSettings {
+  rule: RecurrenceRule;
+  endType: 'never' | 'after' | 'on';
+  endAfter?: number;
+  endOn?: string; // ISO date string
+}
+
+export function getTaskRecurrenceRule(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ rule: RecurrenceRule; endType: 'never' | 'after' | 'on'; endAfter?: number; endOn?: string }> {
+  return request(
+    `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/recurrence`,
+    { method: 'GET' },
+  );
+}
+
+export function setTaskRecurrenceRule(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: { rule: RecurrenceRule; endType: 'never' | 'after' | 'on'; endAfter?: number; endOn?: string },
+): Promise<{ rule: RecurrenceRule; endType: 'never' | 'after' | 'on'; endAfter?: number; endOn?: string }> {
+  return request(
+    `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/recurrence`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export function generateTaskRecurrenceInstance(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<TaskSummary> {
+  return request<TaskSummary>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/recurrence/generate`,
+    { method: 'POST' },
   );
 }

@@ -103,6 +103,7 @@ export type AllowedMimeType = (typeof ALLOWED_MIME_TYPES)[number];
 /** Maximum upload size in bytes (50 MB — mirrors backend limit). */
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
+export const PROXY_UPLOAD_LIMIT_BYTES = 4_500_000;
 // ─── Shared fetch helpers ─────────────────────────────────────────────────────
 
 const API_BASE = '/api/backend';

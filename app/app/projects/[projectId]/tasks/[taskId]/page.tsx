@@ -362,8 +362,13 @@ export default function TaskDetailPage() {
 
   useEffect(() => {
     if (!activeWorkspace || !canView) return;
-    void loadCustomFields();
-    void loadRecurrence();
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      void loadCustomFields();
+      void loadRecurrence();
+    });
+    return () => { active = false; };
   }, [activeWorkspace, canView, loadCustomFields, loadRecurrence]);
 
   async function handleSaveCustomFields() {

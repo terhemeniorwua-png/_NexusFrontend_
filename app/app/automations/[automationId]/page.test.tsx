@@ -39,7 +39,7 @@ function fail(code: string, message: string, status = 400) {
   });
 }
 
-function fakeAuto(overrides: Partial<{ name: string; enabled: boolean }> = {}) {
+function fakeAuto(overrides: Partial<{ name: string; enabled: boolean; runs?: unknown[] }> = {}) {
   return {
     id: AUTO_ID,
     workspaceId: WS_ID,
@@ -48,7 +48,7 @@ function fakeAuto(overrides: Partial<{ name: string; enabled: boolean }> = {}) {
     trigger: 'EVENT_TASK_CREATED',
     condition: null,
     action: 'SEND_NOTIFICATION',
-    actionConfig: { message: 'New task!' },
+    actionConfig: { userIds: 'user-2', title: 'New task!' },
     enabled: true,
     maxRetries: 3,
     deletedAt: null,
@@ -57,6 +57,14 @@ function fakeAuto(overrides: Partial<{ name: string; enabled: boolean }> = {}) {
     runs: [],
     ...overrides,
   };
+}
+
+function mockAutomationFetch(auto = fakeAuto(), runs: unknown[] = []) {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+    const href = String(url);
+    if (href.endsWith('/runs') || href.includes('/runs?')) return ok(runs);
+    return ok(auto);
+  });
 }
 
 describe('AutomationDetailPage', () => {
@@ -75,14 +83,14 @@ describe('AutomationDetailPage', () => {
   });
 
   it('renders automation name and status after load', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(fakeAuto()));
+    mockAutomationFetch();
     render(<AutomationDetailPage />);
     expect(await screen.findByRole('heading', { name: 'Notify on task', level: 1 })).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
   });
 
   it('shows trigger and action details', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(fakeAuto()));
+    mockAutomationFetch();
     render(<AutomationDetailPage />);
     await waitFor(() => expect(screen.queryByLabelText('Loading automation')).not.toBeInTheDocument());
     expect(screen.getByText('Task created')).toBeInTheDocument();
@@ -90,13 +98,13 @@ describe('AutomationDetailPage', () => {
   });
 
   it('shows empty run history', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(fakeAuto()));
+    mockAutomationFetch();
     render(<AutomationDetailPage />);
     expect(await screen.findByText('No runs yet')).toBeInTheDocument();
   });
 
   it('shows Rename, Enable/Disable, and Delete buttons', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(fakeAuto()));
+    mockAutomationFetch();
     render(<AutomationDetailPage />);
     await waitFor(() => expect(screen.queryByLabelText('Loading automation')).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
@@ -105,7 +113,7 @@ describe('AutomationDetailPage', () => {
   });
 
   it('opens rename modal when Rename is clicked', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(fakeAuto()));
+    mockAutomationFetch();
     const user = userEvent.setup();
     render(<AutomationDetailPage />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument());
@@ -122,7 +130,7 @@ describe('AutomationDetailPage', () => {
   });
 
   it('redirects to /app/automations when workspace changes', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(fakeAuto()));
+    mockAutomationFetch();
     const { rerender } = render(<AutomationDetailPage />);
     await waitFor(() => expect(screen.queryByLabelText('Loading automation')).not.toBeInTheDocument());
 

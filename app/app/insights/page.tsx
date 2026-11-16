@@ -1,292 +1,226 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { BarList } from '@/components/insights/BarList';
 import { PieChart } from '@/components/insights/PieChart';
-import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
-import { formatBytes } from '@/services/files';
+import { listProjects, type ProjectSummary } from '@/services/projects';
 import {
-  buildProjectCsv,
-  loadWorkspaceInsights,
-  type InsightsRange,
-  type WorkspaceInsights,
-} from '@/services/insights';
+  buildAnalyticsCsv,
+  loadDashboardAggregates,
+  type AnalyticsRange,
+  type DashboardAggregateData,
+} from '@/services/analytics';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+type WidgetKey = 'byStatus' | 'byAssignee' | 'throughput' | 'workload' | 'timeLogged';
 
-const RANGE_OPTIONS = [
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-  { value: 'all', label: 'All time' },
+interface DashboardConfig {
+  widgets: Record<WidgetKey, boolean>;
+  range: AnalyticsRange;
+  projectId: string;
+  startDate: string;
+  endDate: string;
+}
+
+const WIDGET_META: Array<{ key: WidgetKey; label: string; description: string }> = [
+  { key: 'byStatus', label: 'Tasks by status', description: 'Task counts grouped by status.' },
+  { key: 'byAssignee', label: 'Tasks by assignee', description: 'Task counts grouped by assignee.' },
+  { key: 'throughput', label: 'Throughput', description: 'Created vs completed tasks over time.' },
+  { key: 'workload', label: 'Workload', description: 'Open and overdue tasks by assignee.' },
+  { key: 'timeLogged', label: 'Time logged', description: 'Total and per-user logged time.' },
 ];
 
-// Keep in sync with the sampling caps documented in services/insights.ts.
-const PROJECT_PAGE_LIMIT = 50;
-const TASK_SAMPLE_PROJECT_LIMIT = 8;
-const TASK_SAMPLE_PAGE_LIMIT = 100;
-const ACTIVITY_PAGE_LIMIT = 100;
-
-const STATUS_LABELS: Record<string, string> = {
-  PLANNING: 'Planning',
-  ACTIVE: 'Active',
-  ON_HOLD: 'On hold',
-  COMPLETED: 'Completed',
-  ARCHIVED: 'Archived',
-  ASSIGNED: 'Assigned',
-  IN_PROGRESS: 'In progress',
-  SUBMITTED: 'Submitted',
-  UNDER_REVIEW: 'Under review',
-  APPROVED: 'Approved',
-  CHANGES_REQUESTED: 'Changes requested',
+const DEFAULT_CONFIG: DashboardConfig = {
+  widgets: { byStatus: true, byAssignee: true, throughput: true, workload: true, timeLogged: true },
+  range: '30d',
+  projectId: '',
+  startDate: '',
+  endDate: '',
 };
 
-const PRIORITY_LABELS: Record<string, string> = {
-  LOW: 'Low',
-  MEDIUM: 'Medium',
-  HIGH: 'High',
-  URGENT: 'Urgent',
-};
-
-const VISIBILITY_LABELS: Record<string, string> = {
-  PRIVATE: 'Private',
-  DEPARTMENT_TEAM: 'Department or team',
-  WORKSPACE: 'Workspace-wide',
-};
-
-function labelFor(labels: Record<string, string>, value: string): string {
-  return labels[value] ?? value.replace(/_/g, ' ').toLowerCase();
+function configKey(workspaceId: string) {
+  return `nexus.insights.dashboard.${workspaceId}`;
 }
 
-function relativeTime(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(isoString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function formatDate(isoString: string | null): string {
-  if (!isoString) return '—';
-  return new Date(isoString).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function projectStatusVariant(status: string): 'success' | 'info' | 'warning' | 'default' {
-  if (status === 'COMPLETED') return 'success';
-  if (status === 'ACTIVE') return 'info';
-  if (status === 'ON_HOLD') return 'warning';
-  return 'default';
-}
-
-type TrendDirection = 'up' | 'down' | 'neutral';
-
-interface Trend {
-  direction: TrendDirection;
-  percent: number;
-}
-
-/**
- * Compares a baseline value against a later value. Changes below 1% are
- * treated as neutral so rounding noise does not produce an arrow.
- */
-function computeTrend(firstValue: number, secondValue: number): Trend {
-  if (!Number.isFinite(firstValue) || firstValue === 0) {
-    return { direction: 'neutral', percent: 0 };
+function loadConfig(workspaceId: string): DashboardConfig {
+  try {
+    const raw = localStorage.getItem(configKey(workspaceId));
+    if (!raw) return DEFAULT_CONFIG;
+    const parsed = JSON.parse(raw) as Partial<DashboardConfig>;
+    return {
+      widgets: { ...DEFAULT_CONFIG.widgets, ...(parsed.widgets ?? {}) },
+      range: (parsed.range as AnalyticsRange) || DEFAULT_CONFIG.range,
+      projectId: typeof parsed.projectId === 'string' ? parsed.projectId : '',
+      startDate: typeof parsed.startDate === 'string' ? parsed.startDate : '',
+      endDate: typeof parsed.endDate === 'string' ? parsed.endDate : '',
+    };
+  } catch {
+    return DEFAULT_CONFIG;
   }
-  const change = ((secondValue - firstValue) / firstValue) * 100;
-  const percent = Math.round(Math.abs(change));
-  return {
-    direction: percent < 1 ? 'neutral' : change > 0 ? 'up' : 'down',
-    percent,
-  };
 }
 
-type SampledMetric = 'volume' | 'completionRate';
-
-/**
- * Splits the sampled projects into an earlier and a later half (ordered by
- * project update date) and compares a metric between them, using only data
- * already loaded for the insights snapshot. No new backend calls are made.
- */
-function sampleHalfTrend(
-  perProject: WorkspaceInsights['tasks']['perProject'],
-  projectDates: Map<string, string>,
-  metric: SampledMetric,
-): Trend | null {
-  if (perProject.length === 0) return null;
-  const ordered = [...perProject].sort((a, b) => {
-    const dateA = projectDates.get(a.projectId) ?? '';
-    const dateB = projectDates.get(b.projectId) ?? '';
-    return dateB.localeCompare(dateA);
-  });
-  const mid = Math.ceil(ordered.length / 2);
-  const firstHalf = ordered.slice(0, mid);
-  const secondHalf = ordered.slice(mid);
-  const sampledSum = (entries: typeof firstHalf) =>
-    entries.reduce((sum, entry) => sum + entry.sampled, 0);
-  const completedSum = (entries: typeof firstHalf) =>
-    entries.reduce((sum, entry) => sum + entry.completed, 0);
-  let firstValue: number;
-  let secondValue: number;
-  if (metric === 'volume') {
-    firstValue = sampledSum(firstHalf);
-    secondValue = sampledSum(secondHalf);
-  } else {
-    const firstSampled = sampledSum(firstHalf);
-    const secondSampled = sampledSum(secondHalf);
-    if (firstSampled === 0 || secondSampled === 0) {
-      return { direction: 'neutral', percent: 0 };
-    }
-    firstValue = (completedSum(firstHalf) / firstSampled) * 100;
-    secondValue = (completedSum(secondHalf) / secondSampled) * 100;
+function saveConfig(workspaceId: string, config: DashboardConfig) {
+  try {
+    localStorage.setItem(configKey(workspaceId), JSON.stringify(config));
+  } catch {
+    // ignore
   }
-  return computeTrend(firstValue, secondValue);
 }
 
-function projectCountTrend(projects: Array<{ updatedAt: string }>): Trend {
-  const sorted = [...projects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const mid = Math.ceil(sorted.length / 2);
-  return computeTrend(sorted.slice(0, mid).length, sorted.slice(mid).length);
+function formatMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-function trendClass(direction: TrendDirection): string {
-  if (direction === 'up') return 'text-[var(--color-success)]';
-  if (direction === 'down') return 'text-[var(--color-error)]';
-  return 'text-[var(--color-text-muted)]';
+function labelize(value: string): string {
+  return value.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function SummaryCard({
-  label,
-  value,
-  detail,
-  trend,
+function isoDay(value: string): string | undefined {
+  if (!value) return undefined;
+  // datetime-local gives YYYY-MM-DDTHH:mm; backend accepts datetime
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+function WidgetCard({
+  title,
+  description,
+  loading,
+  error,
+  empty,
+  children,
 }: {
-  label: string;
-  value: string;
-  detail: string;
-  trend?: Trend | null;
+  title: string;
+  description?: string;
+  loading: boolean;
+  error?: string | null;
+  empty?: boolean;
+  children: React.ReactNode;
 }) {
   return (
     <Card className="p-5">
-      <p className="text-sm text-[var(--color-text-secondary)]">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-[var(--color-text-muted)]">{detail}</p>
-      {trend && (
-        <p
-          className={`mt-1 text-xs font-medium flex items-center gap-1 ${trendClass(trend.direction)}`}
-          aria-label={
-            trend.direction === 'neutral'
-              ? 'No significant change compared with the first half of the sample.'
-              : `${trend.direction === 'up' ? 'Increase' : 'Decrease'} of ${trend.percent}% compared with the first half of the sample.`
-          }
-        >
-          {trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '—'}
-          {' '}
-          {trend.percent}%
-          {trend.direction !== 'neutral' && <span> vs first half of sample</span>}
-        </p>
+      <div className="mb-3">
+        <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{title}</h2>
+        {description && <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{description}</p>}
+      </div>
+      {loading ? (
+        <div className="space-y-2" aria-busy="true" aria-label={`Loading ${title}`}>
+          <Skeleton className="h-5 w-full" />
+          <Skeleton className="h-5 w-5/6" />
+          <Skeleton className="h-5 w-4/6" />
+        </div>
+      ) : error ? (
+        <Alert variant="warning">{error}</Alert>
+      ) : empty ? (
+        <p className="text-sm text-[var(--color-text-secondary)]">No data available for this scope and range.</p>
+      ) : (
+        children
       )}
     </Card>
   );
 }
 
-function InsightsSkeleton() {
-  return (
-    <div className="space-y-5" aria-busy="true" aria-label="Loading insights">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <Card key={i} className="p-5">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="mt-3 h-7 w-16" />
-            <Skeleton className="mt-2 h-3 w-28" />
-          </Card>
-        ))}
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <Card key={i} className="p-5">
-            <Skeleton className="h-5 w-40" />
-            <div className="mt-4 space-y-3">
-              {[1, 2, 3, 4].map((j) => <Skeleton key={j} className="h-6 w-full" />)}
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Page ────────────────────────────────────────────────────────────────────
-
 export default function InsightsPage() {
   const { activeWorkspace } = useWorkspaceContext();
   const workspaceId = activeWorkspace?.id ?? '';
-  const [range, setRange] = useState<InsightsRange>('30d');
-  const [data, setData] = useState<WorkspaceInsights | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const latestLoad = useRef(0);
 
-  const load = useCallback(async (id: string, selectedRange: InsightsRange) => {
-    if (!id) return;
-    const seq = ++latestLoad.current;
+  const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [data, setData] = useState<DashboardAggregateData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const latest = useRef(0);
+  const configLoadedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    if (configLoadedFor.current === workspaceId) return;
+    configLoadedFor.current = workspaceId;
+    // Sync persisted dashboard config when workspace changes.
+    setConfig(loadConfig(workspaceId));
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    saveConfig(workspaceId, config);
+  }, [workspaceId, config]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProjectsLoading(true);
+    listProjects(workspaceId, { limit: 100 })
+      .then((page) => { if (active) setProjects(page.items ?? []); })
+      .catch(() => { if (active) setProjects([]); })
+      .finally(() => { if (active) setProjectsLoading(false); });
+    return () => { active = false; };
+  }, [workspaceId]);
+
+  const query = useMemo(() => {
+    const q: { workspaceId: string; projectId?: string; range?: AnalyticsRange; startDate?: string; endDate?: string } = {
+      workspaceId,
+      range: config.range,
+    };
+    if (config.projectId) q.projectId = config.projectId;
+    if (config.range === 'custom') {
+      const start = isoDay(config.startDate);
+      const end = isoDay(config.endDate);
+      if (start) q.startDate = start;
+      if (end) q.endDate = end;
+    }
+    return q;
+  }, [workspaceId, config.range, config.projectId, config.startDate, config.endDate]);
+
+  const load = useCallback(async () => {
+    if (!workspaceId) return;
+    const seq = ++latest.current;
     setLoading(true);
     setError(null);
     try {
-      const snapshot = await loadWorkspaceInsights(id, { range: selectedRange });
-      if (seq !== latestLoad.current) return;
-      setData(snapshot);
-    } catch (cause) {
-      if (seq !== latestLoad.current) return;
-      setError(
-        cause instanceof ApiRequestError
-          ? cause.message
-          : 'Workspace insights could not be loaded.',
-      );
+      const result = await loadDashboardAggregates(query, config.widgets);
+      if (seq !== latest.current) return;
+      setData(result);
+    } catch (e) {
+      if (seq !== latest.current) return;
+      setError(e instanceof Error ? e.message : 'Could not load analytics.');
     } finally {
-      if (seq === latestLoad.current) setLoading(false);
+      if (seq === latest.current) setLoading(false);
     }
-  }, []);
+  }, [workspaceId, query, config.widgets]);
 
   useEffect(() => {
-    let active = true;
-    void Promise.resolve().then(() => {
-      if (active) return load(workspaceId, range);
-    });
-    return () => {
-      active = false;
-    };
-  }, [workspaceId, range, load]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  function toggleWidget(key: WidgetKey, checked: boolean) {
+    setConfig((prev) => ({ ...prev, widgets: { ...prev.widgets, [key]: checked } }));
+  }
 
   function handleExport() {
-    if (!data || data.projects.items.length === 0) return;
-    const csv = buildProjectCsv(data);
+    if (!data) return;
+    const csv = buildAnalyticsCsv(data);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `nexus-projects-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.download = `nexus-insights-${workspaceId || 'workspace'}-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -297,492 +231,257 @@ export default function InsightsPage() {
     return (
       <PageContainer>
         <PageHeader title="Insights" />
-        <EmptyState
-          title="No workspace selected"
-          description="Select a workspace to view its reporting and analytics."
-        />
+        <EmptyState title="No workspace selected" description="Select a workspace to view its analytics dashboard." />
       </PageContainer>
     );
   }
 
-  const progressByProject = new Map(
-    (data?.tasks.perProject ?? []).map((entry) => [entry.projectId, entry]),
-  );
+  const projectOptions = [{ value: '', label: 'All accessible projects' }, ...projects.map((p) => ({ value: p.id, label: `${p.name} (${p.key})` }))];
 
-  const projectDates = new Map(
-    (data?.projects.items ?? []).map((project) => [project.id, project.updatedAt]),
-  );
-
-  const projectTrend = projectCountTrend(data?.projects.items ?? []);
-  const tasksVolumeTrend = sampleHalfTrend(data?.tasks.perProject ?? [], projectDates, 'volume');
-  const completionRateTrend = sampleHalfTrend(
-    data?.tasks.perProject ?? [],
-    projectDates,
-    'completionRate',
-  );
-
-  const sampledTaskTotal = (data?.tasks.perProject ?? []).reduce(
-    (sum, entry) => sum + entry.sampled,
-    0,
-  );
-  const completedTaskTotal = (data?.tasks.perProject ?? []).reduce(
-    (sum, entry) => sum + entry.completed,
-    0,
-  );
-  const completionRate =
-    sampledTaskTotal > 0 ? Math.round((completedTaskTotal / sampledTaskTotal) * 100) : 0;
+  const hasAnyData = !!(data && (data.byStatus || data.byAssignee || data.throughput || data.workload || data.timeLogged));
 
   return (
     <PageContainer width="xl">
       <PageHeader
         title="Insights"
-        description={`Reporting for ${activeWorkspace?.name ?? 'this workspace'}, built from data you are permitted to access.`}
+        description="Configurable dashboard widgets powered by aggregate workspace analytics."
         actions={
-          <Button
-            variant="secondary"
-            onClick={handleExport}
-            disabled={!data || data.projects.items.length === 0}
-          >
-            Export projects CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => void load()} disabled={loading}>Refresh</Button>
+            <Button variant="secondary" onClick={handleExport} disabled={!data || !hasAnyData}>
+              Export CSV
+            </Button>
+          </div>
         }
       />
 
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full sm:w-56">
+      <Card className="mb-5 p-4">
+        <h2 className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Dashboard configuration</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Select
-            id="insights-range"
-            label="Reporting period"
-            size="sm"
-            value={range}
-            onChange={(event) => setRange(event.target.value as InsightsRange)}
-            options={RANGE_OPTIONS}
-            helperText="Applies to activity and completed-task counts."
+            id="ins-range"
+            label="Reporting range"
+            value={config.range}
+            onChange={(e) => setConfig((p) => ({ ...p, range: e.target.value as AnalyticsRange }))}
+            options={[
+              { value: '7d', label: 'Last 7 days' },
+              { value: '30d', label: 'Last 30 days' },
+              { value: '90d', label: 'Last 90 days' },
+              { value: 'custom', label: 'Custom range' },
+            ]}
           />
+          <Select
+            id="ins-project"
+            label="Project scope"
+            value={config.projectId}
+            onChange={(e) => setConfig((p) => ({ ...p, projectId: e.target.value }))}
+            options={projectOptions}
+            helperText={projectsLoading ? 'Loading projects…' : 'Workspace/project-scoped aggregates.'}
+          />
+          {config.range === 'custom' && (
+            <>
+              <Input id="ins-start" label="Start date" type="datetime-local" value={config.startDate} onChange={(e) => setConfig((p) => ({ ...p, startDate: e.target.value }))} />
+              <Input id="ins-end" label="End date" type="datetime-local" value={config.endDate} onChange={(e) => setConfig((p) => ({ ...p, endDate: e.target.value }))} />
+            </>
+          )}
         </div>
-        {data && (
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Snapshot generated {relativeTime(data.generatedAt)} · {data.range === 'all' ? 'all time' : `last ${data.range.replace('d', ' days')}`}
-          </p>
-        )}
-      </div>
+        <div className="mt-4">
+          <p className="mb-2 text-sm font-medium text-[var(--color-text-secondary)]">Widgets</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {WIDGET_META.map((w) => (
+              <Checkbox
+                key={w.key}
+                id={`widget-${w.key}`}
+                label={w.label}
+                description={w.description}
+                checked={config.widgets[w.key]}
+                onChange={(e) => toggleWidget(w.key, e.target.checked)}
+              />
+            ))}
+          </div>
+        </div>
+      </Card>
 
-      {loading && <div className="mt-5"><InsightsSkeleton /></div>}
-
-      {!loading && error && (
-        <Alert variant="error" title="Insights unavailable" className="mt-5">
+      {error && (
+        <Alert variant="error" className="mb-4">
           {error}
-          <Button variant="secondary" size="sm" className="mt-2" onClick={() => { void load(workspaceId, range); }}>
-            Retry
-          </Button>
+          <Button variant="secondary" size="sm" className="mt-2" onClick={() => void load()}>Retry</Button>
+        </Alert>
+      )}
+      {data && data.errors.length > 0 && (
+        <Alert variant="warning" className="mb-4" title="Some widgets could not be loaded">
+          <ul className="list-inside list-disc">
+            {data.errors.map((e, i) => <li key={`${e.source}-${i}`}><span className="font-medium capitalize">{e.source}:</span> {e.message}</li>)}
+          </ul>
         </Alert>
       )}
 
-      {!loading && !error && data && (
-        <div className="mt-5 space-y-5">
-          {data.warnings.length > 0 && (
-            <Alert variant="warning" title="Some data could not be loaded">
-              <ul className="list-inside list-disc space-y-0.5">
-                {data.warnings.map((warning, index) => (
-                  <li key={`${warning.source}-${index}`}>
-                    <span className="font-medium capitalize">{warning.source}</span>: {warning.message}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-1.5 text-xs">
-                Other sections remain available. A permission denial is enforced by the backend.
-              </p>
-            </Alert>
-          )}
-
-          <section aria-label="Workspace summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard
-              label="Projects"
-              value={String(data.projects.total)}
-              detail={`${data.projects.active} active · ${data.projects.completed} completed`}
-              trend={projectTrend}
-            />
-            <SummaryCard
-              label="Tasks"
-              value={String(data.tasks.totalAcrossProjects)}
-              detail={`${data.tasks.overdue} overdue in sample`}
-              trend={tasksVolumeTrend}
-            />
-            <SummaryCard
-              label="Members"
-              value={data.members ? String(data.members.total) : 'Unavailable'}
-              detail={
-                data.members
-                  ? `${data.members.active} active · ${data.members.suspended} suspended`
-                  : 'Member list not accessible'
-              }
-            />
-            <SummaryCard
-              label="Storage"
-              value={data.storage ? formatBytes(data.storage.totalBytes) : 'Unavailable'}
-              detail={data.storage ? `${data.storage.fileCount} files` : 'Usage not accessible'}
-            />
-            <SummaryCard
-              label="Task completion rate"
-              value={`${completionRate}%`}
-              detail={`${completedTaskTotal} of ${sampledTaskTotal} sampled tasks completed`}
-              trend={completionRateTrend}
-            />
-          </section>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="p-5">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                Projects by status
-              </h2>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {data.projects.overdue} overdue across {data.projects.total} projects.
-              </p>
-              <BarList
-                className="mt-4"
-                ariaLabel="Projects by status"
-                items={data.projects.byStatus.map((entry) => ({
-                  id: entry.key,
-                  label: labelFor(STATUS_LABELS, entry.key),
-                  value: entry.count,
-                }))}
-                emptyLabel="No projects are visible in this workspace."
-              />
-            </Card>
-
-            <Card className="p-5">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                Projects by visibility
-              </h2>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                Visibility is enforced by the backend for every project request.
-              </p>
-              <BarList
-                className="mt-4"
-                ariaLabel="Projects by visibility"
-                items={data.projects.byVisibility.map((entry) => ({
-                  id: entry.key,
-                  label: labelFor(VISIBILITY_LABELS, entry.key),
-                  value: entry.count,
-                }))}
-                emptyLabel="No projects are visible in this workspace."
-              />
-            </Card>
-
-            <Card className="p-5">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                Tasks by status
-              </h2>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                Sampled from {data.tasks.sampledTasks} tasks in {data.tasks.sampledProjects}{' '}
-                recently updated projects.
-              </p>
-              <BarList
-                className="mt-4"
-                ariaLabel="Sampled tasks by status"
-                items={data.tasks.byStatus.map((entry) => ({
-                  id: entry.key,
-                  label: labelFor(STATUS_LABELS, entry.key),
-                  value: entry.count,
-                }))}
-                emptyLabel="No tasks were returned for the sampled projects."
-              />
-            </Card>
-
-            <Card className="p-5">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                Tasks by priority
-              </h2>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {data.tasks.completedInRange} sampled tasks completed in the selected period.
-              </p>
-              <BarList
-                className="mt-4"
-                ariaLabel="Sampled tasks by priority"
-                items={data.tasks.byPriority.map((entry) => ({
-                  id: entry.key,
-                  label: labelFor(PRIORITY_LABELS, entry.key),
-                  value: entry.count,
-                }))}
-                emptyLabel="No tasks were returned for the sampled projects."
-              />
-            </Card>
-
-            <Card className="p-5">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                Project status distribution
-              </h2>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                Share of the {data.projects.total} visible projects.
-              </p>
-              <PieChart
-                className="mt-4"
-                ariaLabel="Project status distribution"
-                size={240}
-                items={data.projects.byStatus
-                  .map((entry) => ({
-                    id: entry.key,
-                    label: labelFor(STATUS_LABELS, entry.key),
-                    value: entry.count,
-                  }))
-                  .filter((item) => item.value > 0)}
-                emptyLabel="No project status data available."
-              />
-            </Card>
-
-            {data.members ? (
-              <Card className="p-5">
-                <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                  Members by role
-                </h2>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {data.members.active} active · {data.members.suspended} suspended ·{' '}
-                  {data.members.total} total
-                </p>
-                <PieChart
-                  className="mt-4"
-                  ariaLabel="Members by role"
-                  size={240}
-                  items={data.members.byRole.map((entry) => ({
-                    id: entry.role,
-                    label: labelFor({}, entry.role),
-                    value: entry.count,
-                  }))}
-                  emptyLabel="No member data available."
+      <div className="grid gap-4 lg:grid-cols-2">
+        {config.widgets.byStatus && (
+          <WidgetCard
+            title="Tasks by status"
+            description={data?.byStatus ? `Range: ${data.byStatus.rangeDays} days${data.byStatus.projectId ? ' · project scoped' : ''}` : undefined}
+            loading={loading && !data?.byStatus}
+            error={data?.errors.find((e) => e.source === 'tasks by status')?.message}
+            empty={!!data?.byStatus && data.byStatus.items.length === 0}
+          >
+            {data?.byStatus && (
+              <div className="space-y-4">
+                <BarList
+                  ariaLabel="Tasks by status"
+                  items={data.byStatus.items.map((i) => ({ id: i.status, label: labelize(i.status), value: i.count }))}
+                  emptyLabel="No tasks in this range."
                 />
-              </Card>
-            ) : (
-              <Card className="p-5">
-                <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                  Members by role
-                </h2>
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  Member breakdown is not available for this workspace.
-                </p>
-              </Card>
-            )}
-          </div>
-
-          <Card className="p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                  Project progress
-                </h2>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  Completed counts come from the task sample; projects outside the sample show
-                  only their backend task total.
-                </p>
+                <PieChart
+                  ariaLabel="Tasks by status distribution"
+                  size={220}
+                  items={data.byStatus.items.filter((i) => i.count > 0).map((i) => ({ id: i.status, label: labelize(i.status), value: i.count }))}
+                  emptyLabel="No tasks in this range."
+                />
               </div>
-              {data.projects.truncated && <Badge variant="warning">Partial project list</Badge>}
-            </div>
+            )}
+          </WidgetCard>
+        )}
 
-            {data.projects.items.length === 0 ? (
-              <EmptyState
-                title="No projects to report"
-                description="Create a project or join one to see progress here."
-                action={
-                  <Link
-                    href="/app/projects"
-                    className="text-sm font-medium text-[var(--color-primary)] hover:underline"
-                  >
-                    Go to Projects
-                  </Link>
-                }
+        {config.widgets.byAssignee && (
+          <WidgetCard
+            title="Tasks by assignee"
+            description={data?.byAssignee ? `Range: ${data.byAssignee.rangeDays} days` : undefined}
+            loading={loading && !data?.byAssignee}
+            error={data?.errors.find((e) => e.source === 'tasks by assignee')?.message}
+            empty={!!data?.byAssignee && data.byAssignee.items.length === 0}
+          >
+            {data?.byAssignee && (
+              <BarList
+                ariaLabel="Tasks by assignee"
+                items={data.byAssignee.items.map((i) => ({ id: i.assigneeId ?? 'unassigned', label: i.assigneeName ?? 'Unassigned', value: i.count }))}
+                emptyLabel="No task assignments in this range."
               />
-            ) : (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[640px] text-left text-sm">
-                  <caption className="sr-only">Project progress and task sample</caption>
-                  <thead>
-                    <tr className="border-b border-[var(--color-border)] text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
-                      <th scope="col" className="py-2 pr-4 font-medium">Project</th>
-                      <th scope="col" className="py-2 pr-4 font-medium">Status</th>
-                      <th scope="col" className="py-2 pr-4 font-medium">Tasks</th>
-                      <th scope="col" className="py-2 pr-4 font-medium">Sample progress</th>
-                      <th scope="col" className="py-2 pr-4 font-medium">Members</th>
-                      <th scope="col" className="py-2 font-medium">Due</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.projects.items.map((project) => {
-                      const sample = progressByProject.get(project.id);
-                      return (
-                        <tr key={project.id} className="border-b border-[var(--color-border)] last:border-0">
-                          <td className="py-3 pr-4">
-                            <Link
-                              href={`/app/projects/${project.id}`}
-                              className="font-medium text-[var(--color-text-primary)] hover:underline"
-                            >
-                              {project.name}
-                            </Link>
-                            <span className="ml-2 text-xs text-[var(--color-text-muted)]">{project.key}</span>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <Badge variant={projectStatusVariant(project.status)}>
-                              {labelFor(STATUS_LABELS, project.status)}
-                            </Badge>
-                          </td>
-                          <td className="py-3 pr-4 tabular-nums">{project.taskCount}</td>
-                          <td className="py-3 pr-4">
-                            {sample ? (
-                              <span className="tabular-nums">
-                                {sample.completed}/{sample.sampled}
-                                {sample.overdue > 0 && (
-                                  <span className="ml-2 text-xs text-[var(--color-error)]">
-                                    {sample.overdue} overdue
-                                  </span>
-                                )}
-                              </span>
-                            ) : (
-                              <span className="text-[var(--color-text-muted)]">Not sampled</span>
-                            )}
-                          </td>
-                          <td className="py-3 pr-4 tabular-nums">{project.memberCount}</td>
-                          <td className="py-3">
-                            <span className={project.overdue ? 'font-medium text-[var(--color-error)]' : ''}>
-                              {formatDate(project.dueDate)}
-                              {project.overdue && <span className="ml-1 text-xs">overdue</span>}
-                            </span>
-                          </td>
+            )}
+          </WidgetCard>
+        )}
+
+        {config.widgets.throughput && (
+          <WidgetCard
+            title="Throughput"
+            description={data?.throughput ? `Created ${data.throughput.created} · Completed ${data.throughput.completed} over ${data.throughput.rangeDays} days` : undefined}
+            loading={loading && !data?.throughput}
+            error={data?.errors.find((e) => e.source === 'throughput')?.message}
+            empty={!!data?.throughput && data.throughput.items.length === 0}
+          >
+            {data?.throughput && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <Badge variant="info">Created: {data.throughput.created}</Badge>
+                  <Badge variant="success">Completed: {data.throughput.completed}</Badge>
+                </div>
+                <div className="max-h-72 overflow-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--color-border)] text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
+                        <th className="py-2 pr-3">Date</th>
+                        <th className="py-2 pr-3">Created</th>
+                        <th className="py-2">Completed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.throughput.items.map((p) => (
+                        <tr key={p.date} className="border-b border-[var(--color-border)] last:border-0">
+                          <td className="py-2 pr-3">{p.date}</td>
+                          <td className="py-2 pr-3 tabular-nums">{p.created}</td>
+                          <td className="py-2 tabular-nums">{p.completed}</td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
-          </Card>
+          </WidgetCard>
+        )}
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="p-5">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                Workspace activity
-              </h2>
-              {data.activity ? (
-                <>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                    {data.activity.totalInRange} recorded actions in the selected period.
-                    {data.activity.truncated && ' Only the most recent page was analysed.'}
-                  </p>
-                  <BarList
-                    className="mt-4"
-                    ariaLabel="Activity by action"
-                    items={data.activity.byAction.slice(0, 8).map((entry) => ({
-                      id: entry.action,
-                      label: entry.action.replace(/_/g, ' ').toLowerCase(),
-                      value: entry.count,
-                    }))}
-                    emptyLabel="No activity was recorded in this period."
-                  />
-                </>
-              ) : (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  Workspace activity is not available to this account or could not be loaded.
-                </p>
-              )}
-            </Card>
-
-            <Card className="p-5">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                Plan and seat usage
-              </h2>
-              {data.billing ? (
-                <dl className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-[var(--color-text-secondary)]">Plan</dt>
-                    <dd className="font-medium text-[var(--color-text-primary)]">
-                      {data.billing.subscription?.plan ?? 'No paid subscription'}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-[var(--color-text-secondary)]">Status</dt>
-                    <dd className="font-medium text-[var(--color-text-primary)]">
-                      {data.billing.subscription?.status ?? 'Not subscribed'}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-[var(--color-text-secondary)]">Active billable seats</dt>
-                    <dd className="font-medium text-[var(--color-text-primary)]">
-                      {data.billing.activeBillableSeats} / {data.billing.includedSeats} included
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-[var(--color-text-secondary)]">Next renewal</dt>
-                    <dd className="font-medium text-[var(--color-text-primary)]">
-                      {formatDate(data.billing.nextRenewalAt)}
-                    </dd>
-                  </div>
-                </dl>
-              ) : (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  Billing information is not available for this workspace. Personal
-                  workspaces do not have an organisation subscription.
-                </p>
-              )}
-              <Link
-                href="/app/billing"
-                className="mt-4 inline-flex text-sm font-medium text-[var(--color-primary)] hover:underline"
-              >
-                Open billing
-              </Link>
-            </Card>
-          </div>
-
-          <Card className="p-5">
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-              Recent activity
-            </h2>
-            {data.activity && data.activity.recent.length > 0 ? (
-              <ul className="mt-3 divide-y divide-[var(--color-border)]" aria-label="Recent workspace activity">
-                {data.activity.recent.map((entry) => (
-                  <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm first:pt-0 last:pb-0">
-                    <span className="text-[var(--color-text-primary)]">
-                      {entry.action.replace(/_/g, ' ').toLowerCase()}
-                      <span className="text-[var(--color-text-muted)]"> · {entry.targetType.toLowerCase()}</span>
-                    </span>
-                    <span className="text-xs text-[var(--color-text-muted)]">{relativeTime(entry.createdAt)}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                No recent activity to display.
-              </p>
+        {config.widgets.workload && (
+          <WidgetCard
+            title="Workload"
+            description={data?.workload ? 'Current open and overdue tasks by assignee.' : undefined}
+            loading={loading && !data?.workload}
+            error={data?.errors.find((e) => e.source === 'workload')?.message}
+            empty={!!data?.workload && data.workload.items.length === 0}
+          >
+            {data?.workload && (
+              <div className="space-y-3">
+                <BarList
+                  ariaLabel="Open tasks by assignee"
+                  items={data.workload.items.map((i) => ({ id: `open-${i.assigneeId ?? 'unassigned'}`, label: i.assigneeName ?? 'Unassigned', value: i.openTasks }))}
+                  emptyLabel="No open workload."
+                />
+                <div className="overflow-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--color-border)] text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
+                        <th className="py-2 pr-3">Assignee</th>
+                        <th className="py-2 pr-3">Open</th>
+                        <th className="py-2">Overdue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.workload.items.map((i) => (
+                        <tr key={i.assigneeId ?? 'unassigned'} className="border-b border-[var(--color-border)] last:border-0">
+                          <td className="py-2 pr-3">{i.assigneeName ?? 'Unassigned'}</td>
+                          <td className="py-2 pr-3 tabular-nums">{i.openTasks}</td>
+                          <td className="py-2 tabular-nums text-[var(--color-error)]">{i.overdueTasks}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
-          </Card>
+          </WidgetCard>
+        )}
 
-          <Card className="p-5">
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-              About these metrics
-            </h2>
-            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-[var(--color-text-secondary)]">
-              <li>
-                The current backend does not expose aggregate analytics endpoints, so this
-                page derives its numbers from the existing project, task, member, file,
-                billing, and activity APIs.
-              </li>
-              <li>
-                Project totals reflect the first {PROJECT_PAGE_LIMIT} visible projects. Task
-                distribution is sampled from up to {TASK_SAMPLE_PROJECT_LIMIT} recently
-                updated projects and up to {TASK_SAMPLE_PAGE_LIMIT} tasks per project.
-              </li>
-              <li>
-                Activity is analysed from the most recent {ACTIVITY_PAGE_LIMIT} records and
-                filtered to the selected period in the browser.
-              </li>
-              <li>
-                Trend indicators compare the first half of the sampled tasks against the
-                second half, ordered by project update date. They describe the current
-                sample rather than backend-computed aggregates.
-              </li>
-              <li>
-                All data is scoped to the active workspace and to what the backend permits
-                your role to read. No private project or team data is inferred.
-              </li>
-            </ul>
-          </Card>
-        </div>
+        {config.widgets.timeLogged && (
+          <WidgetCard
+            title="Time logged"
+            description={data?.timeLogged ? `Total ${formatMinutes(data.timeLogged.totalMinutes)} over ${data.timeLogged.rangeDays} days` : undefined}
+            loading={loading && !data?.timeLogged}
+            error={data?.errors.find((e) => e.source === 'time logged')?.message}
+            empty={!!data?.timeLogged && data.timeLogged.items.length === 0}
+          >
+            {data?.timeLogged && (
+              <div className="space-y-3">
+                <p className="text-sm text-[var(--color-text-primary)]"><span className="font-medium">Total:</span> {formatMinutes(data.timeLogged.totalMinutes)}</p>
+                <BarList
+                  ariaLabel="Time logged by user"
+                  items={data.timeLogged.items.map((i) => ({ id: i.userId, label: i.userName ?? 'Unknown user', value: i.minutes }))}
+                  emptyLabel="No time logged in this range."
+                />
+                <div className="overflow-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--color-border)] text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
+                        <th className="py-2 pr-3">User</th>
+                        <th className="py-2">Minutes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.timeLogged.items.map((i) => (
+                        <tr key={i.userId} className="border-b border-[var(--color-border)] last:border-0">
+                          <td className="py-2 pr-3">{i.userName ?? 'Unknown user'}</td>
+                          <td className="py-2 tabular-nums">{i.minutes} ({formatMinutes(i.minutes)})</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </WidgetCard>
+        )}
+      </div>
+
+      {!Object.values(config.widgets).some(Boolean) && (
+        <EmptyState title="No widgets selected" description="Enable at least one widget in Dashboard configuration to view analytics." />
       )}
     </PageContainer>
   );

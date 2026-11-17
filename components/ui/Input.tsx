@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { LabeledProps, ComponentSize } from '@/types/ui';
 
-type InputType = 'text' | 'email' | 'password' | 'search' | 'url' | 'tel' | 'number' | 'date';
+type InputType = 'text' | 'email' | 'password' | 'search' | 'url' | 'tel' | 'number' | 'date' | 'datetime-local';
 
 interface InputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'id'>,

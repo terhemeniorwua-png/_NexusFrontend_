@@ -119,15 +119,22 @@ export async function apiRequest<T>(
       credentials: 'include',
     });
   } catch {
-    throw new ApiRequestError('Unable to reach Nexus. Check your connection and try again.', 0);
+    throw new ApiRequestError('Unable to reach PITERON. Check your connection and try again.', 0);
   }
 
   if (response.status === 204) return undefined as T;
 
   let payload: unknown;
+  const rawBody = await response.text().catch(() => '');
   try {
-    payload = await response.json();
+    payload = JSON.parse(rawBody);
   } catch {
+    console.error('[api] unreadable response', {
+      path,
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      body: rawBody.slice(0, 300),
+    });
     throw new ApiRequestError('The server returned an unreadable response.', response.status);
   }
 
@@ -161,7 +168,7 @@ export async function apiRawRequest(
   try {
     response = await fetch(`${getApiBaseUrl()}${path}`, { ...requestOptions, headers, credentials: 'include' });
   } catch {
-    throw new ApiRequestError('Unable to reach Nexus. Check your connection and try again.', 0);
+    throw new ApiRequestError('Unable to reach PITERON. Check your connection and try again.', 0);
   }
   if (!response.ok) {
     let message = 'Something went wrong. Please try again.';

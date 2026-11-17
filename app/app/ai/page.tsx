@@ -18,6 +18,7 @@ import {
   type ProposedAiAction,
 } from "@/lib/ai-action-proposals";
 import { queryAI, type AiQueryResponse } from "@/services/ai";
+import { AiMessage } from './ai-message';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -478,7 +479,7 @@ export default function AIAssistantPage() {
                             <>
                               {msg.content && (
                                 <p className="whitespace-pre-wrap">
-                                  {msg.content}
+                                  <AiMessage content={msg.content} />
                                 </p>
                               )}
                               {msg.serviceMessage && !msg.content && (

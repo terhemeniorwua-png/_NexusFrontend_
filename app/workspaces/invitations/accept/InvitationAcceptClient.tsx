@@ -159,7 +159,7 @@ export function InvitationAcceptClient() {
           <EmptyState
             title="This invitation is not available"
             description="This invitation link is missing its token. Open the link from your invitation email."
-            action={<Link href="/" className="text-[var(--color-primary)] underline">Return to Nexus</Link>}
+            action={<Link href="/" className="text-[var(--color-primary)] underline">Return to PITERON</Link>}
           />
         </Card>
       </main>
@@ -185,7 +185,7 @@ export function InvitationAcceptClient() {
           <EmptyState
             title="This invitation is not available"
             description={preview.message}
-            action={<Link href="/" className="text-[var(--color-primary)] underline">Return to Nexus</Link>}
+            action={<Link href="/" className="text-[var(--color-primary)] underline">Return to PITERON</Link>}
           />
         </Card>
       </main>
@@ -210,12 +210,12 @@ export function InvitationAcceptClient() {
         <Link
           href="/"
           className="mb-6 inline-flex w-fit items-center gap-2 font-semibold tracking-tight"
-          aria-label="Nexus home"
+          aria-label="PITERON home"
         >
           <span className="grid size-8 place-items-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">
             N
           </span>
-          Nexus
+          PITERON
         </Link>
 
         <Card className="p-6 sm:p-8">
@@ -265,7 +265,7 @@ export function InvitationAcceptClient() {
 
             {invitation.boundToAccount && (
               <p className="text-xs text-[var(--color-text-secondary)]">
-                This invitation is bound to an existing Nexus account. Sign in with that account to continue.
+                This invitation is bound to an existing PITERON account. Sign in with that account to continue.
               </p>
             )}
 

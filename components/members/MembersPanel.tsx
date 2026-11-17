@@ -309,7 +309,7 @@ export function MembersPanel({ workspace, canManage, onAccessChanged }: MembersP
         onConfirm={() => { void confirmRemove(); }}
         title="Remove member"
         description={removeTarget
-          ? `Remove ${removeTarget.name} from ${workspace.name}? Their Nexus account and personal workspace are not deleted. Any tasks assigned to them must be reassigned by the backend rules or the request will be rejected.`
+          ? `Remove ${removeTarget.name} from ${workspace.name}? Their PITERON account and personal workspace are not deleted. Any tasks assigned to them must be reassigned by the backend rules or the request will be rejected.`
           : undefined}
         confirmLabel="Remove member"
         destructive

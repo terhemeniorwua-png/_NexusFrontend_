@@ -145,7 +145,7 @@ export function TaskDevelopment({
           <div>
             <h2 className="text-lg font-semibold">Development</h2>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Link branches and pull/merge requests to this task. Nexus links to source control providers and shows development status; it does not host or edit code.
+              Link branches and pull/merge requests to this task. PITERON links to source control providers and shows development status; it does not host or edit code.
             </p>
           </div>
           <Button size="sm" variant="secondary" onClick={() => void onReload()} disabled={loading || busy}>Refresh</Button>

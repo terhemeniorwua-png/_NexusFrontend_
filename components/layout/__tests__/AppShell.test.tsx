@@ -51,7 +51,7 @@ const navSections: NavSection[] = [
     label: 'AI',
     items: [
       { id: 'ai-assistant', label: 'AI Assistant', href: '/app/ai' },
-      { id: 'ai-write', label: 'Nexus Write', href: '/app/ai-write' },
+      { id: 'ai-write', label: 'PITERON Write', href: '/app/ai-write' },
       { id: 'ai-actions', label: 'AI Actions', href: '/app/ai-actions' },
     ],
   },
@@ -215,7 +215,7 @@ describe('AppShell', () => {
       expect(panel).toHaveClass('w-[16rem]');
       expect(panel).toHaveClass('top-14');
       expect(screen.getByRole('link', { name: 'AI Assistant' })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Nexus Write' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'PITERON Write' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'AI Actions' })).toBeInTheDocument();
     });
 

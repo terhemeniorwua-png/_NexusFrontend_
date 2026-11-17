@@ -70,7 +70,7 @@ vi.mock('@/services/workspaces', () => ({
 }));
 
 const makeProject = (overrides: Record<string, unknown> = {}) => ({
-  id: 'project-1', workspaceId: 'ws-1', name: 'Nexus', key: 'NX', description: null,
+  id: 'project-1', workspaceId: 'ws-1', name: 'PITERON', key: 'NX', description: null,
   category: null, labels: [], status: 'ACTIVE', visibility: 'DEPARTMENT_TEAM',
   startDate: null, dueDate: null, ownerId: 'user-1', owner: { id: 'user-1', name: 'Alice' },
   memberCount: 1, taskCount: 0, myRole: 'PROJECT_MANAGER',

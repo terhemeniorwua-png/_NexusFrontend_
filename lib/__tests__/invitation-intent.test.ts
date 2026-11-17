@@ -10,7 +10,7 @@ import {
 const intent: InvitationIntent = {
   token: 'token_abc123',
   workspaceId: 'workspace-1',
-  workspaceName: 'Nexus Studio',
+  workspaceName: 'PITERON Studio',
   workspaceSlug: 'nexus-studio',
   invitedByName: 'Grace',
   maskedEmail: 'a***@example.com',

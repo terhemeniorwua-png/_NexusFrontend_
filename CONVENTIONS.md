@@ -1,4 +1,4 @@
-# Nexus Frontend — Development Conventions
+# PITERON Frontend — Development Conventions
 
 > **Status:** Agreed in Phase 0. All subsequent phases must follow these conventions.
 > **Last updated:** Phase 0 (2026-10-23)
@@ -49,7 +49,7 @@ __NextFrontend__/           ← repository root
 │   │   ├── notifications/page.tsx
 │   │   └── search/page.tsx
 │   ├── layout.tsx          ← root layout (fonts, global CSS)
-│   ├── globals.css         ← Tailwind imports + Nexus design tokens
+│   ├── globals.css         ← Tailwind imports + PITERON design tokens
 │   ├── not-found.tsx
 │   ├── error.tsx
 │   └── loading.tsx

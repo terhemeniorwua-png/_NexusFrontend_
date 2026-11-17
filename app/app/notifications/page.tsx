@@ -410,7 +410,7 @@ function ActivityTab({ workspaceId }: { workspaceId: string }) {
     return (
       <EmptyState
         title="No activity yet"
-        description="Workspace activity will appear here as your team uses Nexus."
+        description="Workspace activity will appear here as your team uses PITERON."
       />
     );
   }
@@ -658,7 +658,7 @@ function PreferencesTab({ workspaceId }: { workspaceId: string }) {
         <div className="mb-4 border-b border-[var(--color-border)] pb-3">
           <p className="text-sm font-semibold text-[var(--color-text-primary)]">Browser push notifications</p>
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            Opt in to receive browser push notifications on this device. Nexus will not ask for permission until you turn this on.
+            Opt in to receive browser push notifications on this device. PITERON will not ask for permission until you turn this on.
           </p>
         </div>
         {!pushSupported ? (

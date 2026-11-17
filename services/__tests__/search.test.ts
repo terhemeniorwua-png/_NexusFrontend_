@@ -28,7 +28,7 @@ describe('globalSearch', () => {
 
   it('calls GET /search with required q param', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([fakeResult()]));
-    await globalSearch({ q: 'nexus' });
+    await globalSearch({ q: 'piteron' });
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/backend/search?q=nexus'),
       expect.any(Object),

@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: Nexus Backend API
+  title: PITERON Backend API
   version: 0.1.0
-  description: "Nexus workspace and project management backend.\n\nPhase 1 provides the foundation (health, configuration,\
+  description: "PITERON workspace and project management backend.\n\nPhase 1 provides the foundation (health, configuration,\
     \ error contract).\nPhase 3 adds the account lifecycle: registration, email verification,\nsessions, password recovery,\
     \ Google OpenID Connect, server-managed profile\nimages and optional TOTP two-factor authentication.\nThe backend provides\
     \ a signed transactional email provider webhook.\nWorkspace routes support workspace types, memberships, invitations,\n\
@@ -672,6 +672,73 @@ paths:
           description: Authentication is required.
         '404':
           description: Integration is unavailable to the caller.
+    post:
+      tags:
+      - Integrations
+      operationId: enqueueSlackNotification
+      summary: Enqueue a Slack notification for a workspace event
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: integrationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnqueueSlackNotificationInput'
+      responses:
+        '200':
+          description: Slack notification enqueued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnqueueSlackNotificationResult'
+        '400':
+          description: Slack not configured or no channel set
+        '401':
+          description: Authentication is required.
+        '404':
+          description: Integration not connected or disabled
+  /integrations/{integrationId}/slack-settings:
+    patch:
+      tags:
+      - Integrations
+      operationId: updateSlackSettings
+      summary: Update Slack workspace notification settings
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: integrationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlackSettingsInput'
+      responses:
+        '200':
+          description: Slack settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationResponse'
+        '400':
+          description: Slack channel required before enabling notifications
+        '401':
+          description: Authentication is required.
+        '404':
+          description: Slack not connected to this workspace
   /integrations/{integrationId}/sync-jobs/{jobId}/retry:
     post:
       tags:
@@ -7684,7 +7751,7 @@ paths:
       operationId: executeAiAction
       summary: Execute an approved AI action
       description: Re-checks current permissions, transitions APPROVED→EXECUTING conditionally, and executes through the owning
-        Nexus service. The same proposal cannot execute twice.
+        PITERON service. The same proposal cannot execute twice.
       security:
       - bearerAuth: []
       responses:
@@ -20053,6 +20120,53 @@ paths:
           const: true
         data:
           $ref: '#/components/schemas/IntegrationSyncJob'
+    EnqueueSlackNotificationInput:
+      type: object
+      required:
+      - workspaceId
+      - kind
+      - dedupeKey
+      - text
+      properties:
+        workspaceId:
+          type: string
+        kind:
+          type: string
+          enum:
+            - TASK_ASSIGNED
+            - TASK_DUE_SOON
+            - AUTOMATION
+        dedupeKey:
+          type: string
+        text:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    EnqueueSlackNotificationResult:
+      type: object
+      required:
+      - queued
+      properties:
+        queued:
+          type: boolean
+        reason:
+          type: string
+          enum: [not_configured, disabled, duplicate]
+        jobId:
+          type: string
+    SlackSettingsInput:
+      type: object
+      required:
+      - slackChannelId
+      properties:
+        slackChannelId:
+          type: string
+        slackChannelName:
+          type: string
+          nullable: true
+        notificationsEnabled:
+          type: boolean
     WebhookSubscription:
       type: object
       required:

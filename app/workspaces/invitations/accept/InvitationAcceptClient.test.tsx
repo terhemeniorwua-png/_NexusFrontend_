@@ -56,7 +56,7 @@ const savedIntent: InvitationIntent = {
   token: 'token_-123',
   workspaceId: 'workspace-1',
   workspaceName: 'Nexus Studio',
-  workspaceSlug: 'nexus-studio',
+  workspaceSlug: 'piteron-studio',
   invitedByName: 'Grace',
   maskedEmail: 'a***@example.com',
   boundToAccount: true,
@@ -88,7 +88,7 @@ describe('InvitationAcceptClient', () => {
   it('asks anonymous visitors to sign in while preserving the invitation token', async () => {
     render(<InvitationAcceptClient />);
 
-    expect(await screen.findByRole('heading', { name: 'Join Nexus Studio' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Join PITERON Studio' })).toBeInTheDocument();
     expect(screen.getByText('a***@example.com')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Accept invitation' })).not.toBeInTheDocument();
 
@@ -158,7 +158,7 @@ describe('InvitationAcceptClient', () => {
     // Use the dialog element itself to avoid ambiguity with the page h1.
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInTheDocument();
-    expect(dialog.querySelector('h2')).toHaveTextContent('Join Nexus Studio');
+    expect(dialog.querySelector('h2')).toHaveTextContent('Join PITERON Studio');
   });
 
   it('opens the dialog with the account-created notice when from=register', async () => {
@@ -180,7 +180,7 @@ describe('InvitationAcceptClient', () => {
 
     render(<InvitationAcceptClient />);
 
-    await screen.findByRole('heading', { name: 'Join Nexus Studio' }); // page loaded
+    await screen.findByRole('heading', { name: 'Join PITERON Studio' }); // page loaded
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -191,7 +191,7 @@ describe('InvitationAcceptClient', () => {
 
     render(<InvitationAcceptClient />);
 
-    await screen.findByRole('heading', { name: 'Join Nexus Studio' });
+    await screen.findByRole('heading', { name: 'Join PITERON Studio' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -213,7 +213,7 @@ describe('InvitationAcceptClient', () => {
     mocks.previewInvitation.mockResolvedValue({ ...preview, status: 'EXPIRED' });
     render(<InvitationAcceptClient />);
 
-    expect(await screen.findByRole('heading', { name: 'Join Nexus Studio' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Join PITERON Studio' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('This invitation has expired');
     expect(screen.queryByRole('button', { name: 'Accept invitation' })).not.toBeInTheDocument();
   });

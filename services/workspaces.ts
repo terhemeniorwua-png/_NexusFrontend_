@@ -205,7 +205,7 @@ export function listWorkspaceMembers(workspaceId: string): Promise<WorkspaceMemb
   return authorizedRequest<WorkspaceMember[]>(workspacePath(workspaceId, '/members'));
 }
 
-/** Adds an existing Nexus account to the workspace. Invite by email instead for people without accounts. */
+/** Adds an existing PITERON account to the workspace. Invite by email instead for people without accounts. */
 export function addWorkspaceMember(
   workspaceId: string,
   input: AddWorkspaceMemberInput,

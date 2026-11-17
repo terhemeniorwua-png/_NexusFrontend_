@@ -37,12 +37,12 @@ describe('queryAI', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       ok({ query: 'test', answer: null, references: [], message: 'ok' }),
     );
-    await queryAI('What is Nexus?');
+    await queryAI('What is PITERON?');
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/backend/ai/chat',
       expect.objectContaining({
         method: 'POST',
-        body: expect.stringContaining('"query":"What is Nexus?"'),
+        body: expect.stringContaining('"query":"What is PITERON?"'),
       }),
     );
   });

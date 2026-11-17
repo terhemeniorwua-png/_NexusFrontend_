@@ -1,7 +1,7 @@
 /**
  * services/files.ts
  *
- * Nexus Drive — workspace file management service.
+ * PITERON Drive — workspace file management service.
  *
  * All routes are mounted at:
  *   /api/v1/workspaces/:workspaceId/files

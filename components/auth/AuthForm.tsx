@@ -37,7 +37,7 @@ const emailSchema = z.string().trim().email('Enter a valid email address.').max(
 
 const modeContent: Record<AuthMode, { title: string; subtitle: string }> = {
   'sign-in': { title: 'Welcome back', subtitle: 'Sign in to continue to your workspace.' },
-  'sign-up': { title: 'Create your Nexus account', subtitle: 'One account for all your workspaces.' },
+  'sign-up': { title: 'Create your PITERON account', subtitle: 'One account for all your workspaces.' },
   'forgot-password': { title: 'Reset your password', subtitle: 'We’ll send a one-time code to your email if an account matches.' },
   'reset-password': { title: 'Choose a new password', subtitle: 'Use a strong password you have not used before.' },
   'verify-email': { title: 'Check your email', subtitle: 'We sent a six-digit code to verify your account.' },
@@ -246,7 +246,7 @@ export function AuthForm({ mode, initialEmail = '', accountType, redirectPath, d
         ? 'Your email is verified. Sign in to create or resume your institution workspace.'
         : pending?.accountType === 'business'
           ? 'Your email is verified. Sign in to create or resume your business workspace.'
-          : 'Your email is verified. You can now sign in to Nexus.');
+          : 'Your email is verified. You can now sign in to PITERON.');
     } catch (requestError) {
       setError(friendlyError(requestError));
       if (requestError instanceof ApiRequestError && requestError.code === 'INVALID_OR_EXPIRED_CODE') {
@@ -700,9 +700,9 @@ export function AuthForm({ mode, initialEmail = '', accountType, redirectPath, d
     <section className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-lg sm:p-8">
       <div className="mb-7">
         <div className="relative mb-8 flex min-h-10 items-center gap-3 sm:flex-row sm:justify-between sm:items-center">
-          <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight text-text-primary" aria-label="Nexus home">
+          <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight text-text-primary" aria-label="PITERON home">
             <span className="grid size-10 place-items-center rounded-lg bg-primary text-base font-bold text-white">N</span>
-            Nexus
+            PITERON
           </Link>
           {onBackToAccountType && (
             <button
@@ -715,9 +715,9 @@ export function AuthForm({ mode, initialEmail = '', accountType, redirectPath, d
           )}
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">{mode === 'sign-up' && accountType === 'business' ? 'Create a business account' : mode === 'sign-up' && accountType === 'institution' ? 'Create an institution account' : content.title}</h1>
-        <p className="mt-2 text-sm leading-6 text-text-secondary">{accountType ? `${accountType === 'personal' ? 'Personal' : accountType === 'business' ? 'Business' : 'Institution'} account · ${mode === 'sign-in' ? 'Sign in with your Nexus identity.' : content.subtitle}` : content.subtitle}</p>
-        {mode === 'sign-up' && accountType === 'business' && <p className="mt-2 text-sm leading-6 text-text-secondary">Register the business owner’s Nexus identity first. After email verification, create your company workspace; its creator becomes the Owner.</p>}
-        {mode === 'sign-up' && accountType === 'institution' && <p className="mt-2 text-sm leading-6 text-text-secondary">Register the institution administrator’s Nexus identity first. After email verification, create your institution workspace; its creator becomes the Owner.</p>}
+        <p className="mt-2 text-sm leading-6 text-text-secondary">{accountType ? `${accountType === 'personal' ? 'Personal' : accountType === 'business' ? 'Business' : 'Institution'} account · ${mode === 'sign-in' ? 'Sign in with your PITERON identity.' : content.subtitle}` : content.subtitle}</p>
+        {mode === 'sign-up' && accountType === 'business' && <p className="mt-2 text-sm leading-6 text-text-secondary">Register the business owner’s PITERON identity first. After email verification, create your company workspace; its creator becomes the Owner.</p>}
+        {mode === 'sign-up' && accountType === 'institution' && <p className="mt-2 text-sm leading-6 text-text-secondary">Register the institution administrator’s PITERON identity first. After email verification, create your institution workspace; its creator becomes the Owner.</p>}
       </div>
 
       {error && <Alert variant="error" className="mb-5">{error}</Alert>}
@@ -741,7 +741,7 @@ export function AuthForm({ mode, initialEmail = '', accountType, redirectPath, d
         </div>
       )}
 
-      {(mode === 'sign-in' || mode === 'sign-up') && <p className="mt-6 text-center text-sm text-text-secondary">{mode === 'sign-in' ? 'New to Nexus?' : 'Already have an account?'}{' '}{onSwitchMode ? <button type="button" onClick={() => onSwitchMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')} className="font-medium text-primary hover:underline">{mode === 'sign-in' ? 'Create an account' : 'Sign in'}</button> : <Link className="font-medium text-primary hover:underline" href={withRedirect(mode === 'sign-in' ? '/sign-up' : '/sign-in')}>{mode === 'sign-in' ? 'Create an account' : 'Sign in'}</Link>}</p>}
+      {(mode === 'sign-in' || mode === 'sign-up') && <p className="mt-6 text-center text-sm text-text-secondary">{mode === 'sign-in' ? 'New to PITERON?' : 'Already have an account?'}{' '}{onSwitchMode ? <button type="button" onClick={() => onSwitchMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')} className="font-medium text-primary hover:underline">{mode === 'sign-in' ? 'Create an account' : 'Sign in'}</button> : <Link className="font-medium text-primary hover:underline" href={withRedirect(mode === 'sign-in' ? '/sign-up' : '/sign-in')}>{mode === 'sign-in' ? 'Create an account' : 'Sign in'}</Link>}</p>}
       {(mode === 'forgot-password' || mode === 'reset-password') && <p className="mt-6 text-center text-sm"><Link className="font-medium text-primary hover:underline" href={withRedirect('/sign-in')}>Back to sign in</Link></p>}
       {mode === 'sign-up' && (
         <p className="mt-5 text-center text-xs leading-5 text-text-muted">

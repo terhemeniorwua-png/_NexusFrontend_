@@ -1,10 +1,10 @@
-# NEXUS FRONTEND — IMPLEMENTATION PHASES
+# PITERON FRONTEND — IMPLEMENTATION PHASES
 
 ## 1. Purpose
 
-This document defines the phased implementation roadmap for the Nexus frontend.
+This document defines the phased implementation roadmap for the PITERON frontend.
 
-Nexus is a Real-Time Workspace & Project Management Platform that combines project management, team collaboration, communication, document management, meetings, scheduling, automation, and AI-powered productivity.
+PITERON is a Real-Time Workspace & Project Management Platform that combines project management, team collaboration, communication, document management, meetings, scheduling, automation, and AI-powered productivity.
 
 The frontend must provide a consistent, responsive, accessible, and intuitive experience across three workspace types:
 
@@ -21,10 +21,10 @@ The frontend must provide a consistent, responsive, accessible, and intuitive ex
 | Available scripts          | `dev`, `build`, `start`, `lint`                                                                               |
 | App directory contents     | `layout.tsx`, `page.tsx`, `globals.css`, `favicon.ico` only                                                   |
 | Feature folders            | None exist (`components/`, `features/`, `hooks/`, `services/`, `types/`, `lib/`, `providers/` are all absent) |
-| Design tokens              | `globals.css` uses Next.js defaults, not Nexus palette                                                        |
+| Design tokens              | `globals.css` uses Next.js defaults, not PITERON palette                                                        |
 | Path alias                 | `@/*` → repo root (defined in `tsconfig.json`)                                                                |
 | Environment file           | No `.env` present                                                                                             |
-| Nexus features implemented | See current phase evidence and verification records below; this historical baseline is superseded.                                                                                                      |
+| PITERON features implemented | See current phase evidence and verification records below; this historical baseline is superseded.                                                                                                      |
 
 This roadmap has historical planning records followed by dated implementation and verification evidence. Use the latest phase evidence sections below as the current status; the adjacent backend repository is available at `../__NexusBackend__/`.
 
@@ -34,7 +34,7 @@ This roadmap has historical planning records followed by dated implementation an
 
 All three workspace types share the same core application architecture. Their available features, navigation, permissions, and experiences are determined by the active workspace type, subscription plan, user role, and permissions.
 
-The frontend must integrate with the existing Nexus backend rather than independently implementing backend business logic.
+The frontend must integrate with the existing PITERON backend rather than independently implementing backend business logic.
 
 ## Phase 0 — Repository Audit and Project Foundation
 
@@ -45,18 +45,18 @@ Establish a verified understanding of the repository's actual state, resolve env
 ### Prerequisites
 
 - Access to the repository.
-- `AGENTS.md` and `nexus-frontend/SKILL.md` available for reading.
+- `AGENTS.md` and `piteron-frontend/SKILL.md` available for reading.
 - Node.js and npm installed and working.
 
 ### Implementation Tasks
 
-- [x] Read `AGENTS.md` and `nexus-frontend/SKILL.md` in full.
+- [x] Read `AGENTS.md` and `piteron-frontend/SKILL.md` in full.
 - [x] Confirm the installed versions of Next.js, React, Tailwind CSS, and TypeScript.
 - [x] Confirm available npm scripts (`dev`, `build`, `start`, `lint`).
 - [x] Confirm absence of Socket.IO client, form library, test framework, and state manager.
 - [x] Confirm `app/` contains only the default Next.js bootstrap files.
-- [x] Confirm no Nexus feature folders or files exist.
-- [x] Confirm `globals.css` uses Next.js default tokens, not the Nexus palette.
+- [x] Confirm no PITERON feature folders or files exist.
+- [x] Confirm `globals.css` uses Next.js default tokens, not the PITERON palette.
 - [x] Confirm `tsconfig.json` path alias `@/*` points to the repo root.
 - [x] Confirm no `.env` file is present.
 - [x] Create `.env.example` with required variable placeholders (do not populate real values).
@@ -117,7 +117,7 @@ Establish a verified understanding of the repository's actual state, resolve env
 ### Notes and Blockers
 
 - The root instruction file is `AGENTS.md`, not `agent.md`. All future agents must read `AGENTS.md`.
-- `SKILL.md` is located at `nexus-frontend/SKILL.md`, not the repo root.
+- `SKILL.md` is located at `piteron-frontend/SKILL.md`, not the repo root.
 - `SKILL.md` §3 refers to a `src/app` structure. This repository uses `app/` at the repo root; follow the actual structure (documented in `CONVENTIONS.md` §1).
 - Test framework decided: Vitest + Testing Library. Install in Phase 1. See `CONVENTIONS.md` §5.
 - Form validation library decided: Zod. Install in Phase 1. See `CONVENTIONS.md` §4.
@@ -202,7 +202,7 @@ Inspect the actual repository before making changes.
 
 ### 3.5 Design and user experience
 
-- Maintain a consistent Nexus visual identity.
+- Maintain a consistent PITERON visual identity.
 - Build reusable UI components.
 - Support desktop, tablet, and mobile layouts.
 - Ensure accessibility and keyboard navigation.
@@ -259,7 +259,7 @@ Last verified: 2026-11-10, on branch `feature/phase-26-33-completion`.
 | 10    | Tasks and Work Management                                        | In Progress |
 | 11    | Real-Time Messaging and Conversations                            | In Progress |
 | 12    | Notification Centre and Activity Feed                            | **Completed** |
-| 13    | File Management and Nexus Drive                                  | **Completed** |
+| 13    | File Management and PITERON Drive                                  | **Completed** |
 | 14    | Document Collaboration                                           | In Progress |
 | 15    | Calendar and Scheduling                                          | **Completed** |
 | 16    | Meetings and Calling                                             | In Progress |
@@ -268,8 +268,8 @@ Last verified: 2026-11-10, on branch `feature/phase-26-33-completion`.
 | 19    | Global Search and Full Document Search                           | **Completed** |
 | 20    | Integrations Management                                          | In Progress |
 | 21    | Automation and Workflow Builder                                  | **Completed** |
-| 22    | Nexus AI Assistant                                               | In Progress |
-| 23    | Nexus Write                                                      | In Progress |
+| 22    | PITERON AI Assistant                                               | In Progress |
+| 23    | PITERON Write                                                      | In Progress |
 | 24    | AI Action Approval and Execution Interfaces                      | In Progress |
 | 25    | Real-Time State, Presence, and Cross-Application Synchronisation | In Progress |
 | 26    | User Settings and Preferences                                    | Completed   |
@@ -313,8 +313,8 @@ Backend phase numbers below refer to the adjacent backend roadmap/API documentat
 | FE-19 Global and document search | No search module/API registered | Global and full-document search APIs are absent. |
 | FE-20 Integrations | No integration module/API registered | OAuth connection and provider-sync management APIs are absent. |
 | FE-21 Automation | No automation module/API registered | Workflow definition and execution APIs are absent. |
-| FE-22 Nexus AI Assistant | AI orchestration not exposed in application API | No approved frontend-facing AI conversation/context API is registered. |
-| FE-23 Nexus Write | AI writing assistance not exposed | No approved writing-analysis/suggestion API is registered. |
+| FE-22 PITERON AI Assistant | AI orchestration not exposed in application API | No approved frontend-facing AI conversation/context API is registered. |
+| FE-23 PITERON Write | AI writing assistance not exposed | No approved writing-analysis/suggestion API is registered. |
 | FE-24 AI action approval | AI action execution not exposed | No proposal/approval/execution API is registered. |
 | FE-25 Real-time state and presence | Existing backend real-time infrastructure | Implemented client events: `workspace:join`, `workspace:leave`, `typing:start`, `typing:stop`, `presence:online`, `presence:offline`. The backend does not emit `message:new`, task, or notification events, and socket payloads are not documented in OpenAPI. |
 | FE-26 User settings and preferences | Users/workspaces | `/users/me` and workspace notification-preference routes cover current profile and notification settings; broader settings are not contracted. |
@@ -346,7 +346,7 @@ Understand the existing frontend before implementing or modifying features.
 - Identify existing pages and implemented features.
 - Review environment variable usage.
 - Identify existing testing and build configurations.
-- Compare existing frontend functionality with the Nexus product requirements.
+- Compare existing frontend functionality with the PITERON product requirements.
 - Identify missing, incomplete, duplicated, or inconsistent implementations.
 
 ### Deliverables
@@ -436,7 +436,7 @@ This checklist has been reconciled against the adjacent backend docs on 2026-11-
 
 ### Objectives
 
-Establish a consistent visual system for the entire Nexus application.
+Establish a consistent visual system for the entire PITERON application.
 
 ### Tasks
 
@@ -476,7 +476,7 @@ Implemented and verified on 2026-11-03.
 - `:root[data-theme="dark"]` overrides the full token set, including semantic and task-status colours.
 - `:root[data-theme="system"]` follows `prefers-color-scheme` through a media query.
 - `color-scheme` is set per theme so native controls match.
-- `ThemeProvider` (`providers/ThemeProvider.tsx`) stores the preference in `localStorage` under `nexus-theme`, resolves the system preference, and applies `data-theme` to `<html>`.
+- `ThemeProvider` (`providers/ThemeProvider.tsx`) stores the preference in `localStorage` under `PITERON-theme`, resolves the system preference, and applies `data-theme` to `<html>`.
 - A small pre-paint script in `app/layout.tsx` applies the stored theme before paint to prevent a flash of the wrong theme.
 - `ThemeToggle` (`components/ui/ThemeToggle.tsx`) is an accessible light/dark/system segmented control.
 
@@ -756,10 +756,10 @@ The Paystack billing API and UI are implemented in the current worktrees. USD ac
 Before frontend OAuth work begins, the backend contract must specify:
 
 - Authorization-start and provider-callback operations, plus authenticated account-link and unlink operations if linking is supported. Exact route names and request/response shapes must come from the backend implementation.
-- Supported provider(s), provider application configuration, exact redirect URI(s), scopes, and identity claims used to associate an external identity with a Nexus account.
+- Supported provider(s), provider application configuration, exact redirect URI(s), scopes, and identity claims used to associate an external identity with a PITERON account.
 - Callback outcomes for success, cancellation or failure, invalid or expired state, and account-link conflicts, including a safe allowlisted post-authentication redirect.
-- Whether provider identities can be linked to existing Nexus accounts, the proof required before linking, and handling for duplicate identities or email collisions. An email match alone must not silently link accounts.
-- Session handoff through Nexus's existing session contract: backend code exchange and validation, server-set HttpOnly rotating refresh cookie, CSRF cookie/header behavior where applicable, and short-lived access-token response. Provider tokens and client secrets remain server-side.
+- Whether provider identities can be linked to existing PITERON accounts, the proof required before linking, and handling for duplicate identities or email collisions. An email match alone must not silently link accounts.
+- Session handoff through PITERON's existing session contract: backend code exchange and validation, server-set HttpOnly rotating refresh cookie, CSRF cookie/header behavior where applicable, and short-lived access-token response. Provider tokens and client secrets remain server-side.
 - Security requirements including one-time short-lived state, PKCE, nonce and issuer/audience/signature validation when applicable, exact redirect URI validation, CSRF protection, rate limiting, safe redirect validation, and authorization code/token redaction in logs.
 
 These describe backend contract requirements; they are not OAuth routes implemented in this phase.
@@ -826,7 +826,7 @@ This addendum records the authorized subscription and Paystack implementation in
 - Frontend billing page and pricing connect to the workspace-scoped billing API for plan comparison, monthly/annual selection, current status, active seats, target seat quantity, checkout, scheduled changes, period-end cancellation, renewal dates, and billing history.
 - Backend adds the subscription/payment/checkout/Paystack-plan/webhook-event persistence schema and migration; owner-authorized routes; server-owned USD pricing; transaction verification; raw-body HMAC-SHA512 webhook verification; encrypted recurring-management tokens; payment/event idempotency; recurring plan/subscription handling; and paid-seat-capacity enforcement in invitation acceptance, join approval, direct member creation, and suspended-member restoration.
 - API operations: `GET /billing/plans`, `GET /billing/workspaces/:workspaceId`, `GET /billing/workspaces/:workspaceId/payments`, `POST /billing/workspaces/:workspaceId/checkout`, `POST /billing/workspaces/:workspaceId/verify`, `POST /billing/workspaces/:workspaceId/change`, `POST /billing/workspaces/:workspaceId/cancel`, and `POST /webhooks/paystack`.
-- Paystack integration uses hosted transaction initialization, server verification, plan/subscription creation and cancellation, and documented subscription/transaction webhooks. Paystack fixed-amount plans are keyed by product, interval, and seat quantity; Nexus calculates server-owned prorated checkout amounts. Provider-side actions and local persistence still need durable reconciliation tests for partial failures.
+- Paystack integration uses hosted transaction initialization, server verification, plan/subscription creation and cancellation, and documented subscription/transaction webhooks. Paystack fixed-amount plans are keyed by product, interval, and seat quantity; PITERON calculates server-owned prorated checkout amounts. Provider-side actions and local persistence still need durable reconciliation tests for partial failures.
 - Backend environment names are `PAYSTACK_SECRET_KEY`, `PAYSTACK_ENCRYPTION_KEY`, `PAYSTACK_USD_ENABLED`, `PAYSTACK_CALLBACK_URL`, `PAYSTACK_API_URL`, and `PAYSTACK_REQUEST_TIMEOUT_MS`. The hosted checkout flow needs no browser public key or separate webhook secret. Examples and setup instructions are in the backend `.env.example` and `docs/SUBSCRIPTION_BILLING_BACKEND_REQUIREMENTS.md`.
 - Added/updated backend tests cover catalog amounts, annual seat cadence, owner de-duplication, excluded membership states, seat-capacity policy, lifecycle/proration helpers, cancellation behavior, checkout request shape, safe reference verification, and raw-body signature validation. Frontend billing/pricing/legal tests cover visible subscription state, owner-only controls, cancellation confirmation, and approved prices.
 - Latest validation: backend `npm test` passed 204 tests with 0 failures; 2 optional suites were skipped. Backend `npm run build`, `npm run lint`, and `npm run typecheck` passed; focused Prettier checks passed for changed billing/config/workspace files, and billing-focused tests passed 21/21 after the final seat-target correction. Frontend `npm test` passed (26 files, 163 tests), `npm run lint`, `npx tsc --noEmit`, production build, and `git diff --check` passed. Backend repository-wide `npm run format:check` reports a style issue only in unrelated `src/modules/auth/account-deletion.service.ts`; changed files pass focused formatting checks. The new tests are unit/helper and frontend UI tests; full billing-service API, database, and webhook event idempotency integration tests remain outstanding. No migration was applied because no disposable database configuration was verified. No Paystack test credentials were configured, so no provider transactions or webhook delivery were exercised.
@@ -1033,7 +1033,7 @@ Implement organisation membership and invitation workflows.
 - Join requests expire after seven days.
 - Direct invitations expire after 48 hours.
 - Expired invitations cannot be accepted.
-- Removing organisation membership must not delete the user's Nexus identity or personal workspace.
+- Removing organisation membership must not delete the user's PITERON identity or personal workspace.
 
 ### Deliverables
 
@@ -1203,7 +1203,7 @@ Provide organisational structure management.
 
 Branch: `feature/frontend-authentication`. Committed and pushed as `6f78c13`.
 
-- **A2 Workspace-switch state safety**: Audited all workspace-scoped pages. `billing` uses `key={activeWorkspace.id}`, `teams` and `groups` use `latestLoad` refs + `loadedWorkspaceId` guards. `discover`, `invitations`, and `privacy-requests` are user-scoped (not workspace-scoped). No workspace-private data in `localStorage` or `sessionStorage` — only `nexus-active-workspace` (workspace ID), `nexus-theme` (theme preference), and `PENDING_ONBOARDING_KEY` (account type intent) are stored.
+- **A2 Workspace-switch state safety**: Audited all workspace-scoped pages. `billing` uses `key={activeWorkspace.id}`, `teams` and `groups` use `latestLoad` refs + `loadedWorkspaceId` guards. `discover`, `invitations`, and `privacy-requests` are user-scoped (not workspace-scoped). No workspace-private data in `localStorage` or `sessionStorage` — only `PITERON-active-workspace` (workspace ID), `PITERON-theme` (theme preference), and `PENDING_ONBOARDING_KEY` (account type intent) are stored.
 - **A3 Access states**: Added `AccessState` component usage to `billing/page.tsx`, `teams/page.tsx`, and `groups/page.tsx` for 401/403 load failures. Previously only `MembersPanel` used `AccessState`. Added 6 new tests (2 per page: 401 and 403 scenarios). Also added groups page workspace-switch regression test (2 tests). 13 new tests total, all passing.
 - **A4 Quality pass**: Logo manager verified — blob URLs revoked on unmount via `URL.revokeObjectURL`, `ConfirmDialog` on delete, size limit 2 MB and types PNG/JPEG/WebP from backend API docs. Privacy-request page has double-submit protection via `setWorking`. Transfer inbox has double-submit protection via `busy` state.
 - **A5 Phase 8 safe items**: Teams detail page already states "Team activity is not available because the backend does not currently expose a team activity endpoint." Department assignment card already states "The backend supports assignment, but does not currently expose department member identities for listing or removal here." No fabricated content was added.
@@ -1336,7 +1336,7 @@ Additional implementation on `feature/phase-9-projects` after initial commit (`1
 - `discover`, `invitations`, `privacy-requests` → user-scoped, no workspace state ✅
 - `projects` list → `latestLoad` + `loadedWorkspaceId` ✅
 - project detail pages → `useWorkspaceRedirect` ✅
-- Browser storage: `nexus-active-workspace` (workspace ID only), `nexus-theme` (preference), `PENDING_ONBOARDING_KEY` (account type intent) — no workspace-private data.
+- Browser storage: `PITERON-active-workspace` (workspace ID only), `PITERON-theme` (preference), `PENDING_ONBOARDING_KEY` (account type intent) — no workspace-private data.
 
 **4. Sorting: backend gap recorded.** `GET /workspaces/{ws}/projects` supports `cursor`, `limit`, `status`, `visibility`, `teamId`, `departmentId`, `search`, `includeArchived`. No `sort` or `orderBy` parameter is registered. No sort control was added; a backend API gap is recorded here.
 
@@ -1509,7 +1509,7 @@ Phase 10 remains **In Progress** due to:
 
 ### Objectives
 
-Build Nexus messaging interfaces.
+Build PITERON messaging interfaces.
 
 ### Conversation types
 
@@ -1802,7 +1802,7 @@ Branch: `feature/phase-26-33-completion`.
 Phase 12 is now **Completed** for the frontend scope. The only remaining gap is real-time socket push (`notification:new` event not emitted by backend), which is a backend dependency outside frontend control.
 
 
-## Phase 13 — File Management and Nexus Drive
+## Phase 13 — File Management and PITERON Drive
 
 ### Objectives
 
@@ -1830,7 +1830,7 @@ Build file and document management interfaces.
 
 ### Deliverables
 
-- Nexus Drive interface.
+- PITERON Drive interface.
 - File upload and management.
 - File preview and sharing.
 
@@ -1870,7 +1870,7 @@ Allowed MIME types: PDF, Office documents, plain text, Markdown, CSV, JSON, imag
 
 - `services/files.ts` — typed file service (`listFiles`, `getFileUsage`, `uploadFile` with XHR/progress, `downloadFile`, `fetchFileBlob`, `deleteFile`, `formatBytes`, `fileCategory`)
 - `services/__tests__/files.test.ts` — 24 service tests
-- `app/app/files/page.tsx` — Nexus Drive page with preview modal
+- `app/app/files/page.tsx` — PITERON Drive page with preview modal
 - `app/app/files/page.test.tsx` — 11 page tests
 
 #### Files modified
@@ -1999,7 +1999,7 @@ Phase 14 remains **In Progress** due to:
 
 ### Objectives
 
-Build the Nexus calendar experience.
+Build the PITERON calendar experience.
 
 ### Tasks
 
@@ -2368,7 +2368,7 @@ Build subscription and billing interfaces.
 
 ### Objectives
 
-Build a global search experience across authorised Nexus resources.
+Build a global search experience across authorised PITERON resources.
 
 ### Tasks
 
@@ -2689,7 +2689,7 @@ Phase 21 is now **Completed** for the frontend scope. The following backend-depe
 
 These gaps are documented in the Phase 21 backend contract audit above.
 
-## Phase 22 — Nexus AI Assistant
+## Phase 22 — PITERON AI Assistant
 
 ### Objectives
 
@@ -2716,7 +2716,7 @@ Build the AI assistant experience.
 - The Python FastAPI service provides AI processing.
 - The frontend must communicate through the approved backend integration.
 - Do not connect the frontend directly to the main database.
-- Do not make core Nexus functionality dependent on AI availability.
+- Do not make core PITERON functionality dependent on AI availability.
 
 ### Deliverables
 
@@ -2724,7 +2724,7 @@ Build the AI assistant experience.
 - AI conversation experience.
 - Contextual AI interactions.
 
-## Phase 23 — Nexus Write
+## Phase 23 — PITERON Write
 
 ### Objectives
 
@@ -2760,7 +2760,7 @@ Build the Grammarly-like writing assistance experience.
 
 ### Deliverables
 
-- Nexus Write interface.
+- PITERON Write interface.
 - Writing suggestions.
 - User-controlled editing workflows.
 
@@ -2800,7 +2800,7 @@ Provide safe interfaces for AI-proposed application actions.
 
 ### Objectives
 
-Ensure the frontend remains consistent when users interact with Nexus across multiple sessions.
+Ensure the frontend remains consistent when users interact with PITERON across multiple sessions.
 
 ### Tasks
 
@@ -2986,7 +2986,7 @@ Validate the complete frontend application.
 - Test billing interfaces.
 - Test global search.
 - Test AI assistant.
-- Test Nexus Write.
+- Test PITERON Write.
 - Test responsive layouts.
 - Test accessibility.
 - Test error and recovery states.
@@ -3090,7 +3090,7 @@ Confirm that the frontend is ready for release.
 - Verify search.
 - Verify integrations.
 - Verify AI functionality and approval workflows.
-- Verify Nexus Write.
+- Verify PITERON Write.
 - Verify responsive behaviour.
 - Verify accessibility.
 - Verify production configuration.
@@ -3119,7 +3119,7 @@ Validated on branch `feature/phases-21-30-completion`.
 | Tests | `npm test -- --maxWorkers=1` | Passed, 89 files / 769 tests |
 | Production build | `npm run build` | Passed, 50 pages generated |
 
-### Phase 22 — Nexus AI Assistant (In Progress)
+### Phase 22 — PITERON AI Assistant (In Progress)
 
 Implemented:
 
@@ -3140,7 +3140,7 @@ Remaining gaps:
 - Document/file analysis, meeting intelligence, recommendation surfaces, and AI
   settings are not contracted by the backend.
 
-### Phase 23 — Nexus Write (In Progress)
+### Phase 23 — PITERON Write (In Progress)
 
 Implemented:
 
@@ -3332,7 +3332,7 @@ Automated suite passes. **769 tests across 89 files pass** (0 failures),
 covering all phases 1–30: authentication, onboarding, workspace creation and
 switching, invitations, join requests, role-based UI, project visibility, task
 management, messaging, notification separation, file management, calendar and
-meetings, billing, global search, integrations, AI assistant, Nexus Write, AI
+meetings, billing, global search, integrations, AI assistant, PITERON Write, AI
 action approvals, settings, insights, navigation, theme, socket provider,
 shared UI primitives, and the same-origin API proxy.
 
@@ -3388,7 +3388,7 @@ Status reflects contract inspection against `../__NexusBackend__/docs/API.md` an
 | FE-10 | Tasks and work management UI | BE-8 — Projects / task module | Task API fully registered: `GET/POST /workspaces/{workspaceId}/projects/{projectId}/tasks`, `GET/PATCH/DELETE /{taskId}`, `POST /{taskId}/archive`, `/{taskId}/restore`, `/{taskId}/complete`, `/{taskId}/reopen`, `/{taskId}/assignees`, `/{taskId}/dependencies`, `/{taskId}/comments`. All routes verified in backend source. |
 | FE-11 | Real-time messaging and conversations UI | Backend messaging contract phase not yet documented in the active backend roadmap | OpenAPI/API.md message and channel contracts; verify persistence and event support before implementation |
 | FE-12 | Notification centre and activity feed UI | Backend contract phase not yet mapped | Use only registered notification/activity contracts; verify before implementation |
-| FE-13 | File management and Nexus Drive UI | Backend contract phase not yet mapped | Use only registered file/storage contracts; verify authorization and upload shape first |
+| FE-13 | File management and PITERON Drive UI | Backend contract phase not yet mapped | Use only registered file/storage contracts; verify authorization and upload shape first |
 | FE-14 | Document collaboration UI | Backend document module verified 2026-11-07 | `GET/POST /workspaces/{workspaceId}/documents`, `GET/PATCH/DELETE /{docId}`, `GET /{docId}/revisions`, `GET/POST /{docId}/comments`, `DELETE /{docId}/comments/{commentId}`. All routes verified in backend source. |
 | FE-15 | Calendar and scheduling UI | Backend calendar module verified 2026-11-07 | `GET/POST /workspaces/{workspaceId}/events`, `GET/PATCH /{eventId}`, `POST /{eventId}/cancel`, `DELETE /{eventId}`, `GET/POST /{eventId}/invitations`, `DELETE /{eventId}/invitations/{userId}`, `POST /{eventId}/respond`. EventSummary shape confirmed. No Google Calendar / Outlook sync API is registered. |
 | FE-16 | Meetings and calling UI | Backend contract phase not yet mapped | Meeting and managed-calling contracts require verification |
@@ -3397,8 +3397,8 @@ Status reflects contract inspection against `../__NexusBackend__/docs/API.md` an
 | FE-19 | Global and full-document search UI | Backend contract phase not yet mapped | Search contract, filters, pagination, and permission behavior require verification |
 | FE-20 | Integrations management UI | Backend contract phase not yet mapped | Provider connection/OAuth/sync contracts require verification |
 | FE-21 | Automation and workflow builder UI | Backend contract phase not yet mapped | Automation trigger/action/execution contracts require verification |
-| FE-22 | Nexus AI assistant UI | Backend AI orchestration capability; roadmap phase not mapped | Use Express-mediated AI contracts only; verify routes and response/event schemas first |
-| FE-23 | Nexus Write UI | Backend AI orchestration capability; roadmap phase not mapped | Use approved backend writing-assistance contracts only |
+| FE-22 | PITERON AI assistant UI | Backend AI orchestration capability; roadmap phase not mapped | Use Express-mediated AI contracts only; verify routes and response/event schemas first |
+| FE-23 | PITERON Write UI | Backend AI orchestration capability; roadmap phase not mapped | Use approved backend writing-assistance contracts only |
 | FE-24 | AI action approval and execution UI | Backend AI action capability; roadmap phase not mapped | Action proposal/approval/execution contracts require verification |
 | FE-25 | Real-time state, presence and synchronization UI | Backend real-time contracts; roadmap phase not mapped | Socket/event names, payloads, authentication, and reconnect contracts require verification |
 | FE-26 | User settings and preferences UI | Backend user/settings contracts; roadmap phase not mapped | Use registered `/users/*` and preference routes only |
@@ -3465,7 +3465,7 @@ Clearly identify anything that remains incomplete.
 
 # 8. Final Instruction
 
-This roadmap is the implementation guide for the Nexus frontend.
+This roadmap is the implementation guide for the PITERON frontend.
 
 Work sequentially and respect phase dependencies.
 
@@ -3510,7 +3510,7 @@ Do not implement backend functionality inside the frontend. Do not invent API en
 
 #### Sequential phase audit follow-up — 2026-11-04
 
-- Re-read the canonical `AGENTS.md`, `README.md`, `PHASES.md`, `branding.md`, `nexus-frontend/SKILL.md`, and `CONVENTIONS.md`; the lowercase filenames referenced by some instructions are not present. `README.md` duplicates `AGENTS.md`. The adjacent backend references are in `../__NexusBackend__/docs/API.md`, `docs/openapi.yaml`, and the relevant source schemas/controllers.
+- Re-read the canonical `AGENTS.md`, `README.md`, `PHASES.md`, `branding.md`, `piteron-frontend/SKILL.md`, and `CONVENTIONS.md`; the lowercase filenames referenced by some instructions are not present. `README.md` duplicates `AGENTS.md`. The adjacent backend references are in `../__NexusBackend__/docs/API.md`, `docs/openapi.yaml`, and the relevant source schemas/controllers.
 - Phase 0 — **VERIFIED COMPLETE** for repository/configuration deliverables: package/lockfile, environment template, TypeScript/Next configuration, conventions, and backend dependency record are present. The adjacent backend repository and API docs are available; this does not establish completion of later backend-dependent functionality.
 - Phases 1–2 — **VERIFIED COMPLETE** for their design-system and application-shell scope: the tokenized themes, UI primitives, shell/navigation components, and their focused tests are present. The current grouped foundation/shell/Phase 3 workflow run passed 25 files and 192 tests.
 - Phase 3 — remains **PARTIALLY COMPLETE / IN PROGRESS**. The draft legal pack is not legal approval, live auth/email workflow verification remains outstanding, and billing still requires merchant USD enablement, migration/provider verification, and remaining backend lifecycle/reconciliation work. No additional independent frontend workflow can be completed safely against the current approved contracts.

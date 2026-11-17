@@ -29,7 +29,7 @@ describe('account selection authentication flow', () => {
     expect(screen.getByRole('button', { name: /Change account type/ })).toBeInTheDocument();
     if (type === 'business') expect(screen.getByRole('heading', { name: 'Create a business account' })).toBeInTheDocument();
     else if (type === 'institution') expect(screen.getByRole('heading', { name: 'Create an institution account' })).toBeInTheDocument();
-    else expect(screen.getByRole('heading', { name: 'Create your Nexus account' })).toBeInTheDocument();
+    else expect(screen.getByRole('heading', { name: 'Create your PITERON account' })).toBeInTheDocument();
   });
 
   it('preserves sign-in intent and selected type while switching to registration', async () => {
@@ -57,7 +57,7 @@ describe('account selection authentication flow', () => {
     await user.click(screen.getByRole('button', { name: /Change account type/ }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Choose how you plan to start with Nexus.')).toBeInTheDocument();
+    expect(screen.getByText('Choose how you plan to start with PITERON.')).toBeInTheDocument();
   });
 
   it('closes the selector and returns to the landing page', async () => {

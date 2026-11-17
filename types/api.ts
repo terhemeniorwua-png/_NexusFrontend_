@@ -1,7 +1,7 @@
 /**
  * types/api.ts
  *
- * Generic TypeScript types for Nexus backend API communication.
+ * Generic TypeScript types for PITERON backend API communication.
  * Used by lib/api.ts (Phase 3) and all service modules in services/.
  */
 

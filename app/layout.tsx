@@ -32,11 +32,11 @@ const themeInitScript = `
 
 export const metadata: Metadata = {
   title: {
-    default: 'Nexus',
-    template: '%s | Nexus',
+    default: 'PITERON',
+    template: '%s | PITERON',
   },
   description:
-    'Nexus — One connected workspace for projects, people, and progress.',
+    'PITERON — One connected workspace for projects, people, and progress.',
   manifest: '/manifest.webmanifest',
   robots: { index: true, follow: true },
 };

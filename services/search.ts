@@ -1,7 +1,7 @@
 /**
  * services/search.ts
  *
- * Global search service for the Nexus platform.
+ * Global search service for the PITERON platform.
  *
  * Route: GET /api/v1/search  (mounted at /api/v1/search, NOT under /workspaces)
  * Forwarded via: /api/backend/search

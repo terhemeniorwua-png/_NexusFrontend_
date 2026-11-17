@@ -2,9 +2,9 @@
 
 ## 1. Project Overview
 
-You are working on the frontend of **Nexus**, a Real-Time Workspace & Project Management Platform.
+You are working on the frontend of **PITERON**, a Real-Time Workspace & Project Management Platform.
 
-Nexus combines the capabilities of project management, team collaboration, communication, document management, scheduling, meetings, automation, and AI-powered productivity into one connected platform.
+PITERON combines the capabilities of project management, team collaboration, communication, document management, scheduling, meetings, automation, and AI-powered productivity into one connected platform.
 
 The product combines elements of:
 
@@ -13,7 +13,7 @@ The product combines elements of:
 - Slack — real-time messaging and team communication.
 - Modern productivity platforms — calendars, meetings, integrations, automation, and AI assistance.
 
-Nexus is designed for three workspace types:
+PITERON is designed for three workspace types:
 
 1. **Individual** — personal productivity and workspace management.
 2. **Company** — business collaboration, departments, teams, projects, and organisational management.
@@ -21,7 +21,7 @@ Nexus is designed for three workspace types:
 
 These workspace types share the same core application architecture. The active workspace type, subscription plan, user role, and permissions determine which features and navigation options are available.
 
-Your responsibility is to build and maintain a reliable, polished, responsive, accessible, and production-ready frontend that integrates correctly with the existing Nexus backend.
+Your responsibility is to build and maintain a reliable, polished, responsive, accessible, and production-ready frontend that integrates correctly with the existing PITERON Backend.
 
 ---
 
@@ -92,7 +92,7 @@ The frontend uses:
 
 ## 3.2 Backend architecture
 
-Nexus uses a separate Express.js and TypeScript backend.
+PITERON uses a separate Express.js and TypeScript backend.
 
 The backend is responsible for:
 
@@ -142,7 +142,7 @@ If the required backend endpoint does not exist:
 
 # 4. Core Product Architecture
 
-## 4.1 One Nexus identity
+## 4.1 One PITERON identity
 
 A user has one Nexus identity and can belong to multiple workspaces.
 
@@ -331,7 +331,7 @@ If a task reveals an issue belonging to another phase:
 
 # 7. Frontend Design and UI Standards
 
-The frontend must maintain a consistent Nexus design language.
+The frontend must maintain a consistent PITERON design language.
 
 Before designing or modifying an interface, inspect:
 
@@ -547,7 +547,7 @@ The frontend must support multiple workspaces per user.
 - Do not assume a user has the same role in every workspace.
 - Personal workspace data must remain independent of organisation membership.
 - Pending join request applicants must not access private workspace content.
-- Removing organisation membership must not delete the user's Nexus identity or personal workspace.
+- Removing organisation membership must not delete the user's PITERON identity or personal workspace.
 
 ---
 
@@ -596,7 +596,7 @@ The frontend must reflect permissions supplied by the backend.
 
 # 12. Project and Task Management
 
-Nexus supports shared project and task management.
+PITERON supports shared project and task management.
 
 ### Project visibility
 
@@ -656,7 +656,7 @@ All views must use the same underlying task data.
 
 # 13. Messaging and Conversations
 
-Messaging is a core Nexus feature.
+Messaging is a core PITERON feature.
 
 Supported conversation types:
 
@@ -739,7 +739,7 @@ Use separate state and backend data sources for general notifications and messag
 
 # 15. File Management and Document Collaboration
 
-Nexus includes file management and document collaboration.
+PITERON includes file management and document collaboration.
 
 ### File management
 
@@ -905,7 +905,7 @@ Full document search is part of the product requirements.
 
 # 19. Integrations
 
-Nexus supports integrations at individual and organisational workspace levels.
+PITERON supports integrations at individual and organisational workspace levels.
 
 Planned integrations include:
 
@@ -967,7 +967,7 @@ Do not invent automation capabilities that the backend does not support.
 
 # 21. AI Assistant and Python Service Integration
 
-Nexus includes a separate Python/FastAPI AI service.
+PITERON includes a separate Python/FastAPI AI service.
 
 The frontend must integrate through the approved application backend.
 
@@ -989,7 +989,7 @@ The frontend must integrate through the approved application backend.
 - Python performs AI processing.
 - The frontend must not connect directly to the main PostgreSQL database.
 - The frontend must not bypass Express authorisation.
-- Core Nexus functionality must continue when the AI service is unavailable.
+- Core PITERON functionality must continue when the AI service is unavailable.
 
 ### AI interface requirements
 
@@ -1008,9 +1008,9 @@ Do not fabricate AI responses in production workflows.
 
 ---
 
-# 22. Nexus Write
+# 22. PITERON Write
 
-Nexus Write provides Grammarly-like writing assistance.
+PITERON Write provides Grammarly-like writing assistance.
 
 ### Supported capabilities
 
@@ -1048,7 +1048,7 @@ Nexus Write provides Grammarly-like writing assistance.
 
 # 23. AI Action Approval and Execution
 
-AI may propose actions that change Nexus data.
+AI may propose actions that change PITERON data.
 
 Examples include:
 
@@ -1078,7 +1078,7 @@ The frontend must never treat an approval click as proof that the action succeed
 
 # 24. Real-Time Architecture and State Management
 
-Nexus uses real-time application functionality.
+PITERON uses real-time application functionality.
 
 The frontend must integrate with the existing real-time architecture.
 
@@ -1247,7 +1247,7 @@ Use the testing tools already configured in the repository.
 - Global search.
 - Integrations.
 - AI assistant.
-- Nexus Write.
+- PITERON Write.
 - AI action approvals.
 - Real-time reconnection.
 - Responsive layouts.
@@ -1938,7 +1938,7 @@ Where included in the phase requirements, ensure meetings integrate with:
 
 ### G. AI functionality
 
-Nexus AI and Nexus Write must follow the documented AI architecture.
+Nexus AI and PITERON Write must follow the documented AI architecture.
 
 The frontend must communicate through the approved backend integration.
 

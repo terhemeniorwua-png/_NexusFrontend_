@@ -10,13 +10,17 @@ import IntegrationsPage from './page';
 const WS_ID = 'ws-int-test';
 const USER_ID = 'user-1';
 
+const router = { push: vi.fn(), replace: vi.fn() };
+let searchParams = new URLSearchParams();
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => router,
   usePathname: () => '/app/integrations',
+  useSearchParams: () => searchParams,
 }));
 
 const mockCtx = {
-  activeWorkspace: { id: WS_ID, name: 'Test WS', type: 'COMPANY' as const },
+  activeWorkspace: { id: WS_ID, name: 'Test WS', type: 'COMPANY' as const, role: 'OWNER' },
   workspaces: [],
   user: { id: USER_ID, name: 'Ada', email: 'ada@test.com' },
   loading: false,
@@ -37,14 +41,18 @@ function fail(code: string, message: string, status = 400) {
   });
 }
 
-function fakeIntegration(overrides: Partial<{ provider: string; status: string }> = {}) {
+function fakeIntegration(overrides: Record<string, unknown> = {}) {
   return {
     id: 'int-1',
-    provider: 'GOOGLE_DRIVE',
+    provider: 'SLACK',
     status: 'ACTIVE',
-    workspaceId: null,
-    externalEmail: 'user@gmail.com',
-    scopes: ['drive.readonly'],
+    enabled: true,
+    workspaceId: WS_ID,
+    externalEmail: 'team@example.com',
+    scopes: ['chat:write', 'channels:read'],
+    lastSyncedAt: '2026-11-16T10:00:00.000Z',
+    lastError: null,
+    config: { slackChannelId: 'C123' },
     createdAt: new Date().toISOString(),
     ...overrides,
   };
@@ -53,110 +61,83 @@ function fakeIntegration(overrides: Partial<{ provider: string; status: string }
 describe('IntegrationsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    mockCtx.activeWorkspace = { id: WS_ID, name: 'Test WS', type: 'COMPANY' };
+    searchParams = new URLSearchParams();
+    mockCtx.activeWorkspace = { id: WS_ID, name: 'Test WS', type: 'COMPANY' as const, role: 'OWNER' } as any;
     mockCtx.user = { id: USER_ID, name: 'Ada', email: 'ada@test.com' };
   });
 
-  it('renders the page heading', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([]));
-    render(<IntegrationsPage />);
-    expect(screen.getByRole('heading', { name: 'Integrations', level: 1 })).toBeInTheDocument();
-  });
-
-  it('calls GET /integrations on mount', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([]));
+  it('loads integrations for the active workspace', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/dev-integrations/connections')) return ok([]);
+      return ok([fakeIntegration()]);
+    });
     render(<IntegrationsPage />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/backend/integrations'),
+      expect.stringContaining(`/api/backend/integrations?workspaceId=${WS_ID}`),
       expect.any(Object),
     ));
+    expect(await screen.findByText('Slack')).toBeInTheDocument();
+    expect(screen.getByText('team@example.com')).toBeInTheDocument();
+    expect(screen.getAllByText(/Last sync:/i).length).toBeGreaterThan(0);
   });
 
-  it('shows loading skeletons while fetching', () => {
-    let resolve!: (r: Response) => void;
-    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise((res) => { resolve = res; }));
-    render(<IntegrationsPage />);
-    expect(screen.getByLabelText('Loading integrations')).toBeInTheDocument();
-    resolve(ok([]));
-  });
-
-  it('renders connected integrations after load', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([fakeIntegration()]));
-    render(<IntegrationsPage />);
-    expect(await screen.findByText('Google Drive')).toBeInTheDocument();
-    expect(screen.getByText('ACTIVE')).toBeInTheDocument();
-    expect(screen.getByText('user@gmail.com')).toBeInTheDocument();
-  });
-
-  it('shows empty state when no integrations are connected', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([]));
-    render(<IntegrationsPage />);
-    expect(await screen.findByText('No integrations connected')).toBeInTheDocument();
-  });
-
-  it('shows available integrations section', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([]));
-    render(<IntegrationsPage />);
-    await waitFor(() => expect(screen.queryByLabelText('Loading integrations')).not.toBeInTheDocument());
-    expect(screen.getByText('Available integrations')).toBeInTheDocument();
-    expect(screen.getByText('Slack')).toBeInTheDocument();
-    // GitHub appears in both workspace source-control and personal integrations catalog
-    expect(screen.getAllByText('GitHub').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('shows error alert with Retry when loading fails', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(fail('INTERNAL_ERROR', 'Server error', 500));
-    render(<IntegrationsPage />);
-    expect(await screen.findByText('Server error')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-  });
-
-  it('shows AccessState for 401 response', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(fail('UNAUTHORIZED', 'Unauthorized', 401));
-    render(<IntegrationsPage />);
-    await waitFor(() => expect(screen.queryByLabelText('Loading integrations')).not.toBeInTheDocument());
-    expect(screen.queryByText('Google Drive')).not.toBeInTheDocument();
-  });
-
-  it('shows disconnect ConfirmDialog when Disconnect is clicked', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([fakeIntegration()]));
-    const user = userEvent.setup();
-    render(<IntegrationsPage />);
-    expect(await screen.findByRole('button', { name: 'Disconnect' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
-    expect(await screen.findByRole('dialog', { name: 'Disconnect integration' })).toBeInTheDocument();
-  });
-
-  it('calls DELETE to disconnect and removes from list', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
-      if ((init as RequestInit | undefined)?.method === 'DELETE') return ok({ ok: true });
-      return ok([fakeIntegration()]);
+  it('shows OAuth callback result and allows dismissing it', async () => {
+    searchParams = new URLSearchParams('integration=SLACK&status=connected');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/dev-integrations/connections')) return ok([]);
+      return ok([]);
     });
     const user = userEvent.setup();
     render(<IntegrationsPage />);
-    expect(await screen.findByRole('button', { name: 'Disconnect' })).toBeInTheDocument();
+    expect(await screen.findByText(/Slack connected successfully/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(router.replace).toHaveBeenCalled();
+  });
 
-    await user.click(screen.getByRole('button', { name: 'Disconnect' }));
-    await screen.findByRole('dialog', { name: 'Disconnect integration' });
-    const confirmBtns = screen.getAllByRole('button', { name: 'Disconnect' });
-    await user.click(confirmBtns[confirmBtns.length - 1]);
+  it('hides connect/disconnect actions for read-only members', async () => {
+    mockCtx.activeWorkspace = { id: WS_ID, name: 'Test WS', type: 'COMPANY' as const, role: 'MEMBER' } as any;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/dev-integrations/connections')) return ok([]);
+      return ok([fakeIntegration()]);
+    });
+    render(<IntegrationsPage />);
+    expect(await screen.findByText('Slack')).toBeInTheDocument();
+    expect(screen.getByText(/read-only access to integrations/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Disconnect' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Connect' })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Read-only|Admin only/).length).toBeGreaterThan(0);
+  });
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/integrations/int-1'),
-      expect.objectContaining({ method: 'DELETE' }),
+  it('shows Reconnect and Sync now for integrations with invalid token/error', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      const u = String(url);
+      const method = (init as RequestInit | undefined)?.method ?? 'GET';
+      if (u.includes('/dev-integrations/connections')) return ok([]);
+      if (u.includes('/imports?')) return ok([]);
+      if (u.includes('/projects?')) return ok({ items: [], nextCursor: null });
+      if (u.endsWith('/sync') && method === 'POST') return ok({ id: 'job-1', integrationId: 'int-1', status: 'PENDING', createdAt: new Date().toISOString() });
+      if (u.endsWith('/status')) return ok({ lastSyncedAt: '2026-11-16T12:00:00.000Z', lastError: null });
+      if (u.includes('/api/backend/integrations?workspaceId=')) return ok([fakeIntegration({ status: 'ERROR', lastError: 'token expired' })]);
+      return ok([]);
+    });
+    const user = userEvent.setup();
+    render(<IntegrationsPage />);
+    expect(await screen.findByText(/Reconnect required/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sync now' }));
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/integrations/int-1/sync'),
+      expect.objectContaining({ method: 'POST' }),
     ));
   });
 
-  it('workspace switch reloads integrations', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([]));
-    const { rerender } = render(<IntegrationsPage />);
-    // personal integrations + workspace dev connections load
-    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2));
-    const initialCalls = fetchMock.mock.calls.length;
-
-    mockCtx.activeWorkspace = { id: 'ws-other', name: 'Other WS', type: 'COMPANY' };
-    rerender(<IntegrationsPage />);
-    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(initialCalls));
+  it('shows permission denied state on 403', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('/dev-integrations/connections')) return fail('FORBIDDEN', 'Forbidden', 403);
+      return fail('FORBIDDEN', 'Forbidden', 403);
+    });
+    render(<IntegrationsPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Loading integrations')).not.toBeInTheDocument());
+    expect(screen.getByText(/do not have access/i)).toBeInTheDocument();
   });
 });

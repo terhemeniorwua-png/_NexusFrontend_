@@ -21,7 +21,7 @@ vi.mock('@/services/invitations', () => ({
 
 const workspace: Workspace = {
   id: 'workspace-1',
-  name: 'Nexus Studio',
+  name: 'PITERON Studio',
   slug: 'nexus-studio',
   description: null,
   type: 'COMPANY',
@@ -42,7 +42,7 @@ const workspace: Workspace = {
 const pending: Invitation = {
   id: 'invitation-1',
   workspaceId: 'workspace-1',
-  workspaceName: 'Nexus Studio',
+  workspaceName: 'PITERON Studio',
   email: 'grace@example.com',
   role: 'COLLABORATOR',
   organizationRole: 'COMPANY_MEMBER',

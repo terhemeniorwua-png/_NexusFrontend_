@@ -158,7 +158,7 @@ function IntegrationSettings({
               value={slackChannel}
               onChange={(e) => { setSlackChannel(e.target.value); setSaved(false); }}
               placeholder="C0123456789"
-              helperText="Choose the Slack channel where Nexus should post task and automation notifications for this workspace."
+              helperText="Choose the Slack channel where PITERON should post task and automation notifications for this workspace."
               disabled={!canManage}
             />
           </div>
@@ -184,7 +184,7 @@ function IntegrationSettings({
               value={calendarId}
               onChange={(e) => { setCalendarId(e.target.value); setSaved(false); }}
               placeholder="primary"
-              helperText="Calendar ID to sync with Nexus events (use “primary” for your main calendar)."
+              helperText="Calendar ID to sync with PITERON events (use “primary” for your main calendar)."
               disabled={!canManage}
             />
           </div>
@@ -731,7 +731,7 @@ function IntegrationsPageContent() {
 
           <section className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
             <p className="text-xs text-[var(--color-text-muted)]">
-              <strong>Security note:</strong> Nexus stores integration tokens in encrypted form and never exposes them to the browser. Disconnecting revokes Nexus access but does not delete data in the connected provider.
+              <strong>Security note:</strong> PITERON stores integration tokens in encrypted form and never exposes them to the browser. Disconnecting revokes PITERON access but does not delete data in the connected provider.
             </p>
           </section>
         </div>
@@ -740,7 +740,7 @@ function IntegrationsPageContent() {
       <ConfirmDialog
         open={!!disconnectTarget}
         title="Disconnect integration"
-        description={`Disconnect ${disconnectTarget ? PROVIDER_META[disconnectTarget.provider].name : ''}? Nexus access will be revoked for this connection.`}
+        description={`Disconnect ${disconnectTarget ? PROVIDER_META[disconnectTarget.provider].name : ''}? PITERON access will be revoked for this connection.`}
         confirmLabel="Disconnect"
         destructive
         onConfirm={() => { void handleDisconnect(); }}

@@ -23,7 +23,7 @@ vi.mock('@/services/join-requests', () => ({
 
 const workspace: Workspace = {
   id: 'workspace-1',
-  name: 'Nexus Studio',
+  name: 'PITERON Studio',
   slug: 'nexus-studio',
   description: null,
   type: 'COMPANY',
@@ -44,7 +44,7 @@ const workspace: Workspace = {
 const request: JoinRequest = {
   id: 'request-1',
   workspaceId: 'workspace-1',
-  workspaceName: 'Nexus Studio',
+  workspaceName: 'PITERON Studio',
   userId: 'user-2',
   userName: 'Grace Applicant',
   userEmail: 'grace@example.com',
@@ -83,7 +83,7 @@ describe('JoinRequestsPanel', () => {
     await waitFor(() => expect(mocks.approveJoinRequest).toHaveBeenCalledWith('workspace-1', 'request-1', {
       organizationRole: 'COMPANY_COLLABORATOR',
     }));
-    expect(await screen.findByText(/Grace Applicant joined Nexus Studio as Collaborator/)).toBeInTheDocument();
+    expect(await screen.findByText(/Grace Applicant joined PITERON Studio as Collaborator/)).toBeInTheDocument();
   });
 
   it('rejects a request with an optional note', async () => {
@@ -115,7 +115,7 @@ describe('JoinRequestsPanel', () => {
     mocks.createWorkspaceJoinCode.mockResolvedValue({
       workspaceId: 'workspace-1',
       code: 'one-time-code',
-      link: 'https://nexus.test/join/one-time-code',
+      link: 'https://piteron.test/join/one-time-code',
     });
     const user = userEvent.setup();
     render(<JoinRequestsPanel workspace={workspace} canManage />);
@@ -124,6 +124,6 @@ describe('JoinRequestsPanel', () => {
 
     await waitFor(() => expect(mocks.createWorkspaceJoinCode).toHaveBeenCalledWith('workspace-1'));
     expect(await screen.findByText('one-time-code')).toBeInTheDocument();
-    expect(screen.getByText('https://nexus.test/join/one-time-code')).toBeInTheDocument();
+    expect(screen.getByText('https://piteron.test/join/one-time-code')).toBeInTheDocument();
   });
 });

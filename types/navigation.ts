@@ -1,7 +1,7 @@
 /**
  * types/navigation.ts
  *
- * Shared types for the Nexus application shell.
+ * Shared types for the PITERON application shell.
  *
  * These types describe the data the shell renders. They are intentionally
  * presentation-focused: the backend remains authoritative for the user's
@@ -13,7 +13,7 @@
 /**
  * Workspace presentation kind.
  *
- * This mirrors the three documented Nexus workspace types. It is a frontend
+ * This mirrors the three documented PITERON workspace types. It is a frontend
  * union, not a confirmed backend enum. Map the backend workspace type into this
  * union in one place rather than checking backend strings in components.
  */

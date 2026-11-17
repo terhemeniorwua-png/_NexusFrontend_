@@ -254,7 +254,7 @@ export function ImportWizard({ workspaceId, canImport }: Props) {
           <div>
             <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Import wizard</h3>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Preview before importing. Nexus will never start an import without an explicit confirmation of the dry-run preview.
+              Preview before importing. PITERON will never start an import without an explicit confirmation of the dry-run preview.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
@@ -339,7 +339,7 @@ export function ImportWizard({ workspaceId, canImport }: Props) {
             <div>
               <label htmlFor="import-user-mapping" className="text-sm font-medium text-[var(--color-text-primary)]">Field / user mapping</label>
               <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                Map source user emails or identifiers to Nexus workspace member emails, one per line (for example: <code>alice@old.com=alice@nexus.com</code>). Unmapped users will be reported as warnings and left unassigned.
+                Map source user emails or identifiers to PITERON workspace member emails, one per line (for example: <code>alice@old.com=alice@piteron.com</code>). Unmapped users will be reported as warnings and left unassigned.
               </p>
               <textarea
                 id="import-user-mapping"

@@ -252,7 +252,7 @@ describe('AuthForm', () => {
     // Pasting a complete 6-digit code triggers onComplete → handleVerifySubmit automatically.
     await typeCode(user, '123456');
 
-    expect(await screen.findByText('Your email is verified. You can now sign in to Nexus.')).toBeInTheDocument();
+    expect(await screen.findByText('Your email is verified. You can now sign in to PITERON.')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/backend/auth/email/verify', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ email: 'ada@example.com', code: '123456' }),
@@ -277,7 +277,7 @@ describe('AuthForm', () => {
 
   // ── FIXED: use initialEmail + code boxes, assert new endpoint ──
   it.each([
-    ['personal', 'Your email is verified. You can now sign in to Nexus.', '/sign-in?accountType=personal'],
+    ['personal', 'Your email is verified. You can now sign in to PITERON.', '/sign-in?accountType=personal'],
     ['business', 'Your email is verified. Sign in to create or resume your business workspace.', '/sign-in?accountType=business'],
   ])('continues a verified %s account to the matching sign-in route', async (accountType, notice, route) => {
     savePendingOnboardingIntent({ accountType: accountType as 'personal' | 'business', email: 'ada@acme.example' });

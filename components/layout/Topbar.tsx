@@ -131,7 +131,7 @@ export function Topbar({
 
       <Link
         href="/app"
-        aria-label="Nexus home"
+        aria-label="PITERON home"
         className="flex flex-shrink-0 items-center gap-2 rounded-[var(--radius-md)] px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
       >
         <span
@@ -141,7 +141,7 @@ export function Topbar({
           N
         </span>
         <span className="hidden text-base font-semibold text-[var(--color-text-primary)] sm:inline">
-          Nexus
+          PITERON
         </span>
       </Link>
 

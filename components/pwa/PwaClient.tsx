@@ -73,14 +73,14 @@ export function PwaClient() {
   return (
     <div
       role="dialog"
-      aria-label="Install Nexus"
+      aria-label="Install PITERON"
       className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-lg sm:inset-x-auto sm:right-4"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">Install Nexus</p>
+          <p className="text-sm font-semibold text-[var(--color-text-primary)]">Install PITERON</p>
           <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-            Install the app for quick access. Nexus only caches the app shell and static assets, never your
+            Install the app for quick access. PITERON only caches the app shell and static assets, never your
             workspace data or API responses.
           </p>
         </div>

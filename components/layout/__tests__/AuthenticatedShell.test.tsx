@@ -34,8 +34,8 @@ vi.mock('@/services/notifications', () => ({ getUnreadCount: vi.fn().mockResolve
 
 const company: Record<string, unknown> = {
   id: 'workspace-company',
-  name: 'Nexus Studio',
-  slug: 'nexus-studio',
+  name: 'PITERON Studio',
+  slug: 'piteron-studio',
   description: null,
   type: 'COMPANY',
   isPersonal: false,
@@ -88,7 +88,7 @@ describe('AuthenticatedShell', () => {
     expect(screen.getByRole('button', { name: 'People and access' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
     expect(screen.getByText('Page body')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Switch workspace: Nexus Studio' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch workspace: PITERON Studio' })).toBeInTheDocument();
   });
 
   it('switches workspace through the provider', async () => {
@@ -96,7 +96,7 @@ describe('AuthenticatedShell', () => {
     mocks.context.switchToWorkspace.mockResolvedValue(true);
     render(<ThemeProvider><AuthenticatedShell><p>Page body</p></AuthenticatedShell></ThemeProvider>);
 
-    await user.click(screen.getByRole('button', { name: 'Switch workspace: Nexus Studio' }));
+    await user.click(screen.getByRole('button', { name: 'Switch workspace: PITERON Studio' }));
     await user.click(screen.getByRole('menuitem', { name: 'Personal' }));
 
     expect(mocks.context.switchToWorkspace).toHaveBeenCalledWith('workspace-personal');

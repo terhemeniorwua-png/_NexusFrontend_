@@ -7,15 +7,15 @@ export function PolicyPage({ policy }: { policy: LegalPolicyContent }) {
   return (
     <main className="min-h-dvh bg-[var(--color-background)]">
       <header className="mx-auto flex max-w-4xl items-center justify-between px-5 py-5 sm:px-8">
-        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight" aria-label="Nexus home">
+        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight" aria-label="PITERON home">
           <span aria-hidden="true" className="grid size-9 place-items-center rounded-xl bg-[var(--color-primary)] text-sm font-bold text-white">N</span>
-          Nexus
+          PITERON
         </Link>
         <Link href="/sign-in" className="text-sm font-medium text-[var(--color-primary)] hover:underline">Sign in</Link>
       </header>
 
       <article className="mx-auto max-w-3xl px-5 pb-16 pt-8 sm:px-8 sm:pt-12">
-        <p className="text-sm font-semibold text-[var(--color-primary)]">Nexus policies</p>
+        <p className="text-sm font-semibold text-[var(--color-primary)]">PITERON policies</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{policy.title}</h1>
         <p className="mt-4 text-base leading-7 text-[var(--color-text-secondary)]">{policy.summary}</p>
 
@@ -42,7 +42,7 @@ export function PolicyPage({ policy }: { policy: LegalPolicyContent }) {
         <footer className="mt-10 border-t border-[var(--color-border)] pt-6">
           <PolicyLinks />
           <p className="mt-4 text-center text-xs text-[var(--color-text-muted)]">
-            <Link href="/" className="hover:text-[var(--color-text-primary)]">Return to Nexus</Link>
+            <Link href="/" className="hover:text-[var(--color-text-primary)]">Return to PITERON</Link>
           </p>
         </footer>
       </article>

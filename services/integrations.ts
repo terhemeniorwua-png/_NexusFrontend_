@@ -1,7 +1,7 @@
 /**
  * services/integrations.ts
  *
- * Integrations management service for Nexus.
+ * Integrations management service for PITERON.
  * Routes are mounted at /api/v1/integrations and proxied via /api/backend/integrations.
  */
 

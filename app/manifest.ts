@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Nexus',
-    short_name: 'Nexus',
+    name: 'PITERON',
+    short_name: 'PITERON',
     description: 'One connected workspace for projects, people, and progress.',
     start_url: '/app',
     scope: '/',

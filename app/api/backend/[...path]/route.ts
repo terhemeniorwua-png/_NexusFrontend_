@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 
 const REQUEST_HEADERS = ['authorization', 'content-type', 'cookie', 'user-agent', 'x-csrf-token'] as const;
-const RESPONSE_HEADERS = ['cache-control', 'content-type', 'x-request-id'] as const;
+const RESPONSE_HEADERS = ['cache-control', 'content-type', 'etag', 'content-disposition', 'content-length', 'x-request-id'] as const;
 
 /**
  * Backend API prefixes the browser is allowed to reach through the same-origin

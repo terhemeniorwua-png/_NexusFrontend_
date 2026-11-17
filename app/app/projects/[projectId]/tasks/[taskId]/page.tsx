@@ -38,11 +38,22 @@ import {
   addComment,
   updateComment,
   deleteComment,
+  listProjectCustomFields,
+  getTaskCustomFieldValues,
+  setTaskCustomFieldValues,
+  getTaskRecurrence,
+  upsertTaskRecurrence,
+  deleteTaskRecurrence,
+  generateTaskRecurrenceInstance,
+  type ProjectCustomField,
+  type TaskRecurrenceFrequency,
+  type TaskRecurrenceRule,
   type TaskSummary,
   type TaskStatus,
   type TaskPriority,
   type TaskComment,
 } from '@/services/tasks';
+import { CustomFieldInput, formatCustomFieldValue } from '@/components/tasks/CustomFieldInputs';
 import { listProjectMembers, type ProjectMember } from '@/services/projects';
 import {
   deleteFile,
@@ -207,6 +218,28 @@ export default function TaskDetailPage() {
   // Submission / review actions
   const [submissionBusy, setSubmissionBusy] = useState(false);
 
+  // Custom fields (project definitions + task values)
+  const [customFields, setCustomFields] = useState<ProjectCustomField[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
+  const [cfDraft, setCfDraft] = useState<Record<string, unknown>>({});
+  const [cfEditing, setCfEditing] = useState(false);
+  const [cfBusy, setCfBusy] = useState(false);
+  const [cfError, setCfError] = useState<string | null>(null);
+
+  // Recurrence
+  const [recurrence, setRecurrence] = useState<TaskRecurrenceRule | null>(null);
+  const [recurrenceLoading, setRecurrenceLoading] = useState(false);
+  const [recurrenceEditing, setRecurrenceEditing] = useState(false);
+  const [recurrenceBusy, setRecurrenceBusy] = useState(false);
+  const [recurrenceError, setRecurrenceError] = useState<string | null>(null);
+  const [recFrequency, setRecFrequency] = useState<TaskRecurrenceFrequency>('WEEKLY');
+  const [recInterval, setRecInterval] = useState(1);
+  const [recDays, setRecDays] = useState<number[]>([1]);
+  const [recDayOfMonth, setRecDayOfMonth] = useState<number | ''>('');
+  const [recEndsAt, setRecEndsAt] = useState('');
+  const [recMax, setRecMax] = useState<number | ''>('');
+  const [recActive, setRecActive] = useState(true);
+
   // ---------------------------------------------------------------------------
   // Data loading
   // ---------------------------------------------------------------------------
@@ -289,6 +322,122 @@ export default function TaskDetailPage() {
 
   // Abort an in-flight upload when the page unmounts.
   useEffect(() => () => { uploadAbortRef.current?.abort(); }, []);
+
+  const loadCustomFields = useCallback(async () => {
+    if (!activeWorkspace) return;
+    try {
+      const [fields, values] = await Promise.all([
+        listProjectCustomFields(activeWorkspace.id, projectId).catch(() => [] as ProjectCustomField[]),
+        getTaskCustomFieldValues(activeWorkspace.id, projectId, taskId).catch(() => []),
+      ]);
+      setCustomFields(fields);
+      const map: Record<string, unknown> = {};
+      for (const row of values) map[row.fieldId] = row.value;
+      setCustomFieldValues(map);
+      setCfDraft(map);
+    } catch {
+      // non-blocking
+    }
+  }, [activeWorkspace, projectId, taskId]);
+
+  const loadRecurrence = useCallback(async () => {
+    if (!activeWorkspace) return;
+    setRecurrenceLoading(true);
+    try {
+      const rule = await getTaskRecurrence(activeWorkspace.id, projectId, taskId);
+      setRecurrence(rule);
+      setRecFrequency(rule.frequency);
+      setRecInterval(rule.interval || 1);
+      setRecDays(rule.daysOfWeek || []);
+      setRecDayOfMonth(rule.dayOfMonth ?? '');
+      setRecEndsAt(rule.endsAt ? rule.endsAt.slice(0, 10) : '');
+      setRecMax(rule.maxOccurrences ?? '');
+      setRecActive(rule.active);
+    } catch {
+      setRecurrence(null);
+    } finally {
+      setRecurrenceLoading(false);
+    }
+  }, [activeWorkspace, projectId, taskId]);
+
+  useEffect(() => {
+    if (!activeWorkspace || !canView) return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      void loadCustomFields();
+      void loadRecurrence();
+    });
+    return () => { active = false; };
+  }, [activeWorkspace, canView, loadCustomFields, loadRecurrence]);
+
+  async function handleSaveCustomFields() {
+    if (!activeWorkspace) return;
+    setCfBusy(true); setCfError(null);
+    try {
+      const values = customFields.map((f) => ({ fieldId: f.id, value: cfDraft[f.id] ?? null }));
+      await setTaskCustomFieldValues(activeWorkspace.id, projectId, taskId, values);
+      setCustomFieldValues(cfDraft);
+      setCfEditing(false);
+      setNotice('Custom field values saved.');
+    } catch (cause) {
+      setCfError(requestError(cause, 'Custom field values could not be saved.'));
+    } finally {
+      setCfBusy(false);
+    }
+  }
+
+  async function handleSaveRecurrence() {
+    if (!activeWorkspace) return;
+    setRecurrenceBusy(true); setRecurrenceError(null);
+    try {
+      const rule = await upsertTaskRecurrence(activeWorkspace.id, projectId, taskId, {
+        frequency: recFrequency,
+        interval: Math.max(1, recInterval || 1),
+        daysOfWeek: recFrequency === 'WEEKLY' ? recDays : [],
+        dayOfMonth: recFrequency === 'MONTHLY' ? (recDayOfMonth === '' ? null : Number(recDayOfMonth)) : null,
+        endsAt: recEndsAt ? new Date(`${recEndsAt}T23:59:59.000Z`).toISOString() : null,
+        maxOccurrences: recMax === '' ? null : Number(recMax),
+        active: recActive,
+      });
+      setRecurrence(rule);
+      setRecurrenceEditing(false);
+      setNotice('Recurrence settings saved.');
+    } catch (cause) {
+      setRecurrenceError(requestError(cause, 'Recurrence settings could not be saved.'));
+    } finally {
+      setRecurrenceBusy(false);
+    }
+  }
+
+  async function handleDeleteRecurrence() {
+    if (!activeWorkspace) return;
+    setRecurrenceBusy(true); setRecurrenceError(null);
+    try {
+      await deleteTaskRecurrence(activeWorkspace.id, projectId, taskId);
+      setRecurrence(null);
+      setRecurrenceEditing(false);
+      setNotice('Recurrence removed.');
+    } catch (cause) {
+      setRecurrenceError(requestError(cause, 'Recurrence could not be removed.'));
+    } finally {
+      setRecurrenceBusy(false);
+    }
+  }
+
+  async function handleGenerateRecurrence() {
+    if (!activeWorkspace) return;
+    setRecurrenceBusy(true); setRecurrenceError(null);
+    try {
+      await generateTaskRecurrenceInstance(activeWorkspace.id, projectId, taskId);
+      setNotice('Next recurrence instance generated.');
+      await load();
+    } catch (cause) {
+      setRecurrenceError(requestError(cause, 'Could not generate recurrence instance.'));
+    } finally {
+      setRecurrenceBusy(false);
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Edit form helpers
@@ -678,6 +827,16 @@ export default function TaskDetailPage() {
                   <span className="font-mono text-xs bg-[var(--color-surface-secondary)] border border-[var(--color-border)] px-1.5 py-0.5 rounded text-[var(--color-text-secondary)]">
                     {task.key}
                   </span>
+                  {task?.customFields && Object.keys(task.customFields).length > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+                      <span className="font-medium">Custom:</span>
+                      {Object.entries(task.customFields ?? {}).map(([key, value]: [string, unknown]) => (
+                        <span key={key} className="mx-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[var(--color-text-secondary)] bg-[var(--color-surface-secondary)]">
+                          {key}: {String(value)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <Badge variant={task.status}>{statusLabel(task.status)}</Badge>
                   <Badge variant={task.priority}>{priorityLabel(task.priority)}</Badge>
                   {isArchived && <Badge variant="outline">Archived</Badge>}
@@ -948,6 +1107,103 @@ export default function TaskDetailPage() {
               </ul>
             </Card>
           )}
+
+          {/* Custom fields */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h2 className="font-semibold">Custom fields</h2>
+              {canUpdate && customFields.length > 0 && !cfEditing && (
+                <Button size="sm" variant="secondary" onClick={() => { setCfDraft(customFieldValues); setCfEditing(true); }}>Edit</Button>
+              )}
+            </div>
+            {cfError && <Alert variant="error" className="mb-3">{cfError}</Alert>}
+            {customFields.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">No custom fields are defined for this project.</p>
+            ) : cfEditing ? (
+              <div className="space-y-4">
+                {customFields.map((f) => (
+                  <CustomFieldInput key={f.id} field={f} idPrefix="task-cf" value={cfDraft[f.id] ?? null} onChange={(v) => setCfDraft((prev) => ({ ...prev, [f.id]: v }))} />
+                ))}
+                <div className="flex gap-2">
+                  <Button size="sm" loading={cfBusy} onClick={() => void handleSaveCustomFields()}>Save fields</Button>
+                  <Button size="sm" variant="secondary" disabled={cfBusy} onClick={() => { setCfEditing(false); setCfDraft(customFieldValues); }}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <dl className="space-y-2 text-sm">
+                {customFields.map((f) => (
+                  <div key={f.id} className="flex justify-between gap-3">
+                    <dt className="text-[var(--color-text-secondary)]">{f.name}</dt>
+                    <dd className="font-medium text-right">{formatCustomFieldValue(f, customFieldValues[f.id])}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </Card>
+
+          {/* Recurrence */}
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h2 className="font-semibold">Recurrence</h2>
+              <div className="flex gap-2">
+                {canUpdate && !recurrenceEditing && (
+                  <Button size="sm" variant="secondary" onClick={() => setRecurrenceEditing(true)}>{recurrence ? 'Edit recurrence' : 'Set recurrence'}</Button>
+                )}
+              </div>
+            </div>
+            {recurrenceError && <Alert variant="error" className="mb-3">{recurrenceError}</Alert>}
+            {recurrenceLoading ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">Loading recurrence…</p>
+            ) : recurrenceEditing ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Select id="rec-freq-detail" label="Frequency" value={recFrequency} onChange={(e) => setRecFrequency(e.target.value as TaskRecurrenceFrequency)} options={[{ value: 'DAILY', label: 'Daily' }, { value: 'WEEKLY', label: 'Weekly' }, { value: 'MONTHLY', label: 'Monthly' }]} />
+                  <Input id="rec-interval-detail" label="Interval" type="number" value={String(recInterval)} onChange={(e) => setRecInterval(Math.max(1, Number(e.target.value) || 1))} />
+                </div>
+                {recFrequency === 'WEEKLY' && (
+                  <div>
+                    <p className="mb-1 text-sm font-medium">Days of week</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[['Sun',0],['Mon',1],['Tue',2],['Wed',3],['Thu',4],['Fri',5],['Sat',6]].map(([label, val]) => {
+                        const n = val as number;
+                        const active = recDays.includes(n);
+                        return <label key={n} className="inline-flex items-center gap-1 text-sm"><input type="checkbox" checked={active} onChange={(e) => setRecDays((prev) => e.target.checked ? [...prev, n] : prev.filter((x) => x !== n))} className="h-4 w-4 rounded border border-[var(--color-border)]" />{label as string}</label>;
+                      })}
+                    </div>
+                  </div>
+                )}
+                {recFrequency === 'MONTHLY' && (
+                  <Input id="rec-dom-detail" label="Day of month (1-31, optional)" type="number" value={recDayOfMonth === '' ? '' : String(recDayOfMonth)} onChange={(e) => setRecDayOfMonth(e.target.value === '' ? '' : Math.max(1, Math.min(31, Number(e.target.value) || 1)))} />
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="rec-ends-detail" className="block text-sm font-medium text-[var(--color-text-primary)]">Ends on (optional)</label>
+                    <input id="rec-ends-detail" type="date" value={recEndsAt} onChange={(e) => setRecEndsAt(e.target.value)} className="mt-1 h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-3 text-sm" />
+                  </div>
+                  <Input id="rec-max-detail" label="Max occurrences (optional)" type="number" value={recMax === '' ? '' : String(recMax)} onChange={(e) => setRecMax(e.target.value === '' ? '' : Math.max(1, Number(e.target.value) || 1))} />
+                </div>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={recActive} onChange={(e) => setRecActive(e.target.checked)} className="h-4 w-4 rounded border border-[var(--color-border)]" /> Active</label>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" loading={recurrenceBusy} onClick={() => void handleSaveRecurrence()}>Save recurrence</Button>
+                  <Button size="sm" variant="secondary" disabled={recurrenceBusy} onClick={() => setRecurrenceEditing(false)}>Cancel</Button>
+                  {recurrence && <Button size="sm" variant="ghost" disabled={recurrenceBusy} onClick={() => void handleDeleteRecurrence()}>Remove recurrence</Button>}
+                </div>
+              </div>
+            ) : recurrence ? (
+              <div className="space-y-2 text-sm">
+                <p><span className="text-[var(--color-text-secondary)]">Frequency:</span> <span className="font-medium">{recurrence.frequency.toLowerCase()}</span> every {recurrence.interval}</p>
+                {recurrence.frequency === 'WEEKLY' && <p><span className="text-[var(--color-text-secondary)]">Days:</span> <span className="font-medium">{(recurrence.daysOfWeek || []).join(', ') || '—'}</span></p>}
+                {recurrence.frequency === 'MONTHLY' && <p><span className="text-[var(--color-text-secondary)]">Day of month:</span> <span className="font-medium">{recurrence.dayOfMonth ?? '—'}</span></p>}
+                <p><span className="text-[var(--color-text-secondary)]">Active:</span> <span className="font-medium">{recurrence.active ? 'Yes' : 'No'}</span></p>
+                <p><span className="text-[var(--color-text-secondary)]">Occurrences:</span> <span className="font-medium">{recurrence.occurrenceCount}</span>{recurrence.maxOccurrences ? <span className="text-[var(--color-text-muted)]"> / {recurrence.maxOccurrences}</span> : null}</p>
+                <p><span className="text-[var(--color-text-secondary)]">Next run:</span> <span className="font-medium">{recurrence.nextRunAt ? new Date(recurrence.nextRunAt).toLocaleString() : '—'}</span></p>
+                {recurrence.endsAt && <p><span className="text-[var(--color-text-secondary)]">Ends:</span> <span className="font-medium">{new Date(recurrence.endsAt).toLocaleDateString()}</span></p>}
+                {canUpdate && <div className="pt-2"><Button size="sm" variant="secondary" loading={recurrenceBusy} onClick={() => void handleGenerateRecurrence()}>Generate next instance now</Button></div>}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--color-text-secondary)]">No recurrence rule set for this task.</p>
+            )}
+          </Card>
 
           {/* Comments */}
           <Card className="p-5">

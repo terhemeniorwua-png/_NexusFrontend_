@@ -133,7 +133,11 @@ export async function apiRequest<T>(
       path,
       status: response.status,
       contentType: response.headers.get('content-type'),
-      body: rawBody.slice(0, 300),
+      body: rawBody.slice(0, 120),
+      length: rawBody.length,
+      tail: rawBody.slice(-80),
+      contentLength: response.headers.get('content-length'),
+      contentEncoding: response.headers.get('content-encoding'),
     });
     throw new ApiRequestError('The server returned an unreadable response.', response.status);
   }

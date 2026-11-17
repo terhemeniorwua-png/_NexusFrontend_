@@ -19,6 +19,8 @@ import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
 import {
   getAutomation,
+  listAutomationRuns,
+  retryAutomationRun,
   updateAutomation,
   deleteAutomation,
   type Automation,
@@ -26,58 +28,120 @@ import {
 } from '@/services/automations';
 
 const TRIGGER_LABELS: Record<string, string> = {
-  EVENT_TASK_CREATED:   'Task created',
+  EVENT_TASK_CREATED: 'Task created',
   EVENT_TASK_COMPLETED: 'Task completed',
-  EVENT_MEMBER_JOINED:  'Member joined workspace',
-  SCHEDULED_DAILY:      'Daily schedule',
-  SCHEDULED_WEEKLY:     'Weekly schedule',
+  EVENT_MEMBER_JOINED: 'Member joined workspace',
+  EVENT_TASK_STATUS_CHANGED: 'Task status changed',
+  EVENT_TASK_ASSIGNED: 'Task assigned',
+  EVENT_TASK_DUE_DATE_PASSED: 'Task due date passed',
+  EVENT_FORM_SUBMITTED: 'Form submitted',
+  SCHEDULED_DAILY: 'Daily schedule',
+  SCHEDULED_WEEKLY: 'Weekly schedule',
 };
 
 const ACTION_LABELS: Record<string, string> = {
   SEND_NOTIFICATION: 'Send notification',
-  CREATE_TASK:       'Create a task',
-  SEND_WEBHOOK:      'Send webhook',
+  CREATE_TASK: 'Create a task',
+  SEND_WEBHOOK: 'Send webhook',
+  SET_FIELD: 'Set field',
+  ASSIGN: 'Assign user(s)',
+  POST_MESSAGE: 'Post message',
 };
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
   return new Date(iso).toLocaleString([], {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
 }
 
-function runStatusVariant(status: string): 'default' | 'success' | 'warning' | 'error' {
+function runStatusVariant(status: string): 'default' | 'success' | 'warning' | 'error' | 'info' {
   if (status === 'SUCCEEDED') return 'success';
   if (status === 'FAILED') return 'error';
-  return 'warning';
+  if (status === 'RUNNING') return 'info';
+  if (status === 'PENDING') return 'warning';
+  return 'default';
 }
 
 // ─── Run history ──────────────────────────────────────────────────────────────
 
-function RunHistory({ runs }: { runs: AutomationRun[] }) {
+function RunHistory({
+  runs,
+  loading,
+  onRetry,
+  retryingId,
+}: {
+  runs: AutomationRun[];
+  loading: boolean;
+  onRetry: (run: AutomationRun) => void;
+  retryingId: string | null;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-2" aria-busy="true" aria-label="Loading run history">
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+      </div>
+    );
+  }
+
   if (runs.length === 0) {
     return <EmptyState title="No runs yet" description="This automation has not run yet." />;
   }
 
+  const failedCount = runs.filter((r) => r.status === 'FAILED').length;
+
   return (
     <div className="space-y-2">
+      {failedCount > 0 && (
+        <Alert variant="warning" className="mb-2">
+          {failedCount} failed run{failedCount === 1 ? '' : 's'} in this history. Failed runs show their error reason and can be retried.
+        </Alert>
+      )}
       {runs.map((run) => (
         <div
           key={run.id}
-          className="flex flex-wrap items-start justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3"
+          className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3"
         >
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Badge variant={runStatusVariant(run.status)}>{run.status}</Badge>
-              <span className="text-xs text-[var(--color-text-muted)]">
-                {run.attempts} attempt{run.attempts !== 1 ? 's' : ''}
-              </span>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={runStatusVariant(run.status)}>{run.status}</Badge>
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  {run.attempts} attempt{run.attempts !== 1 ? 's' : ''}
+                </span>
+                {run.eventKey && (
+                  <span className="max-w-full truncate text-xs text-[var(--color-text-muted)]" title={run.eventKey}>
+                    event {run.eventKey}
+                  </span>
+                )}
+              </div>
+              {run.error ? (
+                <p className="mt-1 whitespace-pre-wrap text-xs text-[var(--color-error)]">
+                  <span className="font-medium">Failure reason:</span> {run.error}
+                </p>
+              ) : run.status === 'FAILED' ? (
+                <p className="mt-1 text-xs text-[var(--color-error)]">Failure reason unavailable.</p>
+              ) : null}
+              <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)] sm:grid-cols-2">
+                <div><dt className="inline font-medium text-[var(--color-text-secondary)]">Started: </dt><dd className="inline">{formatDate(run.startedAt)}</dd></div>
+                <div><dt className="inline font-medium text-[var(--color-text-secondary)]">Completed: </dt><dd className="inline">{formatDate(run.completedAt)}</dd></div>
+                <div><dt className="inline font-medium text-[var(--color-text-secondary)]">Created: </dt><dd className="inline">{formatDate(run.createdAt)}</dd></div>
+                {run.nextAttemptAt && <div><dt className="inline font-medium text-[var(--color-text-secondary)]">Next attempt: </dt><dd className="inline">{formatDate(run.nextAttemptAt)}</dd></div>}
+              </dl>
             </div>
-            {run.error && (
-              <p className="mt-1 text-xs text-[var(--color-error)]">{run.error}</p>
+            {run.status === 'FAILED' && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => onRetry(run)}
+                loading={retryingId === run.id}
+                disabled={retryingId !== null}
+              >
+                Retry
+              </Button>
             )}
           </div>
-          <span className="text-xs text-[var(--color-text-muted)]">{formatDate(run.startedAt)}</span>
         </div>
       ))}
     </div>
@@ -98,6 +162,11 @@ export default function AutomationDetailPage() {
   const [accessError, setAccessError] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [automation, setAutomation] = useState<Automation | null>(null);
+  const [runs, setRuns] = useState<AutomationRun[]>([]);
+  const [runsLoading, setRunsLoading] = useState(false);
+  const [runsError, setRunsError] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
@@ -120,6 +189,20 @@ export default function AutomationDetailPage() {
     prevWorkspaceId.current = workspaceId;
   }, [workspaceId, router]);
 
+  const loadRuns = useCallback(async (wsId: string, aId: string) => {
+    setRunsLoading(true);
+    setRunsError(null);
+    try {
+      const history = await listAutomationRuns(wsId, aId, { limit: 50 });
+      setRuns(history);
+    } catch (err) {
+      setRunsError(err instanceof ApiRequestError ? err.message : 'Could not load run history.');
+      // fall back to runs included on automation if available
+    } finally {
+      setRunsLoading(false);
+    }
+  }, []);
+
   const loadAutomation = useCallback(async (wsId: string, aId: string) => {
     if (!wsId || !aId) return;
     setLoading(true);
@@ -128,6 +211,8 @@ export default function AutomationDetailPage() {
     try {
       const a = await getAutomation(wsId, aId);
       setAutomation(a);
+      if (a.runs && a.runs.length > 0) setRuns(a.runs);
+      void loadRuns(wsId, aId);
     } catch (err) {
       if (err instanceof ApiRequestError && (err.status === 401 || err.status === 403)) {
         setAccessError(err.status);
@@ -139,7 +224,7 @@ export default function AutomationDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadRuns]);
 
   useEffect(() => {
     let active = true;
@@ -154,7 +239,7 @@ export default function AutomationDetailPage() {
     setSaveError(null);
     try {
       const updated = await updateAutomation(workspaceId, automationId, { name: editName.trim() });
-      setAutomation(updated);
+      setAutomation((prev) => prev ? { ...prev, ...updated } : updated);
       setEditOpen(false);
     } catch (err) {
       setSaveError(err instanceof ApiRequestError ? err.message : 'Could not save.');
@@ -169,11 +254,25 @@ export default function AutomationDetailPage() {
     setToggleError(null);
     try {
       const updated = await updateAutomation(workspaceId, automationId, { enabled: !automation.enabled });
-      setAutomation(updated);
+      setAutomation((prev) => prev ? { ...prev, ...updated } : updated);
     } catch (err) {
       setToggleError(err instanceof ApiRequestError ? err.message : 'Could not update.');
     } finally {
       setToggling(false);
+    }
+  }
+
+  async function handleRetry(run: AutomationRun) {
+    if (!automation || retryingId) return;
+    setRetryingId(run.id);
+    setRetryError(null);
+    try {
+      const updated = await retryAutomationRun(workspaceId, automationId, run.id);
+      setRuns((prev) => prev.map((r) => (r.id === run.id ? { ...r, ...updated } : r)));
+    } catch (err) {
+      setRetryError(err instanceof ApiRequestError ? err.message : 'Could not retry run.');
+    } finally {
+      setRetryingId(null);
     }
   }
 
@@ -268,6 +367,7 @@ export default function AutomationDetailPage() {
 
       {toggleError && <Alert variant="error" className="mb-3">{toggleError}</Alert>}
       {deleteError && <Alert variant="error" className="mb-3">{deleteError}</Alert>}
+      {retryError && <Alert variant="error" className="mb-3">{retryError}</Alert>}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Details */}
@@ -343,10 +443,24 @@ export default function AutomationDetailPage() {
 
         {/* Run history */}
         <Card className="p-5">
-          <h2 className="mb-3 font-semibold text-[var(--color-text-primary)]">
-            Recent runs (last 10)
-          </h2>
-          <RunHistory runs={automation.runs ?? []} />
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="font-semibold text-[var(--color-text-primary)]">Run history</h2>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void loadRuns(workspaceId, automationId)}
+              disabled={runsLoading}
+            >
+              Refresh
+            </Button>
+          </div>
+          {runsError && <Alert variant="warning" className="mb-3">{runsError}</Alert>}
+          <RunHistory
+            runs={runs}
+            loading={runsLoading && runs.length === 0}
+            onRetry={(run) => { void handleRetry(run); }}
+            retryingId={retryingId}
+          />
         </Card>
       </div>
 

@@ -24,37 +24,59 @@ import {
   updateAutomation,
   deleteAutomation,
   type Automation,
-  type AutomationTrigger,
-  type AutomationAction,
 } from '@/services/automations';
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
 
-const TRIGGER_LABELS: Record<AutomationTrigger, string> = {
-  EVENT_TASK_CREATED:   'Task created',
+const TRIGGER_LABELS: Record<string, string> = {
+  EVENT_TASK_CREATED: 'Task created',
   EVENT_TASK_COMPLETED: 'Task completed',
-  EVENT_MEMBER_JOINED:  'Member joined workspace',
-  SCHEDULED_DAILY:      'Daily schedule',
-  SCHEDULED_WEEKLY:     'Weekly schedule',
+  EVENT_MEMBER_JOINED: 'Member joined workspace',
+  EVENT_TASK_STATUS_CHANGED: 'Task status changed',
+  EVENT_TASK_ASSIGNED: 'Task assigned',
+  EVENT_TASK_DUE_DATE_PASSED: 'Task due date passed',
+  EVENT_FORM_SUBMITTED: 'Form submitted',
+  SCHEDULED_DAILY: 'Daily schedule',
+  SCHEDULED_WEEKLY: 'Weekly schedule',
 };
 
-const ACTION_LABELS: Record<AutomationAction, string> = {
+const ACTION_LABELS: Record<string, string> = {
   SEND_NOTIFICATION: 'Send notification',
-  CREATE_TASK:       'Create a task',
-  SEND_WEBHOOK:      'Send webhook',
+  CREATE_TASK: 'Create a task',
+  SEND_WEBHOOK: 'Send webhook',
+  SET_FIELD: 'Set field',
+  ASSIGN: 'Assign user(s)',
+  POST_MESSAGE: 'Post message',
 };
 
-const ACTION_CONFIG_FIELDS: Record<AutomationAction, Array<{ key: string; label: string; placeholder: string }>> = {
+const ACTION_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; placeholder: string; required?: boolean; helperText?: string }>> = {
   SEND_NOTIFICATION: [
-    { key: 'message', label: 'Message', placeholder: 'Notification message text' },
+    { key: 'userIds', label: 'Recipient user IDs', placeholder: 'Comma-separated user IDs (or use userId)', required: true },
+    { key: 'title', label: 'Notification title', placeholder: 'Notification title', required: true },
+    { key: 'body', label: 'Message (optional)', placeholder: 'Notification body' },
+    { key: 'link', label: 'Link (optional)', placeholder: '/app/...' },
   ],
   CREATE_TASK: [
-    { key: 'title', label: 'Task title', placeholder: 'New task title' },
-    { key: 'projectId', label: 'Project ID (optional)', placeholder: 'UUID of target project' },
+    { key: 'projectId', label: 'Project ID', placeholder: 'Target project UUID', required: true },
+    { key: 'title', label: 'Task title', placeholder: 'New task title', required: true },
+    { key: 'description', label: 'Description (optional)', placeholder: 'Task description' },
+    { key: 'priority', label: 'Priority (optional)', placeholder: 'LOW, MEDIUM, HIGH, URGENT' },
+    { key: 'assigneeIds', label: 'Assignee IDs (optional)', placeholder: 'Comma-separated user IDs' },
   ],
   SEND_WEBHOOK: [
-    { key: 'url', label: 'Webhook URL', placeholder: 'https://example.com/webhook' },
+    { key: 'url', label: 'Webhook URL', placeholder: 'https://example.com/webhook', required: true, helperText: 'Must use HTTPS.' },
     { key: 'secret', label: 'Secret (optional)', placeholder: 'Signing secret' },
+  ],
+  SET_FIELD: [
+    { key: 'field', label: 'Field', placeholder: 'status, priority, startDate, or dueDate', required: true },
+    { key: 'value', label: 'Value', placeholder: 'New field value', required: true },
+  ],
+  ASSIGN: [
+    { key: 'userIds', label: 'User IDs', placeholder: 'Comma-separated user IDs (or userId/assigneeId)', required: true },
+  ],
+  POST_MESSAGE: [
+    { key: 'channelId', label: 'Channel ID', placeholder: 'Target channel UUID', required: true },
+    { key: 'body', label: 'Message body', placeholder: 'Message to post', required: true },
   ],
 };
 
@@ -67,8 +89,8 @@ interface ConditionRow {
 
 interface CreateFormState {
   name: string;
-  trigger: AutomationTrigger;
-  action: AutomationAction;
+  trigger: string;
+  action: string;
   actionConfig: Record<string, string>;
   condition: ConditionRow[];
   maxRetries: number;
@@ -95,7 +117,7 @@ function CreateAutomationForm({ saving, error, onSubmit, onCancel }: CreateFormP
     enabled: true,
   });
 
-  const configFields = ACTION_CONFIG_FIELDS[form.action];
+  const configFields = ACTION_CONFIG_FIELDS[form.action] ?? [];
 
   function setField(key: string, value: string) {
     setForm((prev) => ({
@@ -148,7 +170,7 @@ function CreateAutomationForm({ saving, error, onSubmit, onCancel }: CreateFormP
         id="ca-trigger"
         label="Trigger"
         value={form.trigger}
-        onChange={(e) => setForm((p) => ({ ...p, trigger: e.target.value as AutomationTrigger }))}
+        onChange={(e) => setForm((p) => ({ ...p, trigger: e.target.value }))}
         options={Object.entries(TRIGGER_LABELS).map(([value, label]) => ({ value, label }))}
       />
 
@@ -158,7 +180,7 @@ function CreateAutomationForm({ saving, error, onSubmit, onCancel }: CreateFormP
         value={form.action}
         onChange={(e) => setForm((p) => ({
           ...p,
-          action: e.target.value as AutomationAction,
+          action: e.target.value,
           actionConfig: {},
         }))}
         options={Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))}
@@ -169,9 +191,11 @@ function CreateAutomationForm({ saving, error, onSubmit, onCancel }: CreateFormP
           key={field.key}
           id={`ca-config-${field.key}`}
           label={field.label}
+          required={field.required}
           value={form.actionConfig[field.key] ?? ''}
           onChange={(e) => setField(field.key, e.target.value)}
           placeholder={field.placeholder}
+          helperText={field.helperText}
         />
       ))}
 
@@ -293,11 +317,11 @@ function AutomationCard({ automation, onToggle, onDelete, toggling }: Automation
           <div className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--color-text-muted)]">
             <span>
               <span className="font-medium text-[var(--color-text-secondary)]">Trigger: </span>
-              {TRIGGER_LABELS[automation.trigger]}
+              {TRIGGER_LABELS[automation.trigger] ?? automation.trigger}
             </span>
             <span>
               <span className="font-medium text-[var(--color-text-secondary)]">Action: </span>
-              {ACTION_LABELS[automation.action]}
+              {ACTION_LABELS[automation.action] ?? automation.action}
             </span>
           </div>
         </div>
@@ -389,12 +413,17 @@ export default function AutomationsPage() {
         .map((row) => [row.key.trim(), row.value.trim()] as const)
         .filter(([key]) => key.length > 0),
     );
+    const actionConfig = Object.fromEntries(
+      Object.entries(state.actionConfig)
+        .map(([key, value]) => [key, value.trim()] as const)
+        .filter(([, value]) => value.length > 0),
+    );
     try {
       const created = await createAutomation(workspaceId, {
         name: state.name.trim(),
         trigger: state.trigger,
         action: state.action,
-        actionConfig: state.actionConfig,
+        actionConfig,
         condition: Object.keys(condition).length > 0 ? condition : null,
         maxRetries: state.maxRetries,
         enabled: state.enabled,

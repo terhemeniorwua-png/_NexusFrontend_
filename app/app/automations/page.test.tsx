@@ -136,6 +136,8 @@ describe('AutomationsPage', () => {
     await user.click(screen.getByRole('button', { name: 'New automation' }));
     await screen.findByRole('dialog', { name: 'New automation' });
     await user.type(screen.getByRole('textbox', { name: 'Automation name' }), 'Daily digest');
+    await user.type(screen.getByLabelText(/Recipient user IDs/i), 'user-2');
+    await user.type(screen.getByLabelText(/Notification title/i), 'Daily digest');
     await user.click(screen.getByRole('button', { name: 'Create automation' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
@@ -157,7 +159,9 @@ describe('AutomationsPage', () => {
     await user.click(screen.getByRole('button', { name: 'New automation' }));
     await screen.findByRole('dialog', { name: 'New automation' });
     await user.type(screen.getByRole('textbox', { name: 'Automation name' }), 'Conditional notify');
-    await user.type(screen.getByLabelText('Message'), 'A high priority task arrived');
+    await user.type(screen.getByLabelText(/Recipient user IDs/i), 'user-2');
+    await user.type(screen.getByLabelText(/Notification title/i), 'Task alert');
+    await user.type(screen.getByLabelText(/Message \(optional\)/i), 'A high priority task arrived');
     await user.click(screen.getByRole('button', { name: 'Add condition' }));
     await user.type(screen.getByLabelText('Condition field'), 'priority');
     await user.type(screen.getByLabelText('Condition value'), 'HIGH');
@@ -173,7 +177,7 @@ describe('AutomationsPage', () => {
       const body = JSON.parse(String((post?.[1] as RequestInit).body));
       expect(body.condition).toEqual({ priority: 'HIGH' });
       expect(body.maxRetries).toBe(5);
-      expect(body.actionConfig).toEqual({ message: 'A high priority task arrived' });
+      expect(body.actionConfig).toMatchObject({ userIds: 'user-2', title: 'Task alert' });
     });
   });
 

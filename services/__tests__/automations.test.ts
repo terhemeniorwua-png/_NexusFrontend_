@@ -7,7 +7,9 @@ import {
   createAutomation,
   deleteAutomation,
   getAutomation,
+  listAutomationRuns,
   listAutomations,
+  retryAutomationRun,
   updateAutomation,
 } from '../automations';
 
@@ -21,7 +23,7 @@ function ok(data: unknown, status = 200) {
   });
 }
 
-function fakeAuto(overrides: Partial<{ id: string; name: string; enabled: boolean }> = {}) {
+function fakeAuto(overrides: Record<string, unknown> = {}) {
   return {
     id: A_ID,
     workspaceId: WS,
@@ -30,7 +32,7 @@ function fakeAuto(overrides: Partial<{ id: string; name: string; enabled: boolea
     trigger: 'EVENT_TASK_CREATED',
     condition: null,
     action: 'SEND_NOTIFICATION',
-    actionConfig: { message: 'New task!' },
+    actionConfig: { userIds: 'user-2', title: 'New task!' },
     enabled: true,
     maxRetries: 3,
     deletedAt: null,
@@ -66,6 +68,32 @@ describe('getAutomation', () => {
   });
 });
 
+describe('listAutomationRuns', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('calls GET /workspaces/:wsId/automations/:autoId/runs', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([]));
+    await listAutomationRuns(WS, A_ID, { limit: 25 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/backend/workspaces/${WS}/automations/${A_ID}/runs?limit=25`,
+      expect.any(Object),
+    );
+  });
+});
+
+describe('retryAutomationRun', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('calls POST /runs/:runId/retry', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok({ id: 'run-1', status: 'PENDING' }));
+    await retryAutomationRun(WS, A_ID, 'run-1');
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/backend/workspaces/${WS}/automations/${A_ID}/runs/run-1/retry`,
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+});
+
 describe('createAutomation', () => {
   beforeEach(() => vi.restoreAllMocks());
 
@@ -75,7 +103,7 @@ describe('createAutomation', () => {
       name: 'Notify on task created',
       trigger: 'EVENT_TASK_CREATED',
       action: 'SEND_NOTIFICATION',
-      actionConfig: { message: 'New task!' },
+      actionConfig: { userIds: 'user-2', title: 'New task!' },
     });
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/backend/workspaces/${WS}/automations`,

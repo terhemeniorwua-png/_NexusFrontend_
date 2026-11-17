@@ -40,6 +40,26 @@ export interface IntegrationSummary {
   createdAt: string;
 }
 
+export interface GoogleCalendarChannel {
+  id: string;
+  name: string;
+}
+
+export interface SlackChannel {
+  id: string;
+  name: string;
+}
+
+export async function listGoogleCalendarChannels(workspaceId: string): Promise<GoogleCalendarChannel[]> {
+  const result = await authed<GoogleCalendarChannel[]>(`/integrations/google-calendar/channels?workspaceId=${encodeURIComponent(workspaceId)}`);
+  return Array.isArray(result) ? result : [];
+}
+
+export async function listSlackChannels(workspaceId: string): Promise<SlackChannel[]> {
+  const result = await authed<SlackChannel[]>(`/integrations/slack/channels?workspaceId=${encodeURIComponent(workspaceId)}`);
+  return Array.isArray(result) ? result : [];
+}
+
 export interface IntegrationSyncJob {
   id: string;
   integrationId: string;
@@ -84,6 +104,58 @@ export async function listIntegrations(workspaceId?: string): Promise<Integratio
 export async function getIntegrationStatus(integrationId: string): Promise<IntegrationStatusResponse> {
   const result = await authed<IntegrationStatusResponse>(`/integrations/${encodeURIComponent(integrationId)}/status`);
   return result && typeof result === 'object' ? result : {};
+}
+
+export async function getIntegrationSyncStatus(integrationId: string): Promise<{
+  status: IntegrationStatus;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  reconnectRequired: boolean;
+}> {
+  const result = await authed<{
+    status: IntegrationStatus;
+    lastSyncedAt: string | null;
+    lastError: string | null;
+    reconnectRequired: boolean;
+}>(`/integrations/${encodeURIComponent(integrationId)}/sync-status`);
+  return result && typeof result === 'object' ? result : {
+    status: 'DISCONNECTED' as IntegrationStatus,
+    lastSyncedAt: null,
+    lastError: null,
+    reconnectRequired: false,
+  };
+}
+
+export async function triggerIntegrationSync(integrationId: string, immediate = true): Promise<{
+  jobId: string;
+  status: IntegrationSyncStatus;
+}> {
+  const result = await authed<{
+    jobId: string;
+    status: IntegrationSyncStatus;
+}>(`/integrations/${encodeURIComponent(integrationId)}/sync-now`, {
+  method: 'POST',
+  body: JSON.stringify({ immediate }),
+});
+  return result && typeof result === 'object' ? result : { jobId: '', status: 'FAILED' };
+}
+
+export async function updateSlackEventNotifications(integrationId: string, channelId: string, addEvents: string[], removeEvents: string[]): Promise<{
+  channelId: string;
+  eventTypes: string[];
+  added: string[];
+  removed: string[];
+}> {
+  const result = await authed<{
+    channelId: string;
+    eventTypes: string[];
+    added: string[];
+    removed: string[];
+}>(`/integrations/${encodeURIComponent(integrationId)}/events`, {
+  method: 'POST',
+  body: JSON.stringify({ channelId, addEvents, removeEvents }),
+});
+  return result && typeof result === 'object' ? result : { channelId, eventTypes: [], added: [], removed: [] };
 }
 
 export async function updateIntegration(

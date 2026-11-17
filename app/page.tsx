@@ -12,7 +12,7 @@ export default function HomePage() {
     <main>
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight" aria-label="PITERON home">
-          <span className="grid size-9 place-items-center rounded-xl bg-[var(--color-primary)] text-sm font-bold text-white">N</span>
+          <img src="/images/logo.jpg" alt="PITERON" className="h-8 w-auto rounded-lg" />
           <span className="text-lg">PITERON</span>
         </Link>
         <nav aria-label="Main navigation" className="flex items-center gap-3 sm:gap-7">
@@ -51,7 +51,7 @@ export default function HomePage() {
             <div className="absolute -inset-5 rounded-[2rem] bg-[var(--color-primary-soft)] blur-2xl" />
             <div className="relative rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-lg)] sm:p-6">
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
-                <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-[var(--color-primary-soft)] text-sm font-semibold text-[var(--color-primary)]">N</span><div><p className="text-sm font-semibold">Product launch</p><p className="text-xs text-[var(--color-text-muted)]">Design team · Project</p></div></div>
+                <div className="flex items-center gap-3"><img src="/images/logo.jpg" alt="PITERON" className="h-8 w-auto rounded-lg" /><div><p className="text-sm font-semibold">Product launch</p><p className="text-xs text-[var(--color-text-muted)]">Design team · Project</p></div></div>
                 <span className="rounded-full bg-[var(--color-success-bg)] px-2.5 py-1 text-[10px] font-medium text-[var(--color-success)]">On track</span>
               </div>
               <div className="grid grid-cols-2 gap-3 py-5">

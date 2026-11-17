@@ -46,6 +46,8 @@ async function forwardRequest(
     if (value) headers.set(name, value);
   }
 
+  headers.set('accept-encoding', 'identity');
+
   let upstream: Response;
   try {
     upstream = await fetch(upstreamUrl, {

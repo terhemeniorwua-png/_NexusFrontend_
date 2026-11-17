@@ -28,7 +28,7 @@ function errorResponse(status: number, code: string, message: string): Response 
 const invitation = {
   id: 'invitation-1',
   workspaceId: 'workspace-1',
-  workspaceName: 'Nexus Studio',
+  workspaceName: 'PITERON Studio',
   email: 'ada@example.com',
   role: 'MEMBER',
   organizationRole: 'COMPANY_MEMBER',
@@ -98,7 +98,7 @@ describe('invitation API service', () => {
   it('previews an invitation without a session', async () => {
     setAccessToken(null);
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response({
-      workspace: { id: 'workspace-1', name: 'Nexus Studio', slug: 'nexus-studio' },
+      workspace: { id: 'workspace-1', name: 'PITERON Studio', slug: 'piteron-studio' },
       invitedBy: { id: 'user-1', name: 'Grace' },
       role: 'MEMBER',
       organizationRole: null,

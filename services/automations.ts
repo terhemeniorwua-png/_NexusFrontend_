@@ -1,7 +1,7 @@
 /**
  * services/automations.ts
  *
- * Automation and Workflow service for the Nexus platform.
+ * Automation and Workflow service for the PITERON platform.
  *
  * Routes at /api/v1/workspaces/:workspaceId/automations
  * Forwarded via /api/backend/workspaces/:workspaceId/automations

@@ -189,7 +189,7 @@ export default function ProfilePage() {
         <p className="text-sm font-semibold text-[var(--color-primary)]">Account setup</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Your profile</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--color-text-secondary)]">
-          Add or update the profile details shown across Nexus. Your email address is managed
+          Add or update the profile details shown across PITERON. Your email address is managed
           separately.
         </p>
 
@@ -298,7 +298,7 @@ export default function ProfilePage() {
       </section>
 
       <footer className="text-xs text-[var(--color-text-muted)]">
-        Nexus · Profile setup and management
+        PITERON · Profile setup and management
       </footer>
     </div>
   );

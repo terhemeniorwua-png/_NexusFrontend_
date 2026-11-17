@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { PwaClient } from '@/components/pwa/PwaClient';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import './globals.css';
 
@@ -31,11 +32,12 @@ const themeInitScript = `
 
 export const metadata: Metadata = {
   title: {
-    default: 'Nexus',
-    template: '%s | Nexus',
+    default: 'PITERON',
+    template: '%s | PITERON',
   },
   description:
-    'Nexus — One connected workspace for projects, people, and progress.',
+    'PITERON — One connected workspace for projects, people, and progress.',
+  manifest: '/manifest.webmanifest',
   robots: { index: true, follow: true },
 };
 
@@ -61,7 +63,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
     >
       <body className="min-h-full flex flex-col">
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <PwaClient />
+        </ThemeProvider>
       </body>
     </html>
   );

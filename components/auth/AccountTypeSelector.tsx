@@ -41,7 +41,7 @@ export function AccountTypeSelector({
       className="max-w-[56rem]"
     >
       <div className="p-5 sm:p-6">
-        <p className="mb-4 text-sm text-[var(--color-text-secondary)]">{intent === 'sign-in' ? 'Choose which workspace you want to open after signing in.' : 'Choose how you plan to start with Nexus.'}</p>
+        <p className="mb-4 text-sm text-[var(--color-text-secondary)]">{intent === 'sign-in' ? 'Choose which workspace you want to open after signing in.' : 'Choose how you plan to start with PITERON.'}</p>
         <div className="grid gap-3 sm:gap-5 lg:grid-cols-3 lg:gap-6">
           {accountTypes.map((account) => (
             <button

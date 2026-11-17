@@ -175,7 +175,7 @@ function AppearanceTab() {
       <Card className="p-5">
         <h2 className="text-base font-semibold text-[var(--color-text-primary)]">Theme</h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          Choose how Nexus looks. The preference is stored in this browser and applies
+          Choose how PITERON looks. The preference is stored in this browser and applies
           immediately; it does not change your account on other devices.
         </p>
         <RadioGroup
@@ -196,7 +196,7 @@ function AppearanceTab() {
       <Card className="p-5">
         <h2 className="text-base font-semibold text-[var(--color-text-primary)]">Reduced motion</h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          Nexus follows your operating system&apos;s reduced-motion setting automatically.
+          PITERON follows your operating system&apos;s reduced-motion setting automatically.
           When it is enabled, non-essential transitions and animations are suppressed.
         </p>
       </Card>

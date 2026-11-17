@@ -23,7 +23,7 @@ function response(data: unknown, status = 200): Response {
 const joinRequest = {
   id: 'request-1',
   workspaceId: 'workspace-1',
-  workspaceName: 'Nexus Studio',
+  workspaceName: 'PITERON Studio',
   userId: 'user-2',
   userName: 'Ada',
   userEmail: 'ada@example.com',
@@ -132,7 +132,7 @@ describe('join-request API service', () => {
   it('withdraws a request and manages the workspace join code', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(response({ ...joinRequest, status: 'WITHDRAWN' }))
-      .mockResolvedValueOnce(response({ workspaceId: 'workspace-1', code: 'code', link: 'https://nexus.test/join/code' }))
+      .mockResolvedValueOnce(response({ workspaceId: 'workspace-1', code: 'code', link: 'https://piteron.test/join/code' }))
       .mockResolvedValueOnce(response({ workspaceId: 'workspace-1', joinCodeEnabled: false }));
 
     await withdrawJoinRequest('request-1');

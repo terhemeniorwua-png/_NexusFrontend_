@@ -18,7 +18,7 @@ vi.mock('@/services/workspaces', () => ({
 
 const workspace = {
   id: 'workspace-1',
-  name: 'Nexus Studio',
+  name: 'PITERON Studio',
   slug: 'nexus-studio',
   description: null,
   type: 'COMPANY' as const,

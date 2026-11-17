@@ -19,13 +19,13 @@ type CallbackStatus = 'loading' | 'error' | 'two-factor';
 function oauthErrorMessage(error: string): string {
   if (error === 'OAUTH_CANCELLED') return 'Google sign-in was cancelled. You can try again.';
   if (error === 'GOOGLE_AUTH_UNAVAILABLE') return 'Google sign-in is temporarily unavailable. Please try again later.';
-  if (error === 'GOOGLE_ACCOUNT_LINK_REQUIRED') return 'A Nexus account already uses this email. Sign in to that account first; Google accounts are not linked automatically.';
+  if (error === 'GOOGLE_ACCOUNT_LINK_REQUIRED') return 'A PITERON account already uses this email. Sign in to that account first; Google accounts are not linked automatically.';
   if (error === 'LOGIN_RATE_LIMITED') return 'Too many Google sign-in attempts. Please wait a few minutes and try again.';
   return `We could not complete Google sign-in (${error}). Please try again.`;
 }
 
 function requestErrorMessage(error: unknown): string {
-  if (!(error instanceof ApiRequestError)) return 'Unable to reach Nexus. Check your connection and try again.';
+  if (!(error instanceof ApiRequestError)) return 'Unable to reach PITERON. Check your connection and try again.';
   if (error.code === 'GOOGLE_ACCOUNT_LINK_REQUIRED') return oauthErrorMessage(error.code);
   if (error.code === 'GOOGLE_AUTH_UNAVAILABLE') return oauthErrorMessage(error.code);
   if (error.code === 'OAUTH_CANCELLED') return oauthErrorMessage(error.code);
@@ -107,7 +107,7 @@ export function GoogleOAuthCallback({ code, error }: { code?: string; error?: st
       if (!active) return;
       if ('twoFactorRequired' in result) {
         setChallengeToken(result.challengeToken);
-        setMessage('Enter the two-factor code for your Nexus account.');
+        setMessage('Enter the two-factor code for your PITERON account.');
         setStatus('two-factor');
         return;
       }
@@ -180,7 +180,7 @@ export function GoogleOAuthCallback({ code, error }: { code?: string; error?: st
             <button
               type="button"
               disabled={busy}
-              onClick={() => { setRecoveryMode((current) => !current); setProof(''); setMessage('Enter the two-factor code for your Nexus account.'); }}
+              onClick={() => { setRecoveryMode((current) => !current); setProof(''); setMessage('Enter the two-factor code for your PITERON account.'); }}
               className="text-sm font-medium text-[var(--color-primary)] hover:underline disabled:opacity-50"
             >
               {recoveryMode ? 'Use an authenticator code' : 'Use a recovery code'}

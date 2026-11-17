@@ -410,7 +410,7 @@ function ActivityTab({ workspaceId }: { workspaceId: string }) {
     return (
       <EmptyState
         title="No activity yet"
-        description="Workspace activity will appear here as your team uses Nexus."
+        description="Workspace activity will appear here as your team uses PITERON."
       />
     );
   }
@@ -512,12 +512,19 @@ function ActivityTab({ workspaceId }: { workspaceId: string }) {
 
 // ─── Preferences tab ──────────────────────────────────────────────────────────
 
+const PUSH_OPT_IN_KEY = 'nexus-push-opt-in';
+
 function PreferencesTab({ workspaceId }: { workspaceId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
   const [preferences, setPreferences] = useState<Record<NotificationType, boolean>>(buildDefaultPreferences());
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
+  const [pushOptIn, setPushOptIn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
   const latestLoad = useRef(0);
 
   const load = useCallback(async (wsId: string) => {
@@ -542,6 +549,63 @@ function PreferencesTab({ workspaceId }: { workspaceId: string }) {
     void Promise.resolve().then(() => active ? load(workspaceId) : undefined);
     return () => { active = false; };
   }, [workspaceId, load]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const supported = 'Notification' in window && 'serviceWorker' in navigator;
+    setPushSupported(supported);
+    if (!supported) {
+      setPushPermission('unsupported');
+      return;
+    }
+    // Read current permission state only; never request permission on load.
+    setPushPermission(Notification.permission);
+    try {
+      setPushOptIn(window.localStorage.getItem(PUSH_OPT_IN_KEY) === '1');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  async function handlePushToggle(enabled: boolean) {
+    if (typeof window === 'undefined' || !pushSupported) return;
+    setPushMessage(null);
+    if (!enabled) {
+      setPushOptIn(false);
+      try {
+        window.localStorage.setItem(PUSH_OPT_IN_KEY, '0');
+      } catch {
+        // ignore
+      }
+      setPushMessage('Browser push notifications turned off for this browser. You can also revoke permission in browser settings.');
+      return;
+    }
+
+    // User explicitly opted in: requesting permission here is allowed (not on load).
+    setPushBusy(true);
+    try {
+      const permission = await Notification.requestPermission();
+      setPushPermission(permission);
+      const optedIn = permission === 'granted';
+      setPushOptIn(optedIn);
+      try {
+        window.localStorage.setItem(PUSH_OPT_IN_KEY, optedIn ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      setPushMessage(
+        permission === 'granted'
+          ? 'Push notifications enabled for this browser. Delivery depends on server push configuration.'
+          : permission === 'denied'
+            ? 'Browser notification permission was denied. You can change this in browser settings.'
+            : 'Push notification permission was not granted.',
+      );
+    } catch {
+      setPushMessage('Could not update browser push notification permission.');
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   async function handleToggle(type: NotificationType, enabled: boolean) {
     setPreferences((prev) => ({ ...prev, [type]: enabled }));
@@ -589,6 +653,35 @@ function PreferencesTab({ workspaceId }: { workspaceId: string }) {
       <p className="text-sm text-[var(--color-text-secondary)]">
         Choose which events trigger in-app notifications for you in this workspace. Changes save immediately and do not affect email notifications or message unread counts.
       </p>
+
+      <Card className="p-5">
+        <div className="mb-4 border-b border-[var(--color-border)] pb-3">
+          <p className="text-sm font-semibold text-[var(--color-text-primary)]">Browser push notifications</p>
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            Opt in to receive browser push notifications on this device. PITERON will not ask for permission until you turn this on.
+          </p>
+        </div>
+        {!pushSupported ? (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Browser push notifications are not supported in this browser.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <Checkbox
+              id="pref-browser-push"
+              label="Enable browser push notifications"
+              checked={pushOptIn && pushPermission === 'granted'}
+              disabled={pushBusy}
+              onChange={(e) => { void handlePushToggle(e.target.checked); }}
+            />
+            <p className="ml-6 text-xs text-[var(--color-text-muted)]">
+              Permission: <strong>{pushPermission}</strong>
+            </p>
+            {pushMessage && <p className="ml-6 text-xs text-[var(--color-text-secondary)]">{pushMessage}</p>}
+          </div>
+        )}
+      </Card>
+
       {NOTIFICATION_TYPE_GROUPS.map((group) => (
         <Card key={group.label} className="p-5">
           <div className="mb-4 border-b border-[var(--color-border)] pb-3">

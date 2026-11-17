@@ -51,9 +51,9 @@ describe('projects service', () => {
   it('listProjects passes search, status, and visibility query params', async () => {
     mocks.apiRequest.mockResolvedValue({ items: [], nextCursor: null });
     const { listProjects } = await import('../projects');
-    await listProjects(WS, { search: 'nexus', status: 'ACTIVE', visibility: 'PRIVATE' });
+    await listProjects(WS, { search: 'piteron', status: 'ACTIVE', visibility: 'PRIVATE' });
     const url: string = mocks.apiRequest.mock.calls[0][0] as string;
-    expect(url).toContain('search=nexus');
+    expect(url).toContain('search=piteron');
     expect(url).toContain('status=ACTIVE');
     expect(url).toContain('visibility=PRIVATE');
   });
@@ -61,7 +61,7 @@ describe('projects service', () => {
   it('createProject sends POST with the documented body fields', async () => {
     mocks.apiRequest.mockResolvedValue({ id: PID });
     const { createProject } = await import('../projects');
-    await createProject(WS, { name: 'Nexus', key: 'NX', visibility: 'WORKSPACE' });
+    await createProject(WS, { name: 'PITERON', key: 'PIT', visibility: 'WORKSPACE' });
     expect(mocks.apiRequest).toHaveBeenCalledWith(
       `/workspaces/${WS}/projects`,
       expect.objectContaining({ method: 'POST', authenticated: true }),

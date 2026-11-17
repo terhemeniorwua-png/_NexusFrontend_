@@ -41,7 +41,7 @@ vi.mock('@/providers/WorkspaceProvider', () => ({
 
 vi.mock('@/services/projects', () => ({
   getProject: vi.fn().mockResolvedValue({
-    id: 'project-1', workspaceId: 'ws-1', name: 'Nexus', key: 'NX', description: null,
+    id: 'project-1', workspaceId: 'ws-1', name: 'PITERON', key: 'NX', description: null,
     category: null, labels: [], status: 'ACTIVE', visibility: 'WORKSPACE', startDate: null,
     dueDate: null, ownerId: 'user-1', owner: { id: 'user-1', name: 'Alice' },
     memberCount: 1, taskCount: 0, myRole: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z',

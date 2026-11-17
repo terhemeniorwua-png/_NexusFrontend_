@@ -1,7 +1,7 @@
 /**
  * services/meetings.ts
  *
- * Meeting service for the Nexus meetings module.
+ * Meeting service for the PITERON meetings module.
  *
  * All routes are at /api/v1/workspaces/:workspaceId/meetings
  * forwarded via /workspaces/:workspaceId/meetings

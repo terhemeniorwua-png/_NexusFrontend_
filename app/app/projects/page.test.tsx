@@ -23,7 +23,7 @@ vi.mock('@/services/projects', () => ({
 }));
 
 const projectA = {
-  id: 'project-1', workspaceId: 'ws-1', name: 'Nexus Web', key: 'NW', description: null,
+  id: 'project-1', workspaceId: 'ws-1', name: 'PITERON Web', key: 'NW', description: null,
   category: null, labels: [], status: 'ACTIVE', visibility: 'WORKSPACE', startDate: null,
   dueDate: null, ownerId: 'user-1', owner: { id: 'user-1', name: 'Alice' },
   memberCount: 3, taskCount: 0, myRole: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z',
@@ -39,7 +39,7 @@ describe('ProjectsPage', () => {
 
   it('shows projects loaded from the API', async () => {
     render(<ProjectsPage />);
-    expect(await screen.findByText('Nexus Web')).toBeInTheDocument();
+    expect(await screen.findByText('PITERON Web')).toBeInTheDocument();
     expect(screen.getByText('NW')).toBeInTheDocument();
     // Visibility badge is present (there may be the filter option as well)
     expect(screen.getAllByText('Organisation-wide').length).toBeGreaterThan(0);
@@ -68,11 +68,11 @@ describe('ProjectsPage', () => {
   it('clears project data when workspace changes', async () => {
     mocks.listProjects.mockResolvedValueOnce({ items: [projectA], nextCursor: null }).mockResolvedValueOnce({ items: [], nextCursor: null });
     const view = render(<ProjectsPage />);
-    expect(await screen.findByText('Nexus Web')).toBeInTheDocument();
+    expect(await screen.findByText('PITERON Web')).toBeInTheDocument();
 
     mocks.activeWorkspace = { id: 'ws-2', name: 'Other Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
     view.rerender(<ProjectsPage />);
-    await waitFor(() => expect(screen.queryByText('Nexus Web')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('PITERON Web')).not.toBeInTheDocument());
   });
 
   it('shows the create project modal on button click', async () => {
@@ -101,8 +101,8 @@ describe('ProjectsPage', () => {
     const user = userEvent.setup();
     mocks.archiveProject.mockResolvedValue({ id: 'project-1', status: 'ARCHIVED' });
     render(<ProjectsPage />);
-    await waitFor(() => screen.getByRole('button', { name: 'Archive Nexus Web' }));
-    await user.click(screen.getByRole('button', { name: 'Archive Nexus Web' }));
+    await waitFor(() => screen.getByRole('button', { name: 'Archive PITERON Web' }));
+    await user.click(screen.getByRole('button', { name: 'Archive PITERON Web' }));
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveTextContent('Archive');
     await user.click(screen.getByRole('button', { name: 'Archive project' }));

@@ -1,4 +1,4 @@
-# NEXUS
+# PITERON
 # BRAND IDENTITY, PRODUCT VISION & PLATFORM SPECIFICATION
 
 **Product Name:** Nexus  
@@ -18,15 +18,15 @@
 
 # 1. PRODUCT OVERVIEW
 
-## 1.1 What is Nexus?
+## 1.1 What is PITERON?
 
-Nexus is a real-time workspace and project management platform designed to bring people, teams, projects, communication, documents, meetings and productivity tools together in one connected environment.
+PITERON is a real-time workspace and project management platform designed to bring people, teams, projects, communication, documents, meetings and productivity tools together in one connected environment.
 
-Nexus combines the essential capabilities of project management platforms, collaborative workspaces, communication applications and productivity tools.
+PITERON combines the essential capabilities of project management platforms, collaborative workspaces, communication applications and productivity tools.
 
 It is designed to serve individuals, companies and educational institutions without restricting the platform to a particular industry or profession.
 
-Nexus should provide a connected digital environment where users can:
+PITERON should provide a connected digital environment where users can:
 
 - Manage personal and collaborative work.
 - Create and manage projects.
@@ -41,7 +41,7 @@ Nexus should provide a connected digital environment where users can:
 - Automate repetitive workflows.
 - Use AI to understand information and improve productivity.
 
-Nexus must not be presented as a developer-only platform. It is a general-purpose productivity and collaboration platform for individuals, businesses, institutions, teams and professional communities.
+PITERON must not be presented as a developer-only platform. It is a general-purpose productivity and collaboration platform for individuals, businesses, institutions, teams and professional communities.
 
 ## 1.2 Product Vision
 
@@ -53,7 +53,7 @@ To eliminate unnecessary application switching by providing one intelligent envi
 
 ## 1.4 Product Positioning
 
-Nexus is a:
+PITERON is a:
 
 **Real-Time Workspace & Project Management Platform.**
 
@@ -70,7 +70,7 @@ Its identity should communicate:
 
 ## 1.5 Core Product Philosophy
 
-Nexus should follow these principles:
+PITERON should follow these principles:
 
 1. Everything important should be connected.
 2. Users should not need multiple applications to complete ordinary collaborative work.
@@ -87,7 +87,7 @@ Nexus should follow these principles:
 
 ## 2.1 Brand Personality
 
-Nexus should feel:
+PITERON should feel:
 
 - Modern.
 - Intelligent.
@@ -101,11 +101,11 @@ Nexus should feel:
 
 Avoid making the brand look childish, overly playful, unnecessarily futuristic or excessively decorative.
 
-Nexus is a professional productivity platform. Its visual identity should communicate confidence and simplicity.
+PITERON is a professional productivity platform. Its visual identity should communicate confidence and simplicity.
 
 ## 2.2 Brand Name
 
-**Nexus**
+**PITERON**
 
 The name represents a connection or central point where different things come together.
 
@@ -113,7 +113,7 @@ This meaning should influence the visual identity and product experience.
 
 ## 2.3 Logo Direction
 
-The Nexus logo should use a distinctive geometric N monogram that communicates connected systems, collaboration and integration.
+The PITERON logo should use a distinctive geometric P monogram that communicates connected systems, collaboration and integration.
 
 The logo should be:
 
@@ -128,7 +128,7 @@ The logo concept should communicate connected nodes or interconnected geometric 
 
 Required logo variations:
 
-1. Primary logo: Icon and Nexus wordmark.
+1. Primary logo: Icon and PITERON wordmark.
 2. Compact logo: Icon only.
 3. Horizontal logo: Icon beside wordmark.
 4. Monochrome logo.
@@ -212,7 +212,7 @@ Avoid mixing unrelated icon styles.
 
 ## 2.7 Brand Voice
 
-Nexus communicates in a professional, clear, helpful and confident tone.
+PITERON communicates in a professional, clear, helpful and confident tone.
 
 Its language should be:
 
@@ -230,7 +230,7 @@ Avoid technical jargon when communicating with ordinary users.
 
 ## 3.1 General Design Direction
 
-Nexus should use a modern SaaS application design language.
+PITERON should use a modern SaaS application design language.
 
 The interface should combine:
 
@@ -276,7 +276,7 @@ Switching workspaces should update the available navigation and workspace contex
 
 ## 3.4 Light and Dark Themes
 
-Nexus should support:
+PITERON should support:
 
 - Light mode.
 - Dark mode.
@@ -353,7 +353,7 @@ The desktop experience is the primary design target, but mobile users must be ab
 
 # 4. ACCOUNT TYPES AND ONBOARDING
 
-Nexus supports three primary registration paths.
+PITERON supports three primary registration paths.
 
 They are different onboarding experiences within one application, not separate products.
 
@@ -431,13 +431,13 @@ Institutions may configure structures such as:
 
 The hierarchy must be configurable.
 
-Nexus is initially an academic collaboration platform, not a complete Learning Management System.
+PITERON is initially an academic collaboration platform, not a complete Learning Management System.
 
 Do not introduce grading, examinations, course enrolment, attendance registers or student-result management into the initial scope.
 
 ## 4.4 Unified Identity
 
-A person should have one Nexus identity.
+A person should have one PITERON identity.
 
 One user may belong to multiple workspaces, including:
 

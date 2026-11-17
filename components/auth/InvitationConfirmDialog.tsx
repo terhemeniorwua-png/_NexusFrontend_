@@ -174,7 +174,7 @@ export function InvitationConfirmDialog({
       <div className="space-y-4">
         {accountCreated && (
           <Alert variant="success" title="Account created">
-            Your Nexus account is ready. Accept or decline the workspace invitation below.
+            Your PITERON account is ready. Accept or decline the workspace invitation below.
           </Alert>
         )}
 

@@ -1,14 +1,14 @@
 /**
  * services/ai.ts
  *
- * Nexus AI service — covers the AI assistant (Phase 22), Nexus Write (Phase 23),
+ * PITERON AI service — covers the AI assistant (Phase 22), PITERON Write (Phase 23),
  * and AI action approval (Phase 24).
  *
  * All routes at /api/v1/ai, forwarded via /api/backend/ai
  *
  * ─── Verified backend contract (2026-11-08) ─────────────────────────────────
  *
- * POST /ai/analyze  (Nexus Write — Phase 23)
+ * POST /ai/analyze  (PITERON Write — Phase 23)
  *   body: { text: string, features: string[] }
  *   features: GRAMMAR | SPELLING | CLARITY | TONE | SUMMARY | REWRITE | TRANSLATION
  *   response: { text, suggestions, summary?, rewrite?, message }
@@ -105,7 +105,7 @@ function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // ─── API functions ────────────────────────────────────────────────────────────
 
-/** Analyze text for writing assistance (Nexus Write). */
+/** Analyze text for writing assistance (PITERON Write). */
 export async function analyzeText(
   text: string,
   features: AnalysisFeature[],

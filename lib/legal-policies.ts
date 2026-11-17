@@ -19,14 +19,14 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
   terms: {
     title: "Terms of Service",
     summary:
-      "Draft terms for the Nexus real-time workspace and project-management platform. This draft is not legally approved and contains placeholders that must be completed before publication as final terms.",
+      "Draft terms for the PITERON real-time workspace and project-management platform. This draft is not legally approved and contains placeholders that must be completed before publication as final terms.",
     approvalState: draftState,
     sections: [
       {
         id: "introduction",
         heading: "1. Introduction and acceptance",
         paragraphs: [
-          "These Terms of Service (the “Terms”) govern access to and use of Nexus. By creating an account or using Nexus, you agree to these Terms. If you do not agree, do not use the service.",
+          "These Terms of Service (the “Terms”) govern access to and use of PITERON. By creating an account or using PITERON, you agree to these Terms. If you do not agree, do not use the service.",
           "The contracting legal entity, effective date, and final acceptance flow must be confirmed before publication.",
         ],
         bullets: [
@@ -36,16 +36,16 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
       },
       {
         id: "service",
-        heading: "2. The Nexus service",
+        heading: "2. The PITERON service",
         paragraphs: [
-          "Nexus is a real-time workspace and project-management platform intended to bring together workspaces, projects, tasks, collaboration, communication, files, scheduling, meetings, and productivity tools. Feature availability may depend on workspace type, plan, role, permissions, and whether a feature has been released.",
+          "PITERON is a real-time workspace and project-management platform intended to bring together workspaces, projects, tasks, collaboration, communication, files, scheduling, meetings, and productivity tools. Feature availability may depend on workspace type, plan, role, permissions, and whether a feature has been released.",
         ],
       },
       {
         id: "eligibility",
         heading: "3. Eligibility and registration",
         paragraphs: [
-          "You must be legally able to enter into a binding agreement to register and use Nexus. The minimum age and any guardian-consent rules require legal approval: [MINIMUM AGE / ELIGIBILITY RULE — REQUIRED].",
+          "You must be legally able to enter into a binding agreement to register and use PITERON. The minimum age and any guardian-consent rules require legal approval: [MINIMUM AGE / ELIGIBILITY RULE — REQUIRED].",
           "You must provide accurate registration information, keep it current, and use an account you are authorised to control.",
         ],
       },
@@ -61,7 +61,7 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "personal-workspaces",
         heading: "5. Personal workspaces",
         paragraphs: [
-          "A personal workspace is associated with your Nexus identity and is separate from company and institution workspaces. You control personal content subject to these Terms, applicable law, and any sharing or collaboration choices you make.",
+          "A personal workspace is associated with your PITERON identity and is separate from company and institution workspaces. You control personal content subject to these Terms, applicable law, and any sharing or collaboration choices you make.",
         ],
       },
       {
@@ -82,14 +82,14 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "acceptable-use",
         heading: "8. Acceptable use",
         paragraphs: [
-          "You may not use Nexus to break the law, infringe another person’s rights, distribute malicious code, interfere with service operation, evade access controls, or access another person’s workspace or data without authorisation. Additional abuse reporting and enforcement procedures require approval.",
+          "You may not use PITERON to break the law, infringe another person’s rights, distribute malicious code, interfere with service operation, evade access controls, or access another person’s workspace or data without authorisation. Additional abuse reporting and enforcement procedures require approval.",
         ],
       },
       {
         id: "user-content",
         heading: "9. User-generated content and ownership",
         paragraphs: [
-          "As between you and Nexus, you retain rights you hold in content you submit. You grant Nexus permission to host, process, transmit, display, and back up that content only as reasonably necessary to provide, secure, and support the features you and your workspace use, subject to the approved Privacy Policy.",
+          "As between you and PITERON, you retain rights you hold in content you submit. You grant PITERON permission to host, process, transmit, display, and back up that content only as reasonably necessary to provide, secure, and support the features you and your workspace use, subject to the approved Privacy Policy.",
           "You must have the rights and permissions needed to submit and share content. Content shared in an organization may remain available to that organization under its access and retention settings.",
         ],
       },
@@ -104,14 +104,14 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "communications",
         heading: "11. Messages, calls, meetings, and collaboration",
         paragraphs: [
-          "Nexus collaboration features may include messages, comments, calls, meetings, presence, and shared work. Use these features lawfully and respect participant privacy. Recording, transcription, and retention behavior must be disclosed and supported by applicable feature controls before those functions are enabled.",
+          "PITERON collaboration features may include messages, comments, calls, meetings, presence, and shared work. Use these features lawfully and respect participant privacy. Recording, transcription, and retention behavior must be disclosed and supported by applicable feature controls before those functions are enabled.",
         ],
       },
       {
         id: "ai",
         heading: "12. AI-assisted functionality",
         paragraphs: [
-          "AI features may provide drafts, summaries, analysis, recommendations, and proposed actions. Outputs can be inaccurate or incomplete. You are responsible for reviewing outputs before relying on them or sharing them. AI-proposed changes to Nexus data require your explicit approval and backend authorization.",
+          "AI features may provide drafts, summaries, analysis, recommendations, and proposed actions. Outputs can be inaccurate or incomplete. You are responsible for reviewing outputs before relying on them or sharing them. AI-proposed changes to PITERON data require your explicit approval and backend authorization.",
           "AI feature availability, processing providers, and data retention must be disclosed when those features are enabled.",
         ],
       },
@@ -181,7 +181,7 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "suspension",
         heading: "20. Suspension and termination",
         paragraphs: [
-          "Nexus may need to restrict or suspend access to address security risks, legal requirements, non-payment, or material violations. Notice, review, appeal, and restoration procedures are [PENDING LEGAL AND BUSINESS APPROVAL]. Any action remains subject to rights that applicable law provides.",
+          "PITERON may need to restrict or suspend access to address security risks, legal requirements, non-payment, or material violations. Notice, review, appeal, and restoration procedures are [PENDING LEGAL AND BUSINESS APPROVAL]. Any action remains subject to rights that applicable law provides.",
         ],
       },
       {
@@ -210,21 +210,21 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "third-party-services",
         heading: "24. Third-party services and integrations",
         paragraphs: [
-          "Some features may connect to third-party services. Those services are governed by their own terms and privacy policies. Nexus integrations are not available unless shown as connected by the product; personal connections do not automatically become workspace connections. Provider list and transfer details: [PROCESSOR / INTEGRATION LIST — REQUIRED BEFORE FINAL APPROVAL].",
+          "Some features may connect to third-party services. Those services are governed by their own terms and privacy policies. PITERON integrations are not available unless shown as connected by the product; personal connections do not automatically become workspace connections. Provider list and transfer details: [PROCESSOR / INTEGRATION LIST — REQUIRED BEFORE FINAL APPROVAL].",
         ],
       },
       {
         id: "availability",
         heading: "25. Availability and service changes",
         paragraphs: [
-          "Nexus may change, suspend, or discontinue features as the service evolves. Material changes, notice, and any user options required by applicable law must be handled under an approved change policy. No uptime commitment is made by this draft.",
+          "PITERON may change, suspend, or discontinue features as the service evolves. Material changes, notice, and any user options required by applicable law must be handled under an approved change policy. No uptime commitment is made by this draft.",
         ],
       },
       {
         id: "intellectual-property",
         heading: "26. Intellectual property",
         paragraphs: [
-          "Nexus and its licensors retain rights in the platform and materials they provide. These Terms grant you a limited right to use available features for their intended purpose while your account and access remain in good standing. No ownership of another party’s content is transferred.",
+          "PITERON and its licensors retain rights in the platform and materials they provide. These Terms grant you a limited right to use available features for their intended purpose while your account and access remain in good standing. No ownership of another party’s content is transferred.",
         ],
       },
       {
@@ -268,7 +268,7 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "privacy-introduction",
         heading: "1. Introduction",
         paragraphs: [
-          "This draft describes information handled by Nexus and processing that may occur when you use available features. It must be reviewed against production deployment, vendors, and applicable law before publication.",
+          "This draft describes information handled by PITERON and processing that may occur when you use available features. It must be reviewed against production deployment, vendors, and applicable law before publication.",
           "Controller / provider legal name: [LEGAL ENTITY NAME — REQUIRED]. Effective date: [EFFECTIVE DATE — REQUIRED].",
         ],
       },
@@ -276,7 +276,7 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "information-categories",
         heading: "2. Categories of information",
         paragraphs: [
-          "Depending on features actually used, Nexus may process account and profile details, authentication/session data, workspace and collaboration records, uploaded-file metadata, and technical or security records. Not every described product feature is currently connected in the frontend or backend.",
+          "Depending on features actually used, PITERON may process account and profile details, authentication/session data, workspace and collaboration records, uploaded-file metadata, and technical or security records. Not every described product feature is currently connected in the frontend or backend.",
         ],
       },
       {
@@ -311,7 +311,7 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "billing-information",
         heading: "7. Subscription and payment information",
         paragraphs: [
-          "The backend stores subscription status, interval, seat quantity, period dates, provider references, payment amounts and statuses, and billing history. Paystack hosted checkout collects payment details directly; Nexus does not store raw card details. USD billing remains disabled until the merchant enables USD and configures credentials. Processor terms, deployment locations, and retention require legal review before this draft is approved.",
+          "The backend stores subscription status, interval, seat quantity, period dates, provider references, payment amounts and statuses, and billing history. Paystack hosted checkout collects payment details directly; PITERON does not store raw card details. USD billing remains disabled until the merchant enables USD and configures credentials. Processor terms, deployment locations, and retention require legal review before this draft is approved.",
         ],
       },
       {
@@ -325,7 +325,7 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "ai-processing",
         heading: "9. AI-related processing",
         paragraphs: [
-          "AI assistant and writing-assistance requests are not connected in the reviewed frontend. If enabled, user prompts, selected text, and authorised contextual material may be sent to the Nexus backend and its configured AI processing service to provide the requested output. The AI provider, retention, model-training use, and user controls must be confirmed and disclosed before activation.",
+          "AI assistant and writing-assistance requests are not connected in the reviewed frontend. If enabled, user prompts, selected text, and authorised contextual material may be sent to the PITERON backend and its configured AI processing service to provide the requested output. The AI provider, retention, model-training use, and user controls must be confirmed and disclosed before activation.",
         ],
       },
       {
@@ -346,7 +346,7 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "cookies",
         heading: "12. Cookies and similar technologies",
         paragraphs: [
-          "The authentication backend sets `nexus_rt` as an HttpOnly refresh cookie and uses `nexus_csrf` for CSRF protection. The frontend stores the theme preference under `nexus-theme` in local storage. The reviewed frontend does not configure an analytics cookie or analytics SDK. Production cookie attributes, expiration, and domain must be verified against deployment.",
+          "The authentication backend sets `nexus_rt` as an HttpOnly refresh cookie and uses `nexus_csrf` for CSRF protection. The frontend stores the theme preference under `PITERON-theme` in local storage. The reviewed frontend does not configure an analytics cookie or analytics SDK. Production cookie attributes, expiration, and domain must be verified against deployment.",
         ],
       },
       {
@@ -413,14 +413,14 @@ export const legalPolicies: Record<"terms" | "privacy", LegalPolicyContent> = {
         id: "security",
         heading: "21. Data security",
         paragraphs: [
-          "Nexus applies authentication, access controls, password hashing, session protections, and other safeguards present in the backend implementation. Workspace authorization is enforced by the backend. No claim of end-to-end encryption, certification, or absolute security is made.",
+          "PITERON applies authentication, access controls, password hashing, session protections, and other safeguards present in the backend implementation. Workspace authorization is enforced by the backend. No claim of end-to-end encryption, certification, or absolute security is made.",
         ],
       },
       {
         id: "children",
         heading: "22. Children’s privacy and eligibility",
         paragraphs: [
-          "The minimum age for registration and rules for users who are minors have not been approved. Nexus must not claim a specific age threshold until one is set by product and legal review.",
+          "The minimum age for registration and rules for users who are minors have not been approved. PITERON must not claim a specific age threshold until one is set by product and legal review.",
           "Minimum age and guardian requirements: [CHILDREN’S PRIVACY RULE — REQUIRED].",
         ],
       },

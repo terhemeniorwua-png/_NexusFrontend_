@@ -9,6 +9,8 @@ interface CheckboxProps
   errorMessage?: string;
   /** Helper text shown below the checkbox */
   helperText?: string;
+  /** Secondary text shown under the label */
+  description?: string;
 }
 
 export function Checkbox({
@@ -16,13 +18,15 @@ export function Checkbox({
   id,
   errorMessage,
   helperText,
+  description,
   disabled,
   className = '',
   ...props
 }: CheckboxProps) {
   const errorId = errorMessage ? `${id}-error` : undefined;
   const helperId = helperText ? `${id}-helper` : undefined;
-  const describedBy = [errorId, helperId].filter(Boolean).join(' ') || undefined;
+  const descriptionId = description ? `${id}-description` : undefined;
+  const describedBy = [errorId, descriptionId, helperId].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className="flex flex-col gap-1">
@@ -53,6 +57,12 @@ export function Checkbox({
         />
         {label}
       </label>
+
+      {description && (
+        <p id={descriptionId} className="ml-6 text-xs text-[var(--color-text-secondary)]">
+          {description}
+        </p>
+      )}
 
       {errorMessage && (
         <p id={errorId} role="alert" className="ml-6 text-xs text-[var(--color-error)]">

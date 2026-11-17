@@ -1,7 +1,7 @@
 /**
  * types/ui.ts
  *
- * Shared TypeScript types for Nexus UI component props.
+ * Shared TypeScript types for PITERON UI component props.
  * Import from here when building components in components/ui/.
  */
 
@@ -37,7 +37,7 @@ export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg';
 // ─── Task status types ────────────────────────────────────────────────────────
 
 /**
- * Nexus task workflow statuses.
+ * PITERON task workflow statuses.
  * ASSIGNED → IN_PROGRESS → SUBMITTED → UNDER_REVIEW → APPROVED
  * CHANGES_REQUESTED → IN_PROGRESS
  *
@@ -58,7 +58,7 @@ export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 // ─── Role types ───────────────────────────────────────────────────────────────
 
 /**
- * Nexus workspace/project roles.
+ * PITERON workspace/project roles.
  * Exact string values must match the backend's role enum.
  * Confirm with backend before using in permission logic.
  */

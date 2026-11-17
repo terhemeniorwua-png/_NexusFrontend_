@@ -1,31 +1,8 @@
 /**
  * services/integrations.ts
  *
- * Integrations management service for the Nexus platform.
- *
- * Route: GET/POST/DELETE /api/v1/integrations
- * Forwarded via: /api/backend/integrations
- *
- * ─── Verified backend contract (2026-11-08) ─────────────────────────────────
- *
- * GET    /integrations           list — IntegrationSummary[]
- *   query: workspaceId? (UUID)
- *
- * POST   /integrations           connect — IntegrationSummary (201)
- *   body: { provider, workspaceId?, accessToken, refreshToken?,
- *           tokenExpiresAt?, scopes?, externalUserId?, externalEmail? }
- *   NOTE: SLACK, GOOGLE_DRIVE and DROPBOX must go through their OAuth flows
- *         (/integrations/slack|google-drive|dropbox/authorize)
- *
- * DELETE /integrations/:integrationId   disconnect — {ok: true}
- *
- * GET    /integrations/slack/authorize   get Slack OAuth URL
- *   query: workspaceId (UUID)
- *   response: { url: string }
- *
- * Providers: GOOGLE_DRIVE | ONEDRIVE | DROPBOX | GMAIL | OUTLOOK |
- *            SLACK | GITHUB | GITLAB | GOOGLE_CALENDAR | OUTLOOK_CALENDAR
- * ─────────────────────────────────────────────────────────────────────────────
+ * Integrations management service for PITERON.
+ * Routes are mounted at /api/v1/integrations and proxied via /api/backend/integrations.
  */
 
 import { apiRequest } from '@/lib/api';
@@ -34,100 +11,260 @@ import { withAuthRetry } from '@/lib/with-auth-retry';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type IntegrationProvider =
-  | 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX'
-  | 'GMAIL' | 'OUTLOOK'
+  | 'GOOGLE_DRIVE'
+  | 'ONEDRIVE'
+  | 'DROPBOX'
+  | 'GMAIL'
+  | 'OUTLOOK'
   | 'SLACK'
-  | 'GITHUB' | 'GITLAB'
-  | 'GOOGLE_CALENDAR' | 'OUTLOOK_CALENDAR';
+  | 'GITHUB'
+  | 'GITLAB'
+  | 'GOOGLE_CALENDAR'
+  | 'OUTLOOK_CALENDAR';
 
-export type IntegrationStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED' | 'ERROR';
+export type IntegrationStatus = 'ACTIVE' | 'ERROR' | 'DISCONNECTED';
+export type IntegrationSyncStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 
 export interface IntegrationSummary {
   id: string;
   provider: IntegrationProvider;
   status: IntegrationStatus;
+  enabled?: boolean;
   workspaceId: string | null;
   externalEmail: string | null;
   scopes: string[];
+  lastError?: string | null;
+  lastRefreshedAt?: string | null;
+  lastSyncedAt?: string | null;
+  config?: Record<string, unknown> | null;
   createdAt: string;
 }
 
-export interface ConnectIntegrationInput {
-  provider: IntegrationProvider;
-  workspaceId?: string | null;
-  accessToken: string;
-  refreshToken?: string | null;
-  tokenExpiresAt?: string | null;
-  scopes?: string[];
-  externalUserId?: string | null;
-  externalEmail?: string | null;
+export interface GoogleCalendarChannel {
+  id: string;
+  name: string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+export interface SlackChannel {
+  id: string;
+  name: string;
+}
+
+export async function listGoogleCalendarChannels(workspaceId: string): Promise<GoogleCalendarChannel[]> {
+  const result = await authed<GoogleCalendarChannel[]>(`/integrations/google-calendar/channels?workspaceId=${encodeURIComponent(workspaceId)}`);
+  return Array.isArray(result) ? result : [];
+}
+
+export async function listSlackChannels(workspaceId: string): Promise<SlackChannel[]> {
+  const result = await authed<SlackChannel[]>(`/integrations/slack/channels?workspaceId=${encodeURIComponent(workspaceId)}`);
+  return Array.isArray(result) ? result : [];
+}
+
+export interface IntegrationSyncJob {
+  id: string;
+  integrationId: string;
+  status: IntegrationSyncStatus;
+  attempts?: number;
+  maxRetries?: number;
+  lastError?: string | null;
+  nextAttemptAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+}
+
+export interface IntegrationStatusResponse {
+  integration?: IntegrationSummary;
+  lastSyncedAt?: string | null;
+  lastError?: string | null;
+  syncState?: unknown;
+  jobs?: IntegrationSyncJob[];
+  [key: string]: unknown;
+}
 
 function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
   return withAuthRetry(() => apiRequest<T>(path, { ...options, authenticated: true }));
 }
 
-// ─── API functions ────────────────────────────────────────────────────────────
+function unwrapUrl(data: unknown): string {
+  if (data && typeof data === 'object' && 'url' in data && typeof (data as { url: unknown }).url === 'string') {
+    return (data as { url: string }).url;
+  }
+  throw new Error('The server did not return an authorization URL.');
+}
 
-/** List connected integrations for the current user, optionally scoped to a workspace. */
+// ─── List / Status / Updates ──────────────────────────────────────────────────
+
 export async function listIntegrations(workspaceId?: string): Promise<IntegrationSummary[]> {
-  const q = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
-  return authed<IntegrationSummary[]>(`/integrations${q}`);
+  const params = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+  const result = await authed<IntegrationSummary[]>(`/integrations${params}`);
+  return Array.isArray(result) ? result : [];
 }
 
-/** Disconnect an integration by ID. */
-export async function disconnectIntegration(integrationId: string): Promise<{ ok: true }> {
-  return authed<{ ok: true }>(`/integrations/${integrationId}`, { method: 'DELETE' });
+export async function getIntegrationStatus(integrationId: string): Promise<IntegrationStatusResponse> {
+  const result = await authed<IntegrationStatusResponse>(`/integrations/${encodeURIComponent(integrationId)}/status`);
+  return result && typeof result === 'object' ? result : {};
 }
 
-/** Get the Slack OAuth authorization URL (workspace-level, manager required). */
-export async function getSlackAuthorizeUrl(workspaceId: string): Promise<{ url: string }> {
-  return authed<{ url: string }>(
-    `/integrations/slack/authorize?workspaceId=${encodeURIComponent(workspaceId)}`,
+export async function getIntegrationSyncStatus(integrationId: string): Promise<{
+  status: IntegrationStatus;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  reconnectRequired: boolean;
+}> {
+  const result = await authed<{
+    status: IntegrationStatus;
+    lastSyncedAt: string | null;
+    lastError: string | null;
+    reconnectRequired: boolean;
+}>(`/integrations/${encodeURIComponent(integrationId)}/sync-status`);
+  return result && typeof result === 'object' ? result : {
+    status: 'DISCONNECTED' as IntegrationStatus,
+    lastSyncedAt: null,
+    lastError: null,
+    reconnectRequired: false,
+  };
+}
+
+export async function triggerIntegrationSync(integrationId: string, immediate = true): Promise<{
+  jobId: string;
+  status: IntegrationSyncStatus;
+}> {
+  const result = await authed<{
+    jobId: string;
+    status: IntegrationSyncStatus;
+}>(`/integrations/${encodeURIComponent(integrationId)}/sync-now`, {
+  method: 'POST',
+  body: JSON.stringify({ immediate }),
+});
+  return result && typeof result === 'object' ? result : { jobId: '', status: 'FAILED' };
+}
+
+export async function updateSlackEventNotifications(integrationId: string, channelId: string, addEvents: string[], removeEvents: string[]): Promise<{
+  channelId: string;
+  eventTypes: string[];
+  added: string[];
+  removed: string[];
+}> {
+  const result = await authed<{
+    channelId: string;
+    eventTypes: string[];
+    added: string[];
+    removed: string[];
+}>(`/integrations/${encodeURIComponent(integrationId)}/events`, {
+  method: 'POST',
+  body: JSON.stringify({ channelId, addEvents, removeEvents }),
+});
+  return result && typeof result === 'object' ? result : { channelId, eventTypes: [], added: [], removed: [] };
+}
+
+export async function updateIntegration(
+  integrationId: string,
+  input: { enabled?: boolean; config?: Record<string, unknown> },
+): Promise<IntegrationSummary> {
+  return authed<IntegrationSummary>(`/integrations/${encodeURIComponent(integrationId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function queueIntegrationSync(integrationId: string): Promise<IntegrationSyncJob> {
+  return authed<IntegrationSyncJob>(`/integrations/${encodeURIComponent(integrationId)}/sync`, {
+    method: 'POST',
+  });
+}
+
+export async function listIntegrationSyncJobs(integrationId: string, limit = 25): Promise<IntegrationSyncJob[]> {
+  const q = `?limit=${encodeURIComponent(String(limit))}`;
+  const result = await authed<IntegrationSyncJob[]>(`/integrations/${encodeURIComponent(integrationId)}/sync-jobs${q}`);
+  return Array.isArray(result) ? result : [];
+}
+
+export async function retryIntegrationSyncJob(integrationId: string, jobId: string): Promise<IntegrationSyncJob> {
+  return authed<IntegrationSyncJob>(
+    `/integrations/${encodeURIComponent(integrationId)}/sync-jobs/${encodeURIComponent(jobId)}/retry`,
+    { method: 'POST' },
   );
 }
 
-/** Get the Google Drive OAuth authorization URL (workspace-level, manager required). */
-export async function getGoogleDriveAuthorizeUrl(workspaceId: string): Promise<{ url: string }> {
-  return authed<{ url: string }>(
-    `/integrations/google-drive/authorize?workspaceId=${encodeURIComponent(workspaceId)}`,
-  );
+// ─── Connect / Disconnect ─────────────────────────────────────────────────────
+
+export interface ConnectIntegrationInput {
+  provider: IntegrationProvider;
+  workspaceId?: string;
+  accessToken: string;
+  refreshToken?: string;
+  tokenExpiresAt?: string;
+  scopes?: string[];
+  externalUserId?: string;
+  externalEmail?: string;
 }
 
-/** Get the Dropbox OAuth authorization URL (workspace-level, manager required). */
-export async function getDropboxAuthorizeUrl(workspaceId: string): Promise<{ url: string }> {
-  return authed<{ url: string }>(
-    `/integrations/dropbox/authorize?workspaceId=${encodeURIComponent(workspaceId)}`,
-  );
+/** POST /integrations — direct token connect for providers without dedicated OAuth in UI. */
+export async function connectIntegration(input: ConnectIntegrationInput): Promise<IntegrationSummary> {
+  return authed<IntegrationSummary>('/integrations', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
-/** Get the Gmail OAuth authorization URL (personal connection, no workspace role needed). */
-export async function getGmailAuthorizeUrl(): Promise<{ url: string }> {
-  return authed<{ url: string }>('/integrations/gmail/authorize');
+export async function disconnectIntegration(integrationId: string): Promise<void> {
+  await authed(`/integrations/${encodeURIComponent(integrationId)}`, { method: 'DELETE' });
 }
 
-/** Get the Google Calendar OAuth authorization URL (personal connection, no workspace role needed). */
-export async function getGoogleCalendarAuthorizeUrl(): Promise<{ url: string }> {
-  return authed<{ url: string }>('/integrations/google-calendar/authorize');
+// ─── OAuth Authorize URLs ─────────────────────────────────────────────────────
+// Workspace-scoped providers require workspaceId. Callbacks redirect to the frontend integrations page.
+
+export async function getSlackAuthorizeUrl(workspaceId: string): Promise<string> {
+  return unwrapUrl(await authed(`/integrations/slack/authorize?workspaceId=${encodeURIComponent(workspaceId)}`));
 }
 
-/** Get the GitHub OAuth authorization URL (personal connection, no workspace role needed). */
-export async function getGithubAuthorizeUrl(): Promise<{ url: string }> {
-  return authed<{ url: string }>('/integrations/github/authorize');
+export async function getGoogleDriveAuthorizeUrl(workspaceId: string): Promise<string> {
+  return unwrapUrl(await authed(`/integrations/google-drive/authorize?workspaceId=${encodeURIComponent(workspaceId)}`));
 }
 
-export async function getOutlookCalendarAuthorizeUrl(): Promise<{ url: string }> {
-  return authed<{ url: string }>('/integrations/outlook-calendar/authorize');
+export async function getDropboxAuthorizeUrl(workspaceId: string): Promise<string> {
+  return unwrapUrl(await authed(`/integrations/dropbox/authorize?workspaceId=${encodeURIComponent(workspaceId)}`));
 }
 
-/** Get the OneDrive OAuth authorization URL (personal connection). */
-export async function getOneDriveAuthorizeUrl(): Promise<{ url: string }> {
-  return authed<{ url: string }>('/integrations/onedrive/authorize');
+export async function getGmailAuthorizeUrl(workspaceId?: string): Promise<string> {
+  const params = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+  return unwrapUrl(await authed(`/integrations/gmail/authorize${params}`));
 }
 
-/** Get the Outlook Mail OAuth authorization URL (personal connection). */
-export async function getOutlookMailAuthorizeUrl(): Promise<{ url: string }> {
-  return authed<{ url: string }>('/integrations/outlook-mail/authorize');
+/** Workspace-scoped GitHub integration OAuth (per backend feat/integrations-import). */
+export async function getGithubAuthorizeUrl(workspaceId?: string): Promise<string> {
+  const params = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+  return unwrapUrl(await authed(`/integrations/github/authorize${params}`));
+}
+
+/** Workspace-scoped Google Calendar integration OAuth. */
+export async function getGoogleCalendarAuthorizeUrl(workspaceId?: string): Promise<string> {
+  const params = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+  return unwrapUrl(await authed(`/integrations/google-calendar/authorize${params}`));
+}
+
+export async function getOutlookCalendarAuthorizeUrl(): Promise<string> {
+  return unwrapUrl(await authed('/integrations/outlook-calendar/authorize'));
+}
+
+export async function getOneDriveAuthorizeUrl(): Promise<string> {
+  return unwrapUrl(await authed('/integrations/onedrive/authorize'));
+}
+
+export async function getOutlookMailAuthorizeUrl(): Promise<string> {
+  return unwrapUrl(await authed('/integrations/outlook-mail/authorize'));
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+
+export function integrationNeedsReconnect(integration: Pick<IntegrationSummary, 'status' | 'lastError'>): boolean {
+  if (integration.status === 'ERROR') return true;
+  const err = (integration.lastError ?? '').toLowerCase();
+  return /token|auth|invalid|expired|revoked|unauthor/i.test(err);
+}
+
+export function getIntegrationConfigString(integration: IntegrationSummary, key: string): string {
+  const value = integration.config?.[key];
+  return typeof value === 'string' ? value : '';
 }

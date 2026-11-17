@@ -18,11 +18,11 @@ describe('auth service', () => {
       },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 
-    const result = await signIn({ email: 'ada@example.com', password: 'Nexus-pass-123' });
+    const result = await signIn({ email: 'ada@example.com', password: 'PITERON-pass-123' });
     expect(result.user.name).toBe('Ada');
     expect(getAccessToken()).toBe('short-lived-access-token');
     expect(fetch).toHaveBeenCalledWith('/api/backend/auth/login', expect.objectContaining({
-      method: 'POST', credentials: 'include', body: JSON.stringify({ email: 'ada@example.com', password: 'Nexus-pass-123' }),
+      method: 'POST', credentials: 'include', body: JSON.stringify({ email: 'ada@example.com', password: 'PITERON-pass-123' }),
     }));
   });
 
@@ -32,14 +32,14 @@ describe('auth service', () => {
       data: { user: { id: 'user-id', email: 'ada@example.com', name: 'Ada', status: 'ACTIVE', emailVerifiedAt: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z' } },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 
-    const result = await reactivateAccount({ email: 'ada@example.com', password: 'Nexus-pass-123' });
+    const result = await reactivateAccount({ email: 'ada@example.com', password: 'PITERON-pass-123' });
 
     expect(result.user.status).toBe('ACTIVE');
     expect(getAccessToken()).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith('/api/backend/auth/reactivate', expect.objectContaining({
       method: 'POST',
       credentials: 'include',
-      body: JSON.stringify({ email: 'ada@example.com', password: 'Nexus-pass-123' }),
+      body: JSON.stringify({ email: 'ada@example.com', password: 'PITERON-pass-123' }),
     }));
   });
 

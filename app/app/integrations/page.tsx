@@ -87,7 +87,7 @@ function formatDate(value: string | null | undefined): string {
 
 function callbackMessage(provider: string | null, status: string | null): { variant: 'success' | 'error' | 'info'; text: string } | null {
   if (!status) return null;
-  const name = provider ? (PROVIDER_META[provider as IntegrationProvider]?.name ?? provider) : 'Integration';
+  const name = provider ? (PROVIDER_META[provider.toUpperCase() as IntegrationProvider]?.name ?? provider) : 'Integration';
   if (status === 'connected') return { variant: 'success', text: `${name} connected successfully.` };
   if (status === 'denied') return { variant: 'info', text: `${name} connection was cancelled or denied.` };
   return { variant: 'error', text: `${name} connection failed. You can try connecting again.` };

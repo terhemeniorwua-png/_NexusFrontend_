@@ -700,9 +700,9 @@ export function AuthForm({ mode, initialEmail = '', accountType, redirectPath, d
     <section className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-lg sm:p-8">
       <div className="mb-7">
         <div className="relative mb-8 flex min-h-10 items-center gap-3 sm:flex-row sm:justify-between sm:items-center">
-          <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight text-text-primary" aria-label="PITERON home">
-            <span className="grid size-10 place-items-center rounded-lg bg-primary text-base font-bold text-white">N</span>
-            PITERON
+          <Link href="/" className="flex flex-col items-center gap-1 font-semibold tracking-tight text-text-primary" aria-label="PITERON home">
+            <img src="/logo.png" alt="PITERON logo" className="h-10 w-auto rounded-lg" />
+            <span className="text-base font-semibold">PITErON</span>
           </Link>
           {onBackToAccountType && (
             <button

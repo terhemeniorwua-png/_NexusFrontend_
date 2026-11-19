@@ -196,9 +196,9 @@ export default function ProjectCodePage() {
                 </span>
               </span>
               {c.url ? (
-                <a href={c.url} target="_blank" rel="noreferrer" className="shrink-0 font-mono text-xs text-[var(--color-primary)] underline">
+                <Link href={`/app/projects/${projectId}/code/${repoId}/commit/${c.sha}`} className="shrink-0 font-mono text-xs text-[var(--color-primary)] underline">
                   {c.sha.slice(0, 7)}
-                </a>
+                </Link>
               ) : (
                 <span className="shrink-0 font-mono text-xs">{c.sha.slice(0, 7)}</span>
               )}

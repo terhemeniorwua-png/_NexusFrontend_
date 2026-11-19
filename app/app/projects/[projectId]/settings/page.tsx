@@ -57,7 +57,18 @@ const editSchema = z.object({
   description: z.string().trim().max(5000).optional(),
   status: z.enum(['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED']),
   visibility: z.enum(['WORKSPACE', 'DEPARTMENT_TEAM', 'PRIVATE']),
-});
+  startDate: z.string().trim().max(10).optional().or(z.literal('')),
+  dueDate: z.string().trim().max(10).optional().or(z.literal('')),
+}).refine(
+  (data) => {
+    if (!data.startDate || !data.dueDate) return true;
+    return data.dueDate >= data.startDate;
+  },
+  {
+    message: 'Due date must be on or after the start date.',
+    path: ['dueDate'],
+  },
+);
 
 // Visibility change warnings: when changing from one visibility to another, show a warning
 const VISIBILITY_CHANGE_WARNINGS: Partial<Record<ProjectVisibility, Partial<Record<ProjectVisibility, string>>>> = {
@@ -102,6 +113,8 @@ export default function ProjectSettingsPage() {
   const [status, setStatus] = useState<ProjectStatus>('PLANNING');
   const [visibility, setVisibility] = useState<ProjectVisibility>('WORKSPACE');
   const [commentPolicy, setCommentPolicy] = useState<ProjectCommentPolicy>('ASSIGNEES_ONLY');
+  const [startDate, setStartDate] = useState<string>('');
+  const [dueDate, setDueDate] = useState<string>('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Visibility change confirmation
@@ -157,6 +170,8 @@ export default function ProjectSettingsPage() {
       setStatus(data.status === 'ARCHIVED' ? 'ACTIVE' : data.status);
       setVisibility(data.visibility);
       setCommentPolicy(data.commentPolicy ?? 'ASSIGNEES_ONLY');
+      setStartDate(data.startDate ? new Date(data.startDate).toISOString().slice(0, 10) : '');
+      setDueDate(data.dueDate ? new Date(data.dueDate).toISOString().slice(0, 10) : '');
       setOrgTeamId(data.teamId ?? '');
       setOrgDepartmentId(data.departmentId ?? '');
       setDepartments(deptList);
@@ -449,6 +464,38 @@ export default function ProjectSettingsPage() {
               ]}
               helperText="Everyone who can see a task can read its discussion. This controls who can add comments."
             />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="settings-start-date" className="block text-sm font-medium mb-1">
+                Start date
+              </label>
+              <input
+                id="settings-start-date"
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              />
+              {formErrors.startDate && (
+                <p className="mt-1 text-xs text-[var(--color-error)]">{formErrors.startDate}</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="settings-due-date" className="block text-sm font-medium mb-1">
+                Due date
+              </label>
+              <input
+                id="settings-due-date"
+                type="date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+                className="h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              />
+              {formErrors.dueDate && (
+                <p className="mt-1 text-xs text-[var(--color-error)]">{formErrors.dueDate}</p>
+              )}
+            </div>
           </div>
           <div className="flex justify-end">
             <PermissionButton

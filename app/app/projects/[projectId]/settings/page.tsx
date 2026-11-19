@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
@@ -533,7 +534,7 @@ export default function ProjectSettingsPage() {
               <h4 className="text-sm font-medium">Link a repository</h4>
               {!activeGithubConnection ? (
                 <Alert variant="info">
-                  No active GitHub workspace connection. A workspace manager must connect GitHub in <a className="underline" href="/app/integrations">Integrations</a> first.
+                  No active GitHub workspace connection. A workspace manager must connect GitHub in <Link className="underline" href="/app/integrations">Integrations</Link> first.
                 </Alert>
               ) : (
                 <>

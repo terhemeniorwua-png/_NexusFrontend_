@@ -121,7 +121,7 @@ export function Modal({
     // Backdrop
     <div
       role="presentation"
-      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4"
+      className="fixed inset-0 overflow-y-auto z-[var(--z-modal)] flex items-start sm:items-center justify-center p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

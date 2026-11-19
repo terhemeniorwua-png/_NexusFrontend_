@@ -271,3 +271,13 @@ export function listRepositoryCommits(w: string, p: string, r: string, branch?: 
   if (branch) q.set('branch', branch);
   return authed<{ items: DevCommitSummary[] }>(`${repoBase(w, p, r)}/commits?${q}`);
 }
+
+export interface DevCommitDetail extends DevCommitSummary {
+  additions: number; deletions: number; total: number;
+  parents: string[];
+  files: DevChangedFile[];
+}
+
+export function getRepositoryCommit(w: string, p: string, r: string, sha: string) {
+  return authed<DevCommitDetail>(`${repoBase(w, p, r)}/commits/${sha}`);
+}

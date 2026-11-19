@@ -190,7 +190,7 @@ export default function PullRequestDetailPage() {
                 <span className="block truncate font-medium">{c.message.split('\n')[0]}</span>
                 <span className="block text-xs text-[var(--color-text-muted)]">{c.authorLogin ?? c.authorName ?? 'unknown'}</span>
               </span>
-              <span className="shrink-0 font-mono text-xs">{c.sha.slice(0, 7)}</span>
+              <Link href={`/app/projects/${projectId}/code/${repositoryId}/commit/${c.sha}`} className="shrink-0 font-mono text-xs text-[var(--color-primary)] underline">{c.sha.slice(0, 7)}</Link>
             </li>
           ))}
         </ul>

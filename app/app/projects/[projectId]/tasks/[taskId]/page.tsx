@@ -55,6 +55,7 @@ import {
 } from '@/services/tasks';
 import { CustomFieldInput, formatCustomFieldValue } from '@/components/tasks/CustomFieldInputs';
 import { listProjectMembers, type ProjectMember } from '@/services/projects';
+import { MentionTextarea, extractMentionIds, type MentionMember } from '@/components/ui/MentionTextarea';
 import {
   deleteFile,
   formatBytes,
@@ -197,6 +198,15 @@ export default function TaskDetailPage() {
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentBody, setCommentBody] = useState('');
+  const [mentionMembers, setMentionMembers] = useState<MentionMember[]>([]);
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    let active = true;
+    listProjectMembers(activeWorkspace.id, projectId)
+      .then((list) => { if (active) setMentionMembers(list.map((m) => ({ userId: m.userId, name: m.user.name }))); })
+      .catch(() => { if (active) setMentionMembers([]); });
+    return () => { active = false; };
+  }, [activeWorkspace, projectId]);
   const [commentBusy, setCommentBusy] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [editCommentId, setEditCommentId] = useState<string | null>(null);
@@ -609,7 +619,7 @@ export default function TaskDetailPage() {
     if (!parsed.success) { setCommentError(parsed.error.issues[0]?.message ?? 'Invalid comment.'); return; }
     setCommentBusy(true); setCommentError(null);
     try {
-      await addComment(activeWorkspace.id, projectId, task.id, parsed.data.body);
+      await addComment(activeWorkspace.id, projectId, task.id, parsed.data.body, null, extractMentionIds(parsed.data.body, mentionMembers));
       setCommentBody('');
       await loadComments();
     } catch (cause) {
@@ -1325,15 +1335,7 @@ export default function TaskDetailPage() {
             {/* Add comment form */}
             {canComment ? (
               <form onSubmit={(e) => void handleAddComment(e)} className="space-y-2" aria-label="Add comment">
-                <Textarea
-                  id="new-comment"
-                  label="Add a comment"
-                  value={commentBody}
-                  onChange={(e) => setCommentBody(e.target.value)}
-                  placeholder="Write a comment…"
-                  rows={3}
-                  maxLength={10000}
-                />
+                <MentionTextarea id="new-comment" ariaLabel="Add a comment" value={commentBody} onChange={setCommentBody} members={mentionMembers} placeholder="Write a comment… type @ to mention" rows={3} />
                 <Button type="submit" size="sm" loading={commentBusy} disabled={!commentBody.trim()}>Post comment</Button>
               </form>
             ) : (

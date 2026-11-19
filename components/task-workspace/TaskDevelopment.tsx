@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
@@ -177,7 +178,15 @@ export function TaskDevelopment({
                         {link.repositoryFullName ? <span className="text-xs text-[var(--color-text-muted)]">{link.repositoryFullName}</span> : null}
                       </div>
                       <p className="mt-1 truncate font-medium text-[var(--color-text-primary)]">
-                        {link.url ? <a className="underline underline-offset-2" href={link.url} target="_blank" rel="noreferrer">{label}</a> : label}
+                        {(() => {
+                          const base = link.projectRepositoryId ? `/app/projects/${link.projectId}/code/${link.projectRepositoryId}` : null;
+                          const inApp = !base ? null
+                            : link.externalType === 'COMMIT' ? `${base}/commit/${link.externalId}`
+                            : link.externalType === 'PULL_REQUEST' && link.externalNumber ? `${base}/pull/${link.externalNumber}`
+                            : null;
+                          if (inApp) return <Link className="underline underline-offset-2" href={inApp}>{label}</Link>;
+                          return link.url ? <a className="underline underline-offset-2" href={link.url} target="_blank" rel="noreferrer">{label}</a> : label;
+                        })()}
                       </p>
                       {(link.headRef || link.baseRef) && <p className="text-xs text-[var(--color-text-muted)]">{link.headRef ?? '—'} → {link.baseRef ?? '—'}</p>}
                     </div>

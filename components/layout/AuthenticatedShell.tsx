@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/Alert';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Toaster } from '@/components/ui/Toaster';
 import { AppShell } from '@/components/layout/AppShell';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
+import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 import { buildAppNavigation, workspaceKindFor } from '@/lib/app-navigation';
 import { workspacePermissionKeys } from '@/lib/permissions';
 import { useAvatarUrl } from '@/providers/AvatarUrlProvider';
@@ -15,6 +17,7 @@ import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { signOut } from '@/services/auth';
 import { getUnreadCount } from '@/services/notifications';
 import { getUserProfile } from '@/services/profile';
+import { getOnboardingStatus, type OnboardingStatus } from '@/services/onboarding';
 import type { WorkspaceSummary } from '@/types/navigation';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { IncomingCallListener } from '@/components/meetings/IncomingCallListener';
@@ -60,6 +63,38 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { open: searchOpen, openSearch, closeSearch } = useGlobalSearch();
+
+  // ─── Onboarding gate ──────────────────────────────────────────────────────
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Fetch onboarding status once the session and workspace are available.
+  // The gate blocks the app until required onboarding completes.
+  useEffect(() => {
+    if (!user || !activeWorkspace) return;
+    let active = true;
+    async function load() {
+      setOnboardingLoading(true);
+      try {
+        const result = await getOnboardingStatus();
+        if (!active) return;
+        setOnboardingStatus(result);
+        if (result.required && !result.completedAt) {
+          setShowOnboarding(true);
+        }
+      } catch {
+        if (!active) return;
+        // Do not block the app on a status fetch failure.
+      } finally {
+        if (active) setOnboardingLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [user, activeWorkspace]);
 
   // Load the avatar URL once the session is ready.
   useEffect(() => {
@@ -139,6 +174,44 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
   }
 
   if (!user) return <>{children}</>;
+
+  // While onboarding status is being resolved, show a neutral shell so the
+  // app content never flashes before the gate check completes.
+  if (onboardingLoading) {
+    return (
+      <div className="mx-auto w-full max-w-xl px-5 py-16">
+        <Skeleton className="h-5 w-1/3" />
+        <Skeleton className="mt-4 h-4 w-full" />
+        <Skeleton className="mt-3 h-4 w-3/4" />
+      </div>
+    );
+  }
+
+  // Onboarding is required — render the modal over a neutral background and
+  // block the rest of the app until it completes.
+  if (
+    showOnboarding &&
+    onboardingStatus != null &&
+    onboardingStatus.required &&
+    !onboardingStatus.completedAt
+  ) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--color-background)] p-4">
+        <OnboardingModal
+          open={true}
+          onClose={() => {
+            // Intentional no-op: the flow cannot be dismissed mid-flow.
+          }}
+          onComplete={() => {
+            setShowOnboarding(false);
+          }}
+          userName={user.name}
+          userEmail={user.email}
+          workspace={activeWorkspace}
+        />
+      </div>
+    );
+  }
 
   const workspaceKind = workspaceKindFor(activeWorkspace);
   const permissions = workspacePermissionKeys(activeWorkspace);

@@ -976,7 +976,7 @@ export default function TaskDetailPage() {
                       {task.status === 'ASSIGNED' ? 'Start' : 'Resume'}
                     </Button>
                   )}
-                  {!isArchived && (
+                  {!isArchived && isAssignedToMe && (
                     <Button
                       size="sm"
                       variant={task.status === 'ASSIGNED' ? 'secondary' : 'primary'}

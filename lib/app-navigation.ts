@@ -38,6 +38,7 @@ export function buildAppNavigation(workspace: Workspace | null): NavSection[] {
         { id: 'environment', label: 'Working Environment', href: '/app/work/environment', permissions: ['workspace:view'] },
         { id: 'submissions', label: 'My Submissions', href: '/app/work/submissions', permissions: ['workspace:view'] },
         { id: 'completed', label: 'Completed Work', href: '/app/work/completed', permissions: ['workspace:view'] },
+        { id: 'resources', label: 'Resources', href: '/app/resources', permissions: ['workspace:view'] },
       ],
     },
     {

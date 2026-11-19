@@ -11,6 +11,7 @@ import {
   BlocksIcon,
   ListIcon,
   SettingsIcon,
+  FilesIcon,
 } from './icons';
 
 /** Maps a navigation section id to its primary-sidebar icon. */
@@ -18,6 +19,7 @@ function iconFor(sectionId: string): React.ReactNode {
   const icons: Record<string, React.ReactNode> = {
     workspace: <Building2Icon size={16} />,
     work: <FolderKanbanIcon size={16} />,
+    resources: <FilesIcon size={16} />,
     communication: <MessageSquareIcon size={16} />,
     ai: <BlocksIcon size={16} />,
     people: <ListIcon size={16} />,

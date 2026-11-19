@@ -24,6 +24,8 @@ import {
   type ProjectSummary,
   type ProjectVisibility,
 } from '@/services/projects';
+import { getOverview } from '@/services/resources';
+import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
 
 function visibilityLabel(v: ProjectVisibility): string {
   if (v === 'WORKSPACE') return 'Organisation-wide';
@@ -60,9 +62,43 @@ export default function ProjectOverviewPage() {
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Dashboard data per card
+  const [dashboardData, setDashboardData] = useState<{
+    recentItems: Array<{ id: string; type: string; title: string; url: string; updatedAt: string }>;
+    docs: Array<{ id: string; title: string; updatedAt: string; url: string }>;
+    bookmarks: Array<{ id: string; title: string; url: string }>;
+    folders: Array<{ id: string; name: string; itemCount: number }>;
+    files: Array<{
+      id: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      createdAt: string;
+      uploadedById: string;
+    }>;
+    lists: Array<{
+      id: string;
+      name: string;
+      taskCount: number;
+      completedCount: number;
+      url: string;
+    }>;
+    workload: Array<{
+      userId: string;
+      user: { id: string; name: string };
+      statusCounts: Record<string, number>;
+      total: number;
+    }>;
+  } | null>(null);
+  const [cardLoading, setCardLoading] = useState<Record<string, boolean>>({});
+  const [cardErrors, setCardErrors] = useState<Record<string, string | null>>({});
+
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
-    setLoading(true); setError(null); setAccessStatus(null); setProject(null);
+    setLoading(true);
+    setError(null);
+    setAccessStatus(null);
+    setProject(null);
     try {
       const data = await getProject(activeWorkspace.id, projectId);
       setProject(data);
@@ -79,15 +115,82 @@ export default function ProjectOverviewPage() {
     }
   }, [activeWorkspace, projectId]);
 
+  const loadDashboard = useCallback(async () => {
+    if (!activeWorkspace || !project) return;
+    setCardLoading({});
+    setCardErrors({});
+    try {
+      const data = await getOverview(activeWorkspace.id, project.id);
+      setDashboardData({
+        recentItems: data.recentItems.map((i) => ({
+          id: i.id,
+          type: i.type,
+          title: i.title,
+          url: i.url,
+          updatedAt: i.updatedAt,
+        })),
+        docs: data.docs.map((d) => ({
+          id: d.id,
+          title: d.title,
+          updatedAt: d.updatedAt,
+          url: `/app/projects/${encodeURIComponent(projectId)}/tasks`, // link to tasks/work documents
+        })),
+        bookmarks: data.bookmarks.map((b) => ({
+          id: b.id,
+          title: b.title,
+          url: b.url,
+        })),
+        folders: data.folders.map((f) => ({
+          id: f.id,
+          name: f.name,
+          itemCount: f.itemCount,
+        })),
+        files: data.files.map((f) => ({
+          id: f.id,
+          fileName: f.fileName,
+          mimeType: f.mimeType,
+          sizeBytes: f.sizeBytes,
+          createdAt: f.createdAt,
+          uploadedById: f.uploadedById,
+        })),
+        lists: data.lists.map((l) => ({
+          id: l.id,
+          name: l.name,
+          taskCount: l.taskCount,
+          completedCount: l.completedCount,
+          url: `/app/projects/${encodeURIComponent(projectId)}/tasks`,
+        })),
+        workload: data.workload.map((w) => ({
+          userId: w.userId,
+          user: w.user,
+          statusCounts: w.statusCounts,
+          total: w.total,
+        })),
+      });
+    } catch (cause) {
+      const message = cause instanceof ApiRequestError ? cause.message : 'Dashboard could not be loaded.';
+      setCardErrors({ overview: message });
+    }
+  }, [activeWorkspace, project, projectId]);
+
   useEffect(() => {
     let active = true;
     void Promise.resolve().then(() => active ? load() : undefined);
     return () => { active = false; };
   }, [load]);
 
+  useEffect(() => {
+    let active = true;
+    if (project) {
+      void Promise.resolve().then(() => active ? loadDashboard() : undefined);
+    }
+    return () => { active = false; };
+  }, [project, loadDashboard]);
+
   async function handleArchive() {
     if (!activeWorkspace || !project) return;
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
       await archiveProject(activeWorkspace.id, project.id);
       setConfirmArchive(false);
@@ -102,7 +205,8 @@ export default function ProjectOverviewPage() {
 
   async function handleDelete() {
     if (!activeWorkspace || !project) return;
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
       await deleteProject(activeWorkspace.id, project.id);
       setConfirmDelete(false);
@@ -202,6 +306,7 @@ export default function ProjectOverviewPage() {
       {notice && <Alert variant="success">{notice}</Alert>}
       {error && <Alert variant="error">{error}</Alert>}
 
+      {/* Project summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4">
           <p className="text-xs text-[var(--color-text-muted)]">Owner</p>
@@ -221,83 +326,51 @@ export default function ProjectOverviewPage() {
         </Card>
       </div>
 
-      {/* Organizational access display */}
-      {project.visibility === 'DEPARTMENT_TEAM' && (project.teamId || project.departmentId) && (
-        <Card className="p-4">
-          <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-2">Organizational access</h2>
-          <div className="flex flex-wrap gap-4">
-            {project.teamId && (
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">Team</p>
-                <p className="mt-1 text-sm font-medium">{project.teamId}</p>
-              </div>
-            )}
-            {project.departmentId && (
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">Department</p>
-                <p className="mt-1 text-sm font-medium">{project.departmentId}</p>
-              </div>
-            )}
-          </div>
-          <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-            Members of the associated team or department can access this project.{' '}
-            <Can
-              permission="project.settings.manage"
-              fallback="Ask a project manager to change the associations."
-            >
-              Manage associations in{' '}
-              <Link href={`${projectHref}/settings`} className="text-[var(--color-primary)] underline">settings</Link>.
-            </Can>
-          </p>
-        </Card>
-      )}
-
-      {project.labels.length > 0 && (
-        <Card className="p-4">
-          <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-2">Labels</h2>
-          <div className="flex flex-wrap gap-2">
-            {project.labels.map((label) => (
-              <Badge key={label} variant="outline">{label}</Badge>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Entry points for features */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="p-4">
-          <h3 className="font-semibold mb-1">Tasks</h3>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-3">
-            Create and manage tasks, track progress, and assign work to team members.
-          </p>
-          <Can
-            permission="task.view"
-            fallback={<span className="text-sm text-[var(--color-text-muted)]">Task access is not available for your role.</span>}
-          >
-            <Link
-              href={`${projectHref}/tasks`}
-              className="text-sm text-[var(--color-primary)] underline font-medium"
-            >
-              View tasks →
-            </Link>
-          </Can>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            {project.taskCount} task{project.taskCount !== 1 ? 's' : ''}
-          </p>
-        </Card>
-        <Card className="p-4 opacity-60">
-          <h3 className="font-semibold mb-1">Discussions</h3>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Project discussions are not yet available. No backend message/channel contract is registered for projects.
-          </p>
-        </Card>
-        <Card className="p-4 opacity-60">
-          <h3 className="font-semibold mb-1">Files</h3>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Project file management is not yet available. The backend file/attachment API is not currently registered.
-          </p>
-        </Card>
-      </div>
+      {/* Dashboard grid */}
+      <DashboardGrid
+        workspaceId={activeWorkspace.id}
+        recentItems={dashboardData?.recentItems ?? []}
+        docs={dashboardData?.docs ?? []}
+        bookmarks={dashboardData?.bookmarks ?? []}
+        folders={dashboardData?.folders ?? []}
+        files={dashboardData?.files ?? []}
+        lists={dashboardData?.lists ?? []}
+        workload={dashboardData?.workload ?? []}
+        loading={{
+          recent: cardLoading.recent ?? false,
+          docs: cardLoading.docs ?? false,
+          bookmarks: cardLoading.bookmarks ?? false,
+          folders: cardLoading.folders ?? false,
+          files: cardLoading.files ?? false,
+          lists: cardLoading.lists ?? false,
+          workload: cardLoading.workload ?? false,
+        }}
+        errors={{
+          recent: cardErrors.recent ?? null,
+          docs: cardErrors.docs ?? null,
+          bookmarks: cardErrors.bookmarks ?? null,
+          folders: cardErrors.folders ?? null,
+          files: cardErrors.files ?? null,
+          lists: cardErrors.lists ?? null,
+          workload: cardErrors.workload ?? null,
+        }}
+        onRetry={() => {
+          void loadDashboard();
+        }}
+        onAddDoc={() => {
+          router.push(`${projectHref}/tasks`);
+        }}
+        onAddBookmark={() => {
+          // Bookmark dialog handled by resources page; here just navigate
+          router.push(`${projectHref}/tasks`);
+        }}
+        onAddFolder={() => {
+          router.push(`${projectHref}/tasks`);
+        }}
+        onUploadFiles={() => {
+          router.push(`${projectHref}/tasks`);
+        }}
+      />
 
       <Card className="p-4">
         <p className="text-xs text-[var(--color-text-muted)]">Created</p>

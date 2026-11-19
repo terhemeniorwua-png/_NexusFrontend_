@@ -33,6 +33,7 @@ export interface MessagePage {
 export interface SendMessageInput {
   body: string;
   parentId?: string | null;
+  mentionedUserIds?: string[];
 }
 
 export interface ListMessagesQuery {

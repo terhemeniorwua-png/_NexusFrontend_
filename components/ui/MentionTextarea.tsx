@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
 
 export interface MentionMember {
@@ -27,6 +27,7 @@ export function MentionTextarea({
   rows = 3,
   disabled,
   ariaLabel,
+  onSubmit,
 }: {
   id: string;
   value: string;
@@ -36,6 +37,7 @@ export function MentionTextarea({
   rows?: number;
   disabled?: boolean;
   ariaLabel: string;
+  onSubmit?: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [trigger, setTrigger] = useState<{ start: number; query: string } | null>(null);
@@ -85,7 +87,10 @@ export function MentionTextarea({
         onClick={(e) => detect(value, e.currentTarget.selectionStart)}
         onBlur={() => setTimeout(() => setTrigger(null), 150)}
         onKeyDown={(e) => {
-          if (!open) return;
+          if (!open) {
+            if (e.key === 'Enter' && !e.shiftKey && onSubmit) { e.preventDefault(); onSubmit(); }
+            return;
+          }
           if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => (i + 1) % matches.length); }
           else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => (i - 1 + matches.length) % matches.length); }
           else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); select(matches[active]); }
@@ -116,4 +121,22 @@ export function MentionTextarea({
       )}
     </div>
   );
+}
+
+/** Renders message text with "@Name" of known members in bold. */
+export function renderMentions(body: string, members: MentionMember[]): ReactNode {
+  if (!members.length || !body.includes('@')) return body;
+  const names = members.map((m) => escapeRe(m.name)).sort((a, b) => b.length - a.length);
+  const re = new RegExp(`(^|\\s)(@(?:${names.join('|')}))(?![\\w])`, 'g');
+  const out: ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body))) {
+    const start = m.index + m[1].length;
+    if (start > last) out.push(body.slice(last, start));
+    out.push(<strong key={start} className="font-semibold underline decoration-dotted">{m[2]}</strong>);
+    last = start + m[2].length;
+  }
+  out.push(body.slice(last));
+  return out;
 }

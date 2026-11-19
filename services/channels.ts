@@ -152,3 +152,12 @@ export function removeChannelMember(
     { method: 'DELETE' },
   );
 }
+
+export interface ChannelMentionMember {
+  userId: string;
+  name: string;
+}
+
+export function listChannelMembers(workspaceId: string, channelId: string): Promise<{ items: ChannelMentionMember[] }> {
+  return request<{ items: ChannelMentionMember[] }>(channelPath(workspaceId, channelId, '/members'));
+}

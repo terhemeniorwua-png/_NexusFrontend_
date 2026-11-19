@@ -413,9 +413,11 @@ export default function TaskWorkPage() {
         error={commentsError}
         busy={commentsBusy}
         canDelete={(c) => c.authorId === currentUserId}
-        onAdd={async (body) => {
+        workspaceId={activeWorkspaceId ?? undefined}
+        projectId={projectId}
+        onAdd={async (body, mentionedUserIds) => {
           setCommentsBusy(true);
-          try { await addComment(activeWorkspaceId, projectId, taskId, body); await loadComments(); }
+          try { await addComment(activeWorkspaceId, projectId, taskId, body, null, mentionedUserIds); await loadComments(); }
           finally { setCommentsBusy(false); }
         }}
         onDelete={async (commentId) => {

@@ -12,8 +12,9 @@ full browser URL is `/api/backend/...`; the backend mounts the same paths under
 - Workspace resources base: `/workspaces/:workspaceId/resources`
 - Project resources base: `/workspaces/:workspaceId/projects/:projectId/resources`
 
-Response/request body shapes are **not** part of the contract. Every shape assumed by
-callers is listed under SHAPE-ASSUMPTION and is left unchanged.
+Response/request body shapes are **not** part of the contract except the folder-delete
+shapes, which are VERIFIED below. Every other shape assumed by callers is listed under
+SHAPE-ASSUMPTION and is left unchanged.
 
 ## Phase 1: exported function audit
 
@@ -25,7 +26,7 @@ callers is listed under SHAPE-ASSUMPTION and is left unchanged.
 | `listFolders(workspaceId, parentId?)` | GET `/workspaces/:ws/folders?parentId=…` | GET `/workspaces/:ws/resources/folders` | PATH-MISMATCH; `parentId` query param name is SHAPE-ASSUMPTION |
 | `createFolder(workspaceId, input)` | POST `/workspaces/:ws/folders` | POST `/workspaces/:ws/resources/folders` | PATH-MISMATCH |
 | `updateFolder(workspaceId, folderId, input)` | PATCH `/workspaces/:ws/folders/:folderId` | PATCH `/workspaces/:ws/resources/folders/:folderId` | PATH-MISMATCH |
-| `deleteFolder(workspaceId, folderId)` | DELETE `/workspaces/:ws/folders/:folderId` (assumes `cascadeCount` in DELETE response) | GET `/workspaces/:ws/resources/folders/:folderId/delete-impact` then DELETE `/workspaces/:ws/resources/folders/:folderId` | PATH-MISMATCH + SHAPE-ASSUMPTION |
+| `deleteFolder(workspaceId, folderId)` | DELETE `/workspaces/:ws/folders/:folderId` | GET `/workspaces/:ws/resources/folders/:folderId/delete-impact` then DELETE `/workspaces/:ws/resources/folders/:folderId` | PATH-MISMATCH (fixed); delete shapes VERIFIED |
 | `listBookmarks(workspaceId)` | GET `/workspaces/:ws/bookmarks` | GET `/workspaces/:ws/resources/bookmarks` | PATH-MISMATCH |
 | `createBookmark(workspaceId, input)` | POST `/workspaces/:ws/bookmarks` | POST `/workspaces/:ws/resources/bookmarks` | PATH-MISMATCH |
 | `updateBookmark(workspaceId, bookmarkId, input)` | PATCH `/workspaces/:ws/bookmarks/:bookmarkId` | PATCH `/workspaces/:ws/resources/bookmarks/:bookmarkId` | PATH-MISMATCH |
@@ -37,7 +38,18 @@ callers is listed under SHAPE-ASSUMPTION and is left unchanged.
 - **PATH-MISMATCH** — wrong URL; fixed in Phase 2.
 - **METHOD-MISMATCH** — wrong HTTP verb; fixed in Phase 2.
 - **SHAPE-ASSUMPTION** — request/response body or query shape assumed; not verifiable from the contract, left unchanged.
+- **VERIFIED** — response shape supplied by the deployed backend; encoded in the service types.
 - **UNVERIFIED** — no equivalent contract route used by the frontend function; no path invented.
+
+## VERIFIED shapes — folder delete
+
+| Route | Response |
+|---|---|
+| GET `/workspaces/:ws/resources/folders/:folderId/delete-impact` | `{ folderId: string; name: string; folders: number; files: number }` |
+| DELETE `/workspaces/:ws/resources/folders/:folderId` | `{ deleted: true; folderId: string; folders: number; files: number }` |
+
+A confirmation message reads from `folders` and `files`, for example
+`This deletes 3 folders and 12 files`.
 
 ## SHAPE-ASSUMPTION inventory (caller assumptions — unchanged)
 
@@ -75,9 +87,8 @@ Assumes a top-level object with all of these arrays and maps over each:
 3. All workspace folder/bookmark paths re-based under `/workspaces/:ws/resources/…`,
    including `/:id` PATCH and DELETE paths.
 4. Delete-impact flow: new exported `getFolderDeleteImpact(workspaceId, folderId)`
-   issues `GET …/folders/:id/delete-impact`; `deleteFolder` calls it first, then
-   `DELETE …/folders/:id`, and derives `cascadeCount` from the impact response
-   (never from the DELETE response).
+   issues `GET …/folders/:id/delete-impact` (verified shape above); `deleteFolder`
+   calls it first, then `DELETE …/folders/:id`, returning the verified DELETE shape.
 5. `DashboardGrid` gains a `projectId` prop; the project Overview page passes it.
 6. Service tests assert exact URL and method for every call.
 
@@ -95,5 +106,5 @@ Assumes a top-level object with all of these arrays and maps over each:
 |---|---|
 | `uploadFolder` folder-upload path | Multipart field names and response shape for `POST /workspaces/:ws/resources/files/folder-upload` (or the project equivalent) before switching from per-file `uploadFile` calls. |
 | `parentId` query on `listFolders` | Confirmation of the exact query parameter name/shape for "list filters" on `GET /folders`. |
-| All response shapes in the table above | Request/response schemas for overview, preferences, folders, bookmarks, and delete-impact (field names, envelope, `cascadeCount` field name). |
+| Other response shapes in the table above | Request/response schemas for overview, preferences, folders, and bookmarks (field names, envelope). Folder-delete shapes are VERIFIED and no longer unverified. |
 | Workspace-level overview/recent/preferences | Contract confirms these exist **only** on the project router; no workspace-level attempt will be added. |

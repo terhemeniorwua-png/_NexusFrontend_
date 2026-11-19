@@ -127,14 +127,20 @@ export interface UploadFolderResult {
   files: FileSummary[];
 }
 
-/**
- * Shape assumed for GET /folders/:folderId/delete-impact.
- * The contract confirms the route exists but does not define its body; the
- * `cascadeCount` field is an assumption preserved from the previous frontend
- * delete response contract.
- */
+/** VERIFIED: GET /folders/:folderId/delete-impact response. */
 export interface FolderDeleteImpact {
-  cascadeCount: number;
+  folderId: string;
+  name: string;
+  folders: number;
+  files: number;
+}
+
+/** VERIFIED: DELETE /folders/:folderId response. */
+export interface FolderDeleteResult {
+  deleted: true;
+  folderId: string;
+  folders: number;
+  files: number;
 }
 
 // ─── Internal request helper ───────────────────────────────────────────────────
@@ -222,7 +228,10 @@ export function updateFolder(
   );
 }
 
-/** Fetch the delete impact so a confirmation can show the cascade count. */
+/**
+ * Fetch the delete impact so a confirmation can read `folders` and `files`
+ * (for example: "This deletes 3 folders and 12 files").
+ */
 export function getFolderDeleteImpact(
   workspaceId: string,
   folderId: string,
@@ -232,20 +241,16 @@ export function getFolderDeleteImpact(
   );
 }
 
-/**
- * Deletes a folder. The cascade count is read from the dedicated delete-impact
- * endpoint BEFORE the DELETE; the DELETE response is not trusted to contain it.
- */
+/** Deletes a folder after checking its impact; returns the verified DELETE shape. */
 export async function deleteFolder(
   workspaceId: string,
   folderId: string,
-): Promise<{ id: string; deleted: true; cascadeCount: number }> {
-  const impact = await getFolderDeleteImpact(workspaceId, folderId);
-  await request<unknown>(
+): Promise<FolderDeleteResult> {
+  await getFolderDeleteImpact(workspaceId, folderId);
+  return request<FolderDeleteResult>(
     wsResourcesPath(workspaceId, `/folders/${encodeURIComponent(folderId)}`),
     { method: 'DELETE' },
   );
-  return { id: folderId, deleted: true, cascadeCount: impact.cascadeCount };
 }
 
 // ─── Bookmarks ─────────────────────────────────────────────────────────────────

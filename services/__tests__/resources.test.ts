@@ -91,25 +91,31 @@ describe('resources service — contract paths and methods', () => {
     expectRequest(fetchMock, `${WS_BASE}/folders/${FOLDER}`, 'PATCH');
   });
 
-  it('getFolderDeleteImpact — GET delete-impact before deleting', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok({ cascadeCount: 4 }));
+  it('getFolderDeleteImpact — GET delete-impact with verified shape', async () => {
+    const impact = { folderId: FOLDER, name: 'Docs', folders: 3, files: 12 };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(impact));
     const result = await getFolderDeleteImpact(WS, FOLDER);
     expectRequest(fetchMock, `${WS_BASE}/folders/${FOLDER}/delete-impact`, 'GET');
-    expect(result.cascadeCount).toBe(4);
+    expect(result).toEqual(impact);
+    expect(`This deletes ${result.folders} folders and ${result.files} files`).toBe(
+      'This deletes 3 folders and 12 files',
+    );
   });
 
-  it('deleteFolder — calls delete-impact first, then DELETE, and derives cascadeCount', async () => {
+  it('deleteFolder — calls delete-impact first, then DELETE, and returns the verified DELETE shape', async () => {
+    const impact = { folderId: FOLDER, name: 'Docs', folders: 3, files: 12 };
+    const deleted = { deleted: true as const, folderId: FOLDER, folders: 3, files: 12 };
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(ok({ cascadeCount: 3 }))
-      .mockResolvedValueOnce(ok({ ok: true }));
+      .mockResolvedValueOnce(ok(impact))
+      .mockResolvedValueOnce(ok(deleted));
 
     const result = await deleteFolder(WS, FOLDER);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expectRequest(fetchMock, `${WS_BASE}/folders/${FOLDER}/delete-impact`, 'GET');
     expectRequest(fetchMock, `${WS_BASE}/folders/${FOLDER}`, 'DELETE');
-    expect(result).toEqual({ id: FOLDER, deleted: true, cascadeCount: 3 });
+    expect(result).toEqual(deleted);
   });
 
   it('listBookmarks — GET workspace bookmarks', async () => {

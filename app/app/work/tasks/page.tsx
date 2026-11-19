@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { listMyTasks } from '@/lib/work-tasks';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
@@ -176,12 +177,12 @@ export default function WorkMyTasksPage() {
                 <tr key={task.id} className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-secondary)]">
                   <td className="p-3 font-mono text-sm text-[var(--color-text-muted)]">{task.key}</td>
                   <td className="p-3">
-                    <a
+                    <Link
                       href={`/app/projects/${task.projectId}/tasks/${task.id}`}
                       className="text-[var(--color-primary)] hover:underline"
                     >
                       {task.title}
-                    </a>
+                    </Link>
                   </td>
                   <td className="p-3 text-sm text-[var(--color-text-muted)]">{task.projectKey || '—'}</td>
                   <td className="p-3">

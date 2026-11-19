@@ -28,6 +28,7 @@ import {
   transferProjectOwnership,
   updateProject,
   updateProjectOrganizationAccess,
+  type ProjectCommentPolicy,
   type ProjectStatus,
   type ProjectSummary,
   type ProjectVisibility,
@@ -100,6 +101,7 @@ export default function ProjectSettingsPage() {
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<ProjectStatus>('PLANNING');
   const [visibility, setVisibility] = useState<ProjectVisibility>('WORKSPACE');
+  const [commentPolicy, setCommentPolicy] = useState<ProjectCommentPolicy>('ASSIGNEES_ONLY');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Visibility change confirmation
@@ -154,6 +156,7 @@ export default function ProjectSettingsPage() {
       setDescription(data.description ?? '');
       setStatus(data.status === 'ARCHIVED' ? 'ACTIVE' : data.status);
       setVisibility(data.visibility);
+      setCommentPolicy(data.commentPolicy ?? 'ASSIGNEES_ONLY');
       setOrgTeamId(data.teamId ?? '');
       setOrgDepartmentId(data.departmentId ?? '');
       setDepartments(deptList);
@@ -263,6 +266,7 @@ export default function ProjectSettingsPage() {
         description: parsed.data.description ?? null,
         status: parsed.data.status,
         visibility: parsed.data.visibility,
+        commentPolicy,
       });
       setProject(updated);
       setNotice('Project settings saved.');
@@ -431,6 +435,20 @@ export default function ProjectSettingsPage() {
                 {visibility === 'WORKSPACE' ? 'Organisation-wide' : visibility === 'DEPARTMENT_TEAM' ? 'Department / team' : 'Private'}
               </Badge>
             </p>
+          </div>
+          <div>
+            <Select
+              id="settings-comment-policy"
+              label="Who can comment on tasks"
+              value={commentPolicy}
+              onChange={(event) => setCommentPolicy(event.target.value as ProjectCommentPolicy)}
+              options={[
+                { value: 'ASSIGNEES_ONLY', label: 'Assignees and project members only' },
+                { value: 'TEAM_MEMBERS', label: 'Also members of the linked team or department' },
+                { value: 'ALL_VIEWERS', label: 'Anyone who can view the project' },
+              ]}
+              helperText="Everyone who can see a task can read its discussion. This controls who can add comments."
+            />
           </div>
           <div className="flex justify-end">
             <PermissionButton

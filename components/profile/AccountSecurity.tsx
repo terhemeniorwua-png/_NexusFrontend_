@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/Alert";
@@ -481,19 +482,19 @@ export function AccountSecurity({ email }: { email: string }) {
           ownership transfer. Billing responsibility requires separate consent;
           outstanding invoices remain payable. Shared content and files are
           retained. See the{" "}
-          <a
+          <Link
             className="font-medium text-[var(--color-primary)] underline"
             href="/terms"
           >
             Terms
-          </a>{" "}
+          </Link>{" "}
           and{" "}
-          <a
+          <Link
             className="font-medium text-[var(--color-primary)] underline"
             href="/privacy"
           >
             Privacy Policy
-          </a>{" "}
+          </Link>{" "}
           drafts for current details.
         </p>
         {deletionError && (

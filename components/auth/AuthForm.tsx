@@ -701,8 +701,8 @@ export function AuthForm({ mode, initialEmail = '', accountType, redirectPath, d
       <div className="mb-7">
         <div className="relative mb-8 flex min-h-10 items-center gap-3 sm:flex-row sm:justify-between sm:items-center">
           <Link href="/" className="flex flex-col items-center gap-1 font-semibold tracking-tight text-text-primary" aria-label="PITERON home">
-            <img src="/logo-256.png" alt="PITERON logo" className="h-10 w-auto rounded-lg" />
-            <span className="text-base font-semibold">PITErON</span>
+            <img src="/logo-128.png" alt="PITERON logo" className="h-10 w-auto rounded-lg" />
+            <span className="text-base font-semibold">PITERON</span>
           </Link>
           {onBackToAccountType && (
             <button

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Logo } from '@/components/ui/Logo';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { InvitationConfirmDialog } from '@/components/auth/InvitationConfirmDialog';
@@ -212,9 +213,7 @@ export function InvitationAcceptClient() {
           className="mb-6 inline-flex w-fit items-center gap-2 font-semibold tracking-tight"
           aria-label="PITERON home"
         >
-          <span className="grid size-8 place-items-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">
-            N
-          </span>
+          <Logo size={32} className="rounded-lg" />
           PITERON
         </Link>
 

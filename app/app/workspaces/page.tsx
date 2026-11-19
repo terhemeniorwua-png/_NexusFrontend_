@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
@@ -53,6 +54,7 @@ function WorkspaceSettings({ workspaceId }: { workspaceId: string }) {
     const name = String(data.get('name') ?? '').trim();
     const descriptionValue = String(data.get('description') ?? '').trim();
     const visibility = String(data.get('visibility') ?? workspace.visibility);
+    const timeTrackingEnabled = data.get('timeTrackingEnabled') === 'on';
     if (name.length < 2 || name.length > 80) {
       setError('Workspace name must be between 2 and 80 characters.');
       setSuccess(null);
@@ -71,7 +73,7 @@ function WorkspaceSettings({ workspaceId }: { workspaceId: string }) {
     setError(null);
     setSuccess(null);
     try {
-      await saveWorkspace(workspace.id, { name, description: descriptionValue || null, visibility });
+      await saveWorkspace(workspace.id, { name, description: descriptionValue || null, visibility, timeTrackingEnabled });
       setSuccess('Workspace settings saved.');
     } catch (cause) {
       setError(errorText(cause, 'Workspace settings could not be saved.'));
@@ -91,6 +93,7 @@ function WorkspaceSettings({ workspaceId }: { workspaceId: string }) {
         <Input id="workspace-name" name="name" label="Workspace name" required minLength={2} maxLength={80} defaultValue={workspace.name} />
         <Textarea id="workspace-description" name="description" label="Description" rows={3} maxLength={500} defaultValue={workspace.description ?? ''} helperText="Up to 500 characters." />
         {workspace.isPersonal ? <p className="text-sm text-[var(--color-text-secondary)]">Personal workspaces stay private.</p> : <Select id="workspace-visibility" name="visibility" label="Visibility" defaultValue={workspace.visibility} options={[{ value: 'PRIVATE', label: 'Private' }, { value: 'PUBLIC', label: 'Publicly discoverable' }]} helperText="Public workspaces can appear in discovery; membership still requires an invitation or approved request." />}
+        <Checkbox id="workspace-time-tracking" name="timeTrackingEnabled" label="Enable time tracking" defaultChecked={Boolean(workspace.timeTrackingEnabled)} helperText="Lets people log time on tasks so they can see how long work takes and spot overdue work." />
         <div className="flex justify-end"><Button type="submit" loading={saving}>Save workspace</Button></div>
       </form>
       <WorkspaceLogoManager workspace={workspace} />

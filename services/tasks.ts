@@ -1203,3 +1203,14 @@ export function createProjectFromTemplate(
     { method: 'POST', body: JSON.stringify(input) },
   );
 }
+
+export function listMineTasks(
+  workspaceId: string,
+  query: { status?: TaskStatus; priority?: TaskPriority; limit?: number } = {},
+): Promise<{ items: Array<TaskSummary & { projectName: string; projectKeyLabel: string }>; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (query.status) params.set('status', query.status);
+  if (query.priority) params.set('priority', query.priority);
+  params.set('limit', String(query.limit ?? 50));
+  return request(`/workspaces/${encodeURIComponent(workspaceId)}/tasks/mine?${params}`);
+}

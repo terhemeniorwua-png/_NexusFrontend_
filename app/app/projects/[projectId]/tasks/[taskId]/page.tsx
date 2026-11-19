@@ -136,7 +136,7 @@ const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
 
 export default function TaskDetailPage() {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
-  const { activeWorkspace, user } = useWorkspaceContext();
+  const { activeWorkspace, user, loading: workspaceLoading } = useWorkspaceContext();
   const { can, isLoading: permissionsLoading } = usePermissions();
   const router = useRouter();
   useWorkspaceRedirect();
@@ -723,6 +723,10 @@ export default function TaskDetailPage() {
   // ---------------------------------------------------------------------------
   // Render states
   // ---------------------------------------------------------------------------
+
+  if (workspaceLoading) {
+    return <p role="status" className="p-8 text-sm text-[var(--color-text-secondary)]">Loading task…</p>;
+  }
 
   if (!activeWorkspace) {
     return (

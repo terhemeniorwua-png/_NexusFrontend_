@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 
@@ -149,6 +149,7 @@ function buildCurrentConfig(input: { search: string; statusFilter: TaskStatus | 
 }
 
 export default function ProjectTasksPage() {
+  const router = useRouter();
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
   const { can, isLoading: permissionsLoading } = usePermissions();
@@ -454,7 +455,7 @@ export default function ProjectTasksPage() {
                 </Card>
               )}
 
-              {viewMode === 'gantt' && <TaskGanttView tasks={sortedVisibleTasks} canEdit={canUpdate} onOpenTask={(id) => { window.location.href = taskDetailHref(id); }} onReschedule={handleReschedule} />}
+              {viewMode === 'gantt' && <TaskGanttView tasks={sortedVisibleTasks} canEdit={canUpdate} onOpenTask={(id) => router.push(taskDetailHref(id))} onReschedule={handleReschedule} />}
 
               {viewMode === 'calendar' && (
                 <div className="space-y-4">

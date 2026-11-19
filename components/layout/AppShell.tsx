@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { filterNavSections } from '@/lib/navigation';
-import { Building2Icon, FolderKanbanIcon, MessageSquareIcon, BlocksIcon, ListIcon, SettingsIcon } from './icons';
+import { Building2Icon, FolderKanbanIcon, MessageSquareIcon, BlocksIcon, ListIcon, SettingsIcon, FilesIcon } from './icons';
 import { PrimarySidebar } from './PrimarySidebar';
 import { SecondarySidebar } from './SecondarySidebar';
 import { Topbar } from './Topbar';
@@ -24,6 +24,7 @@ function iconForSection(sectionId: string): React.ReactNode {
   const icons: Record<string, React.ReactNode> = {
     workspace: <Building2Icon size={16} />,
     work: <FolderKanbanIcon size={16} />,
+    resources: <FilesIcon size={16} />,
     communication: <MessageSquareIcon size={16} />,
     ai: <BlocksIcon size={16} />,
     people: <ListIcon size={16} />,

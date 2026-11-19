@@ -54,7 +54,7 @@ function toSwitcherSummary(
 export function AuthenticatedShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname() ?? '/app';
-  const { user, workspaces, activeWorkspace, loading, switchToWorkspace } = useWorkspaceContext();
+  const { user, workspaces, activeWorkspace, loading, error: workspaceError, retry, switchToWorkspace } = useWorkspaceContext();
   const { avatarUrl, setAvatarUrl } = useAvatarUrl();
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
@@ -119,7 +119,26 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
     }
   }
 
-  if (loading || !user) return <>{children}</>;
+  if (loading) {
+    return <p role="status" className="p-8 text-sm text-[var(--color-text-secondary)]">Loading your workspace…</p>;
+  }
+
+  if (workspaceError && !activeWorkspace) {
+    return (
+      <div className="mx-auto w-full max-w-xl px-5 py-16">
+        <Alert variant="error" title="Workspace could not be loaded">{workspaceError}</Alert>
+        <button
+          type="button"
+          onClick={retry}
+          className="mt-4 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (!user) return <>{children}</>;
 
   const workspaceKind = workspaceKindFor(activeWorkspace);
   const permissions = workspacePermissionKeys(activeWorkspace);

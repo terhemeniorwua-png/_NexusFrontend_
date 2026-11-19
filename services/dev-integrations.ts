@@ -229,3 +229,45 @@ export async function unlinkTaskDevLink(
     { method: 'DELETE' },
   );
 }
+
+export interface DevPullRequestDetail {
+  number: number; title: string; body: string | null; state: string; url: string | null;
+  headRef: string | null; baseRef: string | null; headSha: string | null; authorLogin: string | null;
+  createdAt: string | null; updatedAt: string | null; mergedAt: string | null;
+  merged: boolean; draft: boolean; mergeable: boolean | null;
+  additions: number; deletions: number; changedFiles: number; commits: number;
+  comments: number; reviewComments: number;
+  checks: { total: number; passed: number; failed: number; pending: number } | null;
+}
+
+export interface DevChangedFile {
+  filename: string; previousFilename: string | null; status: string;
+  additions: number; deletions: number; changes: number;
+  patch: string | null; patchTruncated: boolean;
+}
+
+export interface DevCommitSummary {
+  sha: string; message: string; authorName: string | null; authorLogin: string | null;
+  date: string | null; url: string | null;
+}
+
+const repoBase = (w: string, p: string, r: string) =>
+  `/workspaces/${w}/projects/${p}/repositories/${r}`;
+
+export function getRepositoryPullRequest(w: string, p: string, r: string, n: number) {
+  return authed<DevPullRequestDetail>(`${repoBase(w, p, r)}/pull-requests/${n}`);
+}
+
+export function listPullRequestFiles(w: string, p: string, r: string, n: number, page = 1) {
+  return authed<{ items: DevChangedFile[] }>(`${repoBase(w, p, r)}/pull-requests/${n}/files?page=${page}`);
+}
+
+export function listPullRequestCommits(w: string, p: string, r: string, n: number, page = 1) {
+  return authed<{ items: DevCommitSummary[] }>(`${repoBase(w, p, r)}/pull-requests/${n}/commits?page=${page}`);
+}
+
+export function listRepositoryCommits(w: string, p: string, r: string, branch?: string, page = 1) {
+  const q = new URLSearchParams({ page: String(page) });
+  if (branch) q.set('branch', branch);
+  return authed<{ items: DevCommitSummary[] }>(`${repoBase(w, p, r)}/commits?${q}`);
+}

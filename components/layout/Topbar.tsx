@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Logo } from '@/components/ui/Logo';
 import { Breadcrumb, type BreadcrumbItem } from '@/components/ui/Breadcrumb';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { UserMenu } from './UserMenu';
@@ -134,12 +135,7 @@ export function Topbar({
         aria-label="PITERON home"
         className="flex flex-shrink-0 items-center gap-2 rounded-[var(--radius-md)] px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
       >
-        <span
-          aria-hidden="true"
-          className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary)] text-sm font-bold text-white"
-        >
-          N
-        </span>
+        <Logo size={32} priority className="rounded-[var(--radius-md)]" />
         <span className="hidden text-base font-semibold text-[var(--color-text-primary)] sm:inline">
           PITERON
         </span>

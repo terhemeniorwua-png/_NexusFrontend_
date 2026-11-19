@@ -9,7 +9,7 @@ type LogoProps = {
 export function Logo({ size = 32, className = '', priority = false }: LogoProps) {
   return (
     <Image
-      src="/logo-256.png"
+      src="/logo-128.png"
       alt="PITERON"
       width={size}
       height={size}

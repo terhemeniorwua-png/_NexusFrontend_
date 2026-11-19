@@ -45,10 +45,11 @@ export const PROJECT_PERMISSIONS = [
 
 export type Permission = (typeof PROJECT_PERMISSIONS)[number];
 
+export type ProjectCommentPolicy = 'ASSIGNEES_ONLY' | 'TEAM_MEMBERS' | 'ALL_VIEWERS';
 export interface ProjectSummary {
   id: string; workspaceId: string; teamId: string | null; departmentId: string | null;
   name: string; key: string; description: string | null; category: string | null; labels: string[];
-  status: ProjectStatus; visibility: ProjectVisibility; startDate: string | null; dueDate: string | null;
+  status: ProjectStatus; visibility: ProjectVisibility; commentPolicy?: ProjectCommentPolicy; startDate: string | null; dueDate: string | null;
   ownerId: string; owner: { id: string; name: string }; memberCount: number; taskCount: number;
   myRole: ProjectRole | null; createdAt: string; updatedAt: string;
 }
@@ -56,6 +57,7 @@ export interface ProjectPage { items: ProjectSummary[]; nextCursor: string | nul
 export interface ProjectInput {
   name: string; key: string; description?: string | null; category?: string | null; labels?: string[];
   visibility?: ProjectVisibility; teamId?: string | null; departmentId?: string | null;
+  commentPolicy?: ProjectCommentPolicy;
   startDate?: string | null; dueDate?: string | null;
 }
 export type ProjectUpdate = Partial<ProjectInput> & { status?: Exclude<ProjectStatus, 'ARCHIVED'> };

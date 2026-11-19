@@ -706,6 +706,20 @@ export default function TaskDetailPage() {
   // Submission / review handlers
   // ---------------------------------------------------------------------------
 
+  async function handleStart() {
+    if (!activeWorkspace || !task) return;
+    setSubmissionBusy(true); setError(null);
+    try {
+      const updated = await updateTask(activeWorkspace.id, projectId, task.id, { status: 'IN_PROGRESS' });
+      setTask(updated);
+      router.push(`/app/projects/${projectId}/tasks/${task.id}/work`);
+    } catch (cause) {
+      setError(requestError(cause, 'The task could not be started.'));
+    } finally {
+      setSubmissionBusy(false);
+    }
+  }
+
   async function handleSubmission(nextStatus: TaskStatus, message: string) {
     if (!activeWorkspace || !task) return;
     setSubmissionBusy(true); setError(null);
@@ -957,6 +971,11 @@ export default function TaskDetailPage() {
                   >
                     Edit
                   </PermissionButton>
+                  {isAssignedToMe && (task.status === 'ASSIGNED' || task.status === 'CHANGES_REQUESTED') && (
+                    <Button size="sm" onClick={() => void handleStart()} disabled={busy || submissionBusy}>
+                      {task.status === 'ASSIGNED' ? 'Start' : 'Resume'}
+                    </Button>
+                  )}
                   {can('task.complete') && isAssignedToMe && (
                     isCompleted
                       ? <Button size="sm" variant="secondary" onClick={() => setConfirmAction('reopen')} disabled={busy}>Reopen</Button>

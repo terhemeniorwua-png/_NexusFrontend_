@@ -976,6 +976,15 @@ export default function TaskDetailPage() {
                       {task.status === 'ASSIGNED' ? 'Start' : 'Resume'}
                     </Button>
                   )}
+                  {!isArchived && (
+                    <Button
+                      size="sm"
+                      variant={task.status === 'ASSIGNED' ? 'secondary' : 'primary'}
+                      onClick={() => router.push(`/app/projects/${projectId}/tasks/${task.id}/work`)}
+                    >
+                      {task.status === 'ASSIGNED' ? 'Open workspace' : 'Continue working'}
+                    </Button>
+                  )}
                   {can('task.complete') && isAssignedToMe && (
                     isCompleted
                       ? <Button size="sm" variant="secondary" onClick={() => setConfirmAction('reopen')} disabled={busy}>Reopen</Button>

@@ -4,13 +4,13 @@
  * Typed functions for the project Overview dashboard, file library (Resources),
  * folders, bookmarks, and dashboard preferences.
  *
- * Routes follow the same mounting convention as services/files.ts:
- *   /api/backend/workspaces/:workspaceId/...
- * and are forwarded through the same-origin proxy.
+ * Verified backend mounts (contract supplied 2026-11-19):
+ *   Workspace: /api/v1/workspaces/:workspaceId/resources
+ *   Project:   /api/v1/workspaces/:workspaceId/projects/:projectId/resources
  *
- * Backend contracts are inferred from existing service patterns (files.ts,
- * projects.ts, tasks.ts). The backend remains authoritative for every
- * authorisation decision.
+ * Requests are forwarded through the same-origin proxy at /api/backend.
+ * Response/request body shapes are not part of the contract; existing caller
+ * assumptions are preserved (see docs/audit-resources-contract.md).
  */
 
 import { apiRequest, ApiRequestError } from '@/lib/api';
@@ -127,6 +127,16 @@ export interface UploadFolderResult {
   files: FileSummary[];
 }
 
+/**
+ * Shape assumed for GET /folders/:folderId/delete-impact.
+ * The contract confirms the route exists but does not define its body; the
+ * `cascadeCount` field is an assumption preserved from the previous frontend
+ * delete response contract.
+ */
+export interface FolderDeleteImpact {
+  cascadeCount: number;
+}
+
 // ─── Internal request helper ───────────────────────────────────────────────────
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -139,11 +149,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 }
 
-const wsPath = (workspaceId: string, suffix = '') =>
-  `/workspaces/${encodeURIComponent(workspaceId)}${suffix}`;
+const wsResourcesPath = (workspaceId: string, suffix = '') =>
+  `/workspaces/${encodeURIComponent(workspaceId)}/resources${suffix}`;
 
-const projectPath = (workspaceId: string, projectId: string, suffix = '') =>
-  `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}${suffix}`;
+const projectResourcesPath = (workspaceId: string, projectId: string, suffix = '') =>
+  `/workspaces/${encodeURIComponent(workspaceId)}/projects/${encodeURIComponent(projectId)}/resources${suffix}`;
 
 // ─── Overview dashboard ────────────────────────────────────────────────────────
 
@@ -151,23 +161,25 @@ export function getOverview(
   workspaceId: string,
   projectId: string,
 ): Promise<OverviewData> {
-  return request(projectPath(workspaceId, projectId, '/overview'));
+  return request(projectResourcesPath(workspaceId, projectId, '/dashboard/overview'));
 }
 
-// ─── Dashboard preferences ─────────────────────────────────────────────────────
+// ─── Dashboard preferences (project-scoped) ────────────────────────────────────
 
 export function getDashboardPreferences(
   workspaceId: string,
+  projectId: string,
 ): Promise<DashboardPreferences> {
-  return request(wsPath(workspaceId, '/dashboard/preferences'));
+  return request(projectResourcesPath(workspaceId, projectId, '/dashboard/preferences'));
 }
 
 export function saveDashboardPreferences(
   workspaceId: string,
+  projectId: string,
   input: DashboardPreferences,
 ): Promise<DashboardPreferences> {
-  return request(wsPath(workspaceId, '/dashboard/preferences'), {
-    method: 'PATCH',
+  return request(projectResourcesPath(workspaceId, projectId, '/dashboard/preferences'), {
+    method: 'PUT',
     body: JSON.stringify(input),
   });
 }
@@ -182,7 +194,7 @@ export function listFolders(
   if (parentId !== undefined && parentId !== null) search.set('parentId', parentId);
   const qs = search.toString();
   return request<FolderSummary[]>(
-    `${wsPath(workspaceId, '/folders')}${qs ? `?${qs}` : ''}`,
+    `${wsResourcesPath(workspaceId, '/folders')}${qs ? `?${qs}` : ''}`,
   );
 }
 
@@ -190,7 +202,7 @@ export function createFolder(
   workspaceId: string,
   input: CreateFolderInput,
 ): Promise<FolderSummary> {
-  return request<FolderSummary>(wsPath(workspaceId, '/folders'), {
+  return request<FolderSummary>(wsResourcesPath(workspaceId, '/folders'), {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -201,33 +213,52 @@ export function updateFolder(
   folderId: string,
   input: UpdateFolderInput,
 ): Promise<FolderSummary> {
-  return request<FolderSummary>(wsPath(workspaceId, `/folders/${encodeURIComponent(folderId)}`), {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  });
+  return request<FolderSummary>(
+    wsResourcesPath(workspaceId, `/folders/${encodeURIComponent(folderId)}`),
+    {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    },
+  );
 }
 
-export function deleteFolder(
+/** Fetch the delete impact so a confirmation can show the cascade count. */
+export function getFolderDeleteImpact(
+  workspaceId: string,
+  folderId: string,
+): Promise<FolderDeleteImpact> {
+  return request<FolderDeleteImpact>(
+    wsResourcesPath(workspaceId, `/folders/${encodeURIComponent(folderId)}/delete-impact`),
+  );
+}
+
+/**
+ * Deletes a folder. The cascade count is read from the dedicated delete-impact
+ * endpoint BEFORE the DELETE; the DELETE response is not trusted to contain it.
+ */
+export async function deleteFolder(
   workspaceId: string,
   folderId: string,
 ): Promise<{ id: string; deleted: true; cascadeCount: number }> {
-  return request<{ id: string; deleted: true; cascadeCount: number }>(
-    wsPath(workspaceId, `/folders/${encodeURIComponent(folderId)}`),
+  const impact = await getFolderDeleteImpact(workspaceId, folderId);
+  await request<unknown>(
+    wsResourcesPath(workspaceId, `/folders/${encodeURIComponent(folderId)}`),
     { method: 'DELETE' },
   );
+  return { id: folderId, deleted: true, cascadeCount: impact.cascadeCount };
 }
 
 // ─── Bookmarks ─────────────────────────────────────────────────────────────────
 
 export function listBookmarks(workspaceId: string): Promise<Bookmark[]> {
-  return request<Bookmark[]>(wsPath(workspaceId, '/bookmarks'));
+  return request<Bookmark[]>(wsResourcesPath(workspaceId, '/bookmarks'));
 }
 
 export function createBookmark(
   workspaceId: string,
   input: CreateBookmarkInput,
 ): Promise<Bookmark> {
-  return request<Bookmark>(wsPath(workspaceId, '/bookmarks'), {
+  return request<Bookmark>(wsResourcesPath(workspaceId, '/bookmarks'), {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -238,10 +269,13 @@ export function updateBookmark(
   bookmarkId: string,
   input: UpdateBookmarkInput,
 ): Promise<Bookmark> {
-  return request<Bookmark>(wsPath(workspaceId, `/bookmarks/${encodeURIComponent(bookmarkId)}`), {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  });
+  return request<Bookmark>(
+    wsResourcesPath(workspaceId, `/bookmarks/${encodeURIComponent(bookmarkId)}`),
+    {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function deleteBookmark(
@@ -249,7 +283,7 @@ export function deleteBookmark(
   bookmarkId: string,
 ): Promise<{ id: string; deleted: true }> {
   return request<{ id: string; deleted: true }>(
-    wsPath(workspaceId, `/bookmarks/${encodeURIComponent(bookmarkId)}`),
+    wsResourcesPath(workspaceId, `/bookmarks/${encodeURIComponent(bookmarkId)}`),
     { method: 'DELETE' },
   );
 }

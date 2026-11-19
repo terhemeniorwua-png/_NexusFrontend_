@@ -8,7 +8,7 @@ export function PolicyPage({ policy }: { policy: LegalPolicyContent }) {
     <main className="min-h-dvh bg-[var(--color-background)]">
       <header className="mx-auto flex max-w-4xl items-center justify-between px-5 py-5 sm:px-8">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight" aria-label="PITERON home">
-          <span aria-hidden="true" className="grid size-9 place-items-center rounded-xl bg-[var(--color-primary)] text-sm font-bold text-white">N</span>
+          <img src="/logo-256.png" alt="" aria-hidden="true" className="size-9 rounded-xl object-contain" />
           PITERON
         </Link>
         <Link href="/sign-in" className="text-sm font-medium text-[var(--color-primary)] hover:underline">Sign in</Link>

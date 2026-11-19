@@ -43,6 +43,7 @@ interface DashboardCardConfig {
 
 interface DashboardGridProps {
   workspaceId: string;
+  projectId: string;
   // Data for each card
   recentItems: Array<{ id: string; type: string; title: string; url: string; updatedAt: string }>;
   docs: Array<{ id: string; title: string; updatedAt: string; url: string }>;
@@ -80,6 +81,7 @@ interface DashboardGridProps {
 
 export function DashboardGrid({
   workspaceId,
+  projectId,
   recentItems,
   docs,
   bookmarks,
@@ -106,7 +108,7 @@ export function DashboardGrid({
     let active = true;
     async function load() {
       try {
-        const result = await getDashboardPreferences(workspaceId);
+        const result = await getDashboardPreferences(workspaceId, projectId);
         if (!active) return;
         if (result.cards && result.cards.length > 0) {
           setPreferences(result.cards);
@@ -119,13 +121,13 @@ export function DashboardGrid({
     return () => {
       active = false;
     };
-  }, [workspaceId]);
+  }, [workspaceId, projectId]);
 
   const handleSavePreferences = async () => {
     setSaving(true);
     setPrefError(null);
     try {
-      const result = await saveDashboardPreferences(workspaceId, {
+      const result = await saveDashboardPreferences(workspaceId, projectId, {
         cards: preferences,
         autoRefresh: false,
       });

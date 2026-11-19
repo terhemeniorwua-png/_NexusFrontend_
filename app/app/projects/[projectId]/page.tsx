@@ -329,6 +329,7 @@ export default function ProjectOverviewPage() {
       {/* Dashboard grid */}
       <DashboardGrid
         workspaceId={activeWorkspace.id}
+        projectId={project.id}
         recentItems={dashboardData?.recentItems ?? []}
         docs={dashboardData?.docs ?? []}
         bookmarks={dashboardData?.bookmarks ?? []}

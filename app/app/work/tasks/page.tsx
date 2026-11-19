@@ -28,6 +28,8 @@ export default function WorkMyTasksPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { activeWorkspace, user } = useWorkspaceContext();
+  const activeWorkspaceId = activeWorkspace?.id ?? null;
+  const userId = user?.id ?? '';
   const [tasks, setTasks] = useState<Array<{ id: string; key: string; title: string; status: TaskStatus; projectId: string; projectKey: string; dueDate: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,10 +49,10 @@ export default function WorkMyTasksPage() {
   useEffect(() => {
     let active = true;
     async function poll() {
-      if (!active || !activeWorkspace) return;
+      if (!active || !activeWorkspaceId) return;
       try {
         setError(null);
-        const result = await listMyTasks(activeWorkspace.id, user?.id ?? '', {
+        const result = await listMyTasks(activeWorkspaceId, userId, {
           assigneeId: '',
           status: filterStatus || undefined,
           priority: filterPriority as TaskPriority | undefined,
@@ -73,7 +75,7 @@ export default function WorkMyTasksPage() {
     void poll().finally(() => { if (active) setLoading(false); });
     const interval = setInterval(() => void poll(), 30_000);
     return () => { active = false; clearInterval(interval); };
-  }, [activeWorkspace, filterStatus, getPriorityParam()]);
+  }, [activeWorkspaceId, userId, filterStatus, filterPriority, highlightTaskId]);
 
   if (loading || !activeWorkspace) {
     return (

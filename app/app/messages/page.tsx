@@ -16,6 +16,8 @@ import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { Textarea } from '@/components/ui/Textarea';
+import { MentionTextarea, extractMentionIds, renderMentions, type MentionMember } from '@/components/ui/MentionTextarea';
+import { listChannelMembers } from '@/services/channels';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
@@ -446,12 +448,23 @@ export default function MessagesPage() {
     }
   }
 
+  const [mentionMembers, setMentionMembers] = useState<MentionMember[]>([]);
+  useEffect(() => {
+    if (!activeWorkspace || !selectedChannel) { setMentionMembers([]); return; }
+    let active = true;
+    listChannelMembers(activeWorkspace.id, selectedChannel.id)
+      .then((r) => { if (active) setMentionMembers(r.items); })
+      .catch(() => { if (active) setMentionMembers([]); });
+    return () => { active = false; };
+  }, [activeWorkspace?.id, selectedChannel?.id]);
+
   async function handleSendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeWorkspace || !selectedChannel || !user || socketStatus === 'disconnected') return;
     const parsed = messageSchema.safeParse({ body: messageBody });
     if (!parsed.success) return;
     const body = parsed.data.body;
+    const mentionedUserIds = extractMentionIds(body, mentionMembers);
     const workspaceId = activeWorkspace.id;
     const channelId = selectedChannel.id;
     const tempId = `temp-${crypto.randomUUID()}`;
@@ -482,7 +495,7 @@ export default function MessagesPage() {
     if (socket) socket.emit('typing:stop', channelId);
 
     try {
-      const sent = await sendMessage(workspaceId, channelId, { body });
+      const sent = await sendMessage(workspaceId, channelId, { body, mentionedUserIds });
       setMessages((prev) =>
         prev.some((m) => m.id === sent.id)
           ? prev.filter((m) => m.id !== tempId)
@@ -783,7 +796,7 @@ export default function MessagesPage() {
                               </div>
                             </div>
                           ) : (
-                            <p className={`mt-0.5 inline-block max-w-[75%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-left text-sm ${user?.id === msg.authorId ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-primary)]'}`}>{msg.body}</p>
+                            <p className={`mt-0.5 inline-block max-w-[75%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-left text-sm ${user?.id === msg.authorId ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-primary)]'}`}>{renderMentions(msg.body, mentionMembers)}</p>
                           )}
 
                           {/* Reactions */}
@@ -925,19 +938,7 @@ export default function MessagesPage() {
                 <>
                 <form onSubmit={(e) => void handleSendMessage(e)} className="flex items-end gap-2">
                   <div className="flex-1">
-                    <Textarea
-                      id="message-input"
-                      label="Send a message"
-                      srOnlyLabel
-                      value={messageBody}
-                      onChange={(e) => { setMessageBody(e.target.value); handleTyping(); }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSendMessage(e as unknown as FormEvent<HTMLFormElement>); }
-                      }}
-                      placeholder="Write a message…"
-                      rows={1}
-                      maxLength={10000}
-                    />
+                    <MentionTextarea id="message-input" ariaLabel="Send a message" value={messageBody} onChange={(v) => { setMessageBody(v); handleTyping(); }} members={mentionMembers} placeholder="Write a message…" rows={1} onSubmit={() => void handleSendMessage({ preventDefault() {} } as unknown as FormEvent<HTMLFormElement>)} />
                   </div>
                   <Button type="button" size="sm" variant="secondary" aria-label="Insert emoji" onClick={() => setShowEmoji((v) => !v)}>😊</Button>
                   <Button type="button" size="sm" variant="secondary" aria-label="Record voice message" disabled={socketStatus === 'disconnected' || rec.state !== 'idle'} onClick={() => { setShowEmoji(false); void rec.start(); }}>🎙️</Button>

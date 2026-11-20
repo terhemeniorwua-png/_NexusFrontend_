@@ -7,7 +7,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...props}>{children}</a>,
 }));
 
-function renderHeader(saveState: SaveSyncState) {
+function renderHeader(saveState: SaveSyncState, blocked = false) {
   return render(
     <TaskWorkspaceHeader
       workspaceName="Acme"
@@ -16,6 +16,7 @@ function renderHeader(saveState: SaveSyncState) {
       taskTitle="Fix authentication"
       status="CHANGES_REQUESTED"
       saveState={saveState}
+      blocked={blocked}
     />,
   );
 }
@@ -44,5 +45,15 @@ describe('TaskWorkspaceHeader', () => {
     renderHeader('idle');
     expect(screen.queryByText('Saving…')).not.toBeInTheDocument();
     expect(screen.queryByText('Saved')).not.toBeInTheDocument();
+  });
+
+  it('shows the Blocked indicator when the task has an open blocker', () => {
+    renderHeader('idle', true);
+    expect(screen.getByText('Blocked')).toBeInTheDocument();
+  });
+
+  it('omits the Blocked indicator when no blocker is open', () => {
+    renderHeader('idle');
+    expect(screen.queryByText('Blocked')).not.toBeInTheDocument();
   });
 });

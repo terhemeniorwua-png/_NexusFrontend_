@@ -39,7 +39,10 @@ vi.mock('@/providers/WorkspaceProvider', () => ({
   useWorkspaceContext: () => ({ activeWorkspace: mocks.activeWorkspace, loading: mocks.loading }),
 }));
 
-vi.mock('@/services/projects', () => ({
+vi.mock('@/services/projects', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/projects')>();
+  return {
+    ...actual,
   getProject: vi.fn().mockResolvedValue({
     id: 'project-1', workspaceId: 'ws-1', name: 'PITERON', key: 'NX', description: null,
     category: null, labels: [], status: 'ACTIVE', visibility: 'WORKSPACE', startDate: null,
@@ -61,7 +64,8 @@ vi.mock('@/services/projects', () => ({
   updateProject: vi.fn(),
   updateProjectOrganizationAccess: vi.fn(),
   transferProjectOwnership: vi.fn(),
-}));
+  };
+});
 
 vi.mock('@/services/workspaces', () => ({
   listWorkspaceMembers: vi.fn().mockResolvedValue([]),

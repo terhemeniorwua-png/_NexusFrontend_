@@ -28,9 +28,12 @@ import {
   transferProjectOwnership,
   updateProject,
   updateProjectOrganizationAccess,
+  PROJECT_TYPE_LABELS,
+  PROJECT_TYPES,
   type ProjectCommentPolicy,
   type ProjectStatus,
   type ProjectSummary,
+  type ProjectType,
   type ProjectVisibility,
 } from '@/services/projects';
 import {
@@ -56,6 +59,7 @@ const editSchema = z.object({
   key: z.string().trim().min(2).max(16).regex(/^[A-Za-z0-9_-]+$/),
   description: z.string().trim().max(5000).optional(),
   status: z.enum(['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED']),
+  type: z.enum(PROJECT_TYPES),
   visibility: z.enum(['WORKSPACE', 'DEPARTMENT_TEAM', 'PRIVATE']),
   startDate: z.string().trim().max(10).optional().or(z.literal('')),
   dueDate: z.string().trim().max(10).optional().or(z.literal('')),
@@ -111,6 +115,7 @@ export default function ProjectSettingsPage() {
   const [key, setKey] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<ProjectStatus>('PLANNING');
+  const [type, setType] = useState<ProjectType>('GENERAL');
   const [visibility, setVisibility] = useState<ProjectVisibility>('WORKSPACE');
   const [commentPolicy, setCommentPolicy] = useState<ProjectCommentPolicy>('ASSIGNEES_ONLY');
   const [startDate, setStartDate] = useState<string>('');
@@ -168,6 +173,7 @@ export default function ProjectSettingsPage() {
       setKey(data.key);
       setDescription(data.description ?? '');
       setStatus(data.status === 'ARCHIVED' ? 'ACTIVE' : data.status);
+      setType(data.type ?? 'GENERAL');
       setVisibility(data.visibility);
       setCommentPolicy(data.commentPolicy ?? 'ASSIGNEES_ONLY');
       setStartDate(data.startDate ? new Date(data.startDate).toISOString().slice(0, 10) : '');
@@ -266,7 +272,7 @@ export default function ProjectSettingsPage() {
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeWorkspace || !project) return;
-    const parsed = editSchema.safeParse({ name, key, description: description.trim() || undefined, status, visibility });
+    const parsed = editSchema.safeParse({ name, key, description: description.trim() || undefined, status, type, visibility });
     if (!parsed.success) {
       const errors: Record<string, string> = {};
       for (const issue of parsed.error.issues) errors[issue.path[0] as string] = issue.message;
@@ -280,6 +286,7 @@ export default function ProjectSettingsPage() {
         key: parsed.data.key,
         description: parsed.data.description ?? null,
         status: parsed.data.status,
+        type: parsed.data.type,
         visibility: parsed.data.visibility,
         commentPolicy,
       });
@@ -431,6 +438,16 @@ export default function ProjectSettingsPage() {
                 { value: 'COMPLETED', label: 'Completed' },
               ]}
               helperText="Archived status is set using the Archive button below, not through this field."
+            />
+          </div>
+          <div>
+            <Select
+              id="settings-type"
+              label="Type"
+              value={type}
+              onChange={(event) => setType(event.target.value as ProjectType)}
+              options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
+              helperText="Changing the project type does not delete or hide existing project data."
             />
           </div>
           <div>

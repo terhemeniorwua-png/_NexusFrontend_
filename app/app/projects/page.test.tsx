@@ -16,6 +16,10 @@ vi.mock('@/providers/WorkspaceProvider', () => ({
   useWorkspaceContext: () => ({ activeWorkspace: mocks.activeWorkspace, loading: false }),
 }));
 vi.mock('@/services/projects', () => ({
+  PROJECT_TYPE_LABELS: {
+    GENERAL: 'General', ENGINEERING: 'Engineering', DESIGN: 'Design',
+    OPERATIONS: 'Operations', MARKETING: 'Marketing', HR: 'HR',
+  },
   listProjects: mocks.listProjects,
   createProject: mocks.createProject,
   archiveProject: mocks.archiveProject,
@@ -24,7 +28,7 @@ vi.mock('@/services/projects', () => ({
 
 const projectA = {
   id: 'project-1', workspaceId: 'ws-1', name: 'PITERON Web', key: 'NW', description: null,
-  category: null, labels: [], status: 'ACTIVE', visibility: 'WORKSPACE', startDate: null,
+  category: null, labels: [], status: 'ACTIVE', type: 'ENGINEERING', visibility: 'WORKSPACE', startDate: null,
   dueDate: null, ownerId: 'user-1', owner: { id: 'user-1', name: 'Alice' },
   memberCount: 3, taskCount: 0, myRole: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -43,6 +47,7 @@ describe('ProjectsPage', () => {
     expect(screen.getByText('NW')).toBeInTheDocument();
     // Visibility badge is present (there may be the filter option as well)
     expect(screen.getAllByText('Organisation-wide').length).toBeGreaterThan(0);
+    expect(screen.getByText('Engineering')).toBeInTheDocument();
   });
 
   it('shows an empty state when there are no projects', async () => {

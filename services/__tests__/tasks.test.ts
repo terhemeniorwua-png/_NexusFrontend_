@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ListTasksQuery } from '../tasks';
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -64,6 +65,25 @@ describe('tasks service', () => {
     expect(url).toContain('includeArchived=true');
     expect(url).toContain('sortBy=dueDate');
     expect(url).toContain('sortOrder=desc');
+  });
+
+  it('listTasks does not forward unsupported due-date or overdue filters', async () => {
+    mocks.apiRequest.mockResolvedValue({ items: [], nextCursor: null });
+    const { listTasks } = await import('../tasks');
+    const query = {
+      status: 'IN_PROGRESS',
+      dueFrom: '2026-01-01',
+      dueTo: '2026-01-31',
+      overdue: true,
+    } as ListTasksQuery & { dueFrom: string; dueTo: string; overdue: boolean };
+
+    await listTasks(WS, PID, query);
+    const url: string = mocks.apiRequest.mock.calls[0][0] as string;
+
+    expect(url).toContain('status=IN_PROGRESS');
+    expect(url).not.toContain('dueFrom');
+    expect(url).not.toContain('dueTo');
+    expect(url).not.toContain('overdue');
   });
 
   // ---------------------------------------------------------------------------

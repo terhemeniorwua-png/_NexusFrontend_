@@ -40,6 +40,7 @@ import {
   updateComment,
   deleteComment,
   reviewTask,
+  submitTask,
   listProjectCustomFields,
   getTaskCustomFieldValues,
   setTaskCustomFieldValues,
@@ -234,6 +235,9 @@ export default function TaskDetailPage() {
   const [reviewFeedbackSource, setReviewFeedbackSource] = useState<'reject' | 'request-revision' | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState('');
   const [reviewFeedbackError, setReviewFeedbackError] = useState<string | null>(null);
+  const [submitSummaryOpen, setSubmitSummaryOpen] = useState(false);
+  const [submitSummary, setSubmitSummary] = useState('');
+  const [submitSummaryError, setSubmitSummaryError] = useState<string | null>(null);
 
   // Custom fields (project definitions + task values)
   const [customFields, setCustomFields] = useState<ProjectCustomField[]>([]);
@@ -743,15 +747,34 @@ export default function TaskDetailPage() {
     }
   }
 
-  async function handleSubmission(nextStatus: TaskStatus, message: string) {
+  function openSubmitSummary() {
+    setSubmitSummary(task?.submissionSummary ?? '');
+    setSubmitSummaryError(null);
+    setError(null);
+    setSubmitSummaryOpen(true);
+  }
+
+  async function confirmSubmit() {
     if (!activeWorkspace || !task) return;
-    setSubmissionBusy(true); setError(null);
+    const workSummary = submitSummary.trim();
+    if (!workSummary) {
+      setSubmitSummaryError('Work summary is required.');
+      return;
+    }
+    if (workSummary.length > 10_000) {
+      setSubmitSummaryError('Work summary must be at most 10 000 characters.');
+      return;
+    }
+
+    setSubmissionBusy(true); setError(null); setSubmitSummaryError(null);
     try {
-      const updated = await updateTask(activeWorkspace.id, projectId, task.id, { status: nextStatus });
-      setTask(updated);
-      setNotice(message);
+      setTask(await submitTask(activeWorkspace.id, projectId, task.id, workSummary));
+      setNotice('Work submitted for review.');
+      setSubmitSummaryOpen(false);
     } catch (cause) {
-      setError(requestError(cause, 'The task status could not be updated.'));
+      const message = requestError(cause, 'The work could not be submitted.');
+      setError(message);
+      setSubmitSummaryError(message);
     } finally {
       setSubmissionBusy(false);
     }
@@ -1509,7 +1532,7 @@ export default function TaskDetailPage() {
                     size="sm"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('SUBMITTED', 'Work submitted for review.')}
+                    onClick={openSubmitSummary}
                   >
                     Submit for review
                   </Button>
@@ -1642,6 +1665,37 @@ export default function TaskDetailPage() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={submitSummaryOpen}
+        onClose={() => setSubmitSummaryOpen(false)}
+        title="Submit work for review"
+        description="Describe what you completed so the reviewer can evaluate the submission."
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setSubmitSummaryOpen(false)} disabled={submissionBusy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void confirmSubmit()} loading={submissionBusy} disabled={submissionBusy}>
+              Submit for review
+            </Button>
+          </>
+        }
+      >
+        <Textarea
+          id="submit-work-summary"
+          label="Work summary"
+          required
+          value={submitSummary}
+          onChange={(e) => { setSubmitSummary(e.target.value); setSubmitSummaryError(null); }}
+          errorMessage={submitSummaryError ?? undefined}
+          placeholder="Describe what you completed, links, or notes for the reviewer"
+          maxLength={10_000}
+          rows={5}
+          disabled={submissionBusy}
+        />
+      </Modal>
 
       <Modal
         open={Boolean(reviewFeedbackSource)}

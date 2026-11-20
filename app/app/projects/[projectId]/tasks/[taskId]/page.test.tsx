@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   updateComment: vi.fn(),
   deleteComment: vi.fn(),
   reviewTask: vi.fn(),
+  submitTask: vi.fn(),
   listFiles: vi.fn(),
   uploadFile: vi.fn(),
   deleteFile: vi.fn(),
@@ -105,6 +106,7 @@ vi.mock('@/services/tasks', () => ({
   updateComment: mocks.updateComment,
   deleteComment: mocks.deleteComment,
   reviewTask: mocks.reviewTask,
+  submitTask: mocks.submitTask,
 }));
 
 vi.mock('@/services/projects', () => ({
@@ -142,6 +144,7 @@ describe('TaskDetailPage — four roles', () => {
     mocks.listFiles.mockResolvedValue({ items: [], nextCursor: null, totalBytes: 0 });
     mocks.listProjectMembers.mockResolvedValue([]);
     mocks.reviewTask.mockResolvedValue({ ...task1, status: 'APPROVED' });
+    mocks.submitTask.mockResolvedValue({ ...task1, status: 'SUBMITTED' });
     mocks.completeTask.mockResolvedValue({ status: 'APPROVED', completedAt: '2026-01-01T00:00:00.000Z' });
   });
 
@@ -445,5 +448,42 @@ describe('TaskDetailPage — four roles', () => {
       'task-1',
       expect.objectContaining({ status: 'IN_PROGRESS' }),
     );
+  });
+
+  it('requires a work summary before submitting through the verified endpoint', async () => {
+    setRole('PROJECT_MANAGER');
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Submit for review' }));
+    const dialog = await screen.findByRole('dialog');
+    const confirm = within(dialog).getByRole('button', { name: 'Submit for review' });
+
+    await user.click(confirm);
+    expect(await within(dialog).findByText('Work summary is required.')).toBeInTheDocument();
+    expect(mocks.submitTask).not.toHaveBeenCalled();
+
+    await user.type(within(dialog).getByLabelText(/Work summary/), '  Finished the fix  ');
+    await user.click(confirm);
+
+    await waitFor(() => {
+      expect(mocks.submitTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', 'Finished the fix');
+      expect(mocks.updateTask).not.toHaveBeenCalled();
+    });
+  });
+
+  it('shows the backend submit error inside the dialog', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.submitTask.mockRejectedValueOnce(new ApiRequestError('Expected deliverables are missing', 400));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Submit for review' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Work summary/), 'Ready for review');
+    await user.click(within(dialog).getByRole('button', { name: 'Submit for review' }));
+
+    expect(await within(dialog).findByText('Expected deliverables are missing')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

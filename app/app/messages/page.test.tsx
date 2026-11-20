@@ -49,6 +49,7 @@ vi.mock('@/services/channels', () => ({
   updateChannel: vi.fn(),
   addChannelMember: vi.fn(),
   removeChannelMember: vi.fn(),
+  listChannelMembers: vi.fn().mockResolvedValue({ items: [] }),
 }));
 
 vi.mock('@/services/messages', () => ({

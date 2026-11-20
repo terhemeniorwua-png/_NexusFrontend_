@@ -44,8 +44,8 @@ describe('notifications service', () => {
 
   // ── Metadata ───────────────────────────────────────────────────────────────
 
-  it('exports all 18 notification types', () => {
-    expect(ALL_NOTIFICATION_TYPES).toHaveLength(18);
+  it('exports all 22 notification types', () => {
+    expect(ALL_NOTIFICATION_TYPES).toHaveLength(22);
     expect(ALL_NOTIFICATION_TYPES).toContain('MENTION');
     expect(ALL_NOTIFICATION_TYPES).toContain('PROJECT_UPDATE');
   });
@@ -56,10 +56,10 @@ describe('notifications service', () => {
     }
   });
 
-  it('groups cover all 18 types without duplication', () => {
+  it('groups cover all 22 types without duplication', () => {
     const flat = NOTIFICATION_TYPE_GROUPS.flatMap((g) => g.types);
-    expect(flat).toHaveLength(18);
-    expect(new Set(flat).size).toBe(18);
+    expect(flat).toHaveLength(22);
+    expect(new Set(flat).size).toBe(22);
   });
 
   // ── listNotifications ──────────────────────────────────────────────────────

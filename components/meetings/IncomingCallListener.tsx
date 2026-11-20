@@ -43,6 +43,8 @@ export function IncomingCallListener() {
 
   useEffect(() => {
     const socket = getSocket();
+    // getSocket() returns null when NEXT_PUBLIC_SOCKET_URL is not set.
+    if (!socket) return;
 
     // Keep the first popup; a second call is left to time out as missed.
     const onIncoming = (payload: IncomingCall) => setCall((current) => current ?? payload);

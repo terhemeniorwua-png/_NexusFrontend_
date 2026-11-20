@@ -75,7 +75,7 @@ describe('WorkspacesPage', () => {
     await user.type(screen.getAllByRole('textbox', { name: /Workspace name/ })[1], 'Nexus Studio Updated');
     await user.click(screen.getByRole('button', { name: 'Save workspace' }));
 
-    await waitFor(() => expect(mocks.context.saveWorkspace).toHaveBeenCalledWith('company-1', { name: 'Nexus Studio Updated', description: null, visibility: 'PRIVATE' }));
+    await waitFor(() => expect(mocks.context.saveWorkspace).toHaveBeenCalledWith('company-1', { name: 'Nexus Studio Updated', description: null, visibility: 'PRIVATE', timeTrackingEnabled: false }));
     expect(await screen.findByText('Workspace settings saved.')).toBeInTheDocument();
   });
 

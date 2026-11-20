@@ -36,28 +36,16 @@ describe('workspace-aware organization navigation', () => {
     expect(hrefs('INDIVIDUAL')).toContain('/app/projects');
   });
 
-  it('shows the files entry for all workspace types', () => {
-    expect(hrefs('COMPANY')).toContain('/app/files');
-    expect(hrefs('INSTITUTION')).toContain('/app/files');
-    expect(hrefs('INDIVIDUAL')).toContain('/app/files');
-  });
-
-  it('shows the documents entry for all workspace types', () => {
-    expect(hrefs('COMPANY')).toContain('/app/documents');
-    expect(hrefs('INSTITUTION')).toContain('/app/documents');
-    expect(hrefs('INDIVIDUAL')).toContain('/app/documents');
-  });
-
-  it('shows the forms entry for all workspace types', () => {
-    expect(hrefs('COMPANY')).toContain('/app/forms');
-    expect(hrefs('INSTITUTION')).toContain('/app/forms');
-    expect(hrefs('INDIVIDUAL')).toContain('/app/forms');
-  });
-
-  it('shows the calendar entry for all workspace types', () => {
-    expect(hrefs('COMPANY')).toContain('/app/calendar');
-    expect(hrefs('INSTITUTION')).toContain('/app/calendar');
-    expect(hrefs('INDIVIDUAL')).toContain('/app/calendar');
+  it.each([
+    ['My Tasks', '/app/work/tasks'],
+    ['Working Environment', '/app/work/environment'],
+    ['My Submissions', '/app/work/submissions'],
+    ['Completed Work', '/app/work/completed'],
+    ['Resources', '/app/resources'],
+  ])('shows the %s entry for all workspace types', (_label, href) => {
+    expect(hrefs('COMPANY')).toContain(href);
+    expect(hrefs('INSTITUTION')).toContain(href);
+    expect(hrefs('INDIVIDUAL')).toContain(href);
   });
 
   it('shows the messages entry for all workspace types', () => {

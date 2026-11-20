@@ -11,7 +11,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
-import { listTasks, type TaskPriority } from '@/services/tasks';
+import { listProjects, type ProjectSummary } from '@/services/projects';
+import { type TaskPriority } from '@/services/tasks';
 
 type TaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED';
 
@@ -35,6 +36,10 @@ export default function WorkMyTasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<TaskStatus | ''>('');
   const [filterPriority, setFilterPriority] = useState<string | ''>('');
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
   const highlightTaskId = searchParams.get('highlight') ?? undefined;
   const highlightRef = useRef<string | null>(highlightTaskId);
 
@@ -77,7 +82,34 @@ export default function WorkMyTasksPage() {
     return () => { active = false; clearInterval(interval); };
   }, [activeWorkspaceId, userId, filterStatus, filterPriority, highlightTaskId]);
 
-  if (loading || !activeWorkspace) {
+  useEffect(() => {
+    if (!activeWorkspaceId) {
+      setProjects([]);
+      setSelectedProjectId('');
+      setProjectsLoading(false);
+      return;
+    }
+    let active = true;
+    setProjectsLoading(true);
+    void listProjects(activeWorkspaceId, { limit: 100 })
+      .then((result) => {
+        if (!active) return;
+        const available = result.items.filter((project) => project.status !== 'ARCHIVED');
+        setProjects(available);
+        setSelectedProjectId(available[0]?.id ?? '');
+        setShowProjectPicker(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setProjects([]);
+        setSelectedProjectId('');
+        setShowProjectPicker(false);
+      })
+      .finally(() => { if (active) setProjectsLoading(false); });
+    return () => { active = false; };
+  }, [activeWorkspaceId]);
+
+  if (loading || projectsLoading || !activeWorkspace) {
     return (
       <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
         <Skeleton className="h-64 w-full rounded-lg" />
@@ -100,6 +132,41 @@ export default function WorkMyTasksPage() {
   ];
 
   const hasHighlight = highlightTaskId && tasks.some((t) => t.id === highlightTaskId);
+  const singleProject = projects.length === 1 ? projects[0] : null;
+  const linkButtonClass = 'inline-flex h-9 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary)] px-4 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2';
+  const createAction = singleProject ? (
+    <Link href={`/app/projects/${singleProject.id}/tasks?create=1`} className={linkButtonClass}>
+      Create task
+    </Link>
+  ) : projects.length > 1 ? (
+    showProjectPicker ? (
+      <div className="flex flex-col items-start gap-2">
+        <label htmlFor="create-task-project" className="text-sm font-medium text-[var(--color-text-primary)]">
+          Choose a project
+        </label>
+        <select
+          id="create-task-project"
+          value={selectedProjectId}
+          onChange={(event) => setSelectedProjectId(event.target.value)}
+          className="h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+        >
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>{project.name}</option>
+          ))}
+        </select>
+        <Button
+          onClick={() => router.push(`/app/projects/${selectedProjectId}/tasks?create=1`)}
+          disabled={!selectedProjectId}
+        >
+          Continue
+        </Button>
+      </div>
+    ) : (
+      <Button onClick={() => setShowProjectPicker(true)}>Create task</Button>
+    )
+  ) : (
+    <Link href="/app/projects" className={linkButtonClass}>Go to Projects</Link>
+  );
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
@@ -157,8 +224,10 @@ export default function WorkMyTasksPage() {
       {tasks.length === 0 && !error ? (
         <EmptyState
           title="No tasks found"
-          description="You don't have any tasks assigned yet. Create your first task to get started."
-          action={<Button onClick={() => router.push('/app/work/tasks')}>Create task</Button>}
+          description={projects.length === 0
+            ? "You don't have any projects yet. Create a project before adding tasks."
+            : "You don't have any tasks assigned yet. Create your first task to get started."}
+          action={createAction}
         />
       ) : (
         <div className="overflow-x-auto">

@@ -63,6 +63,7 @@ export interface RecentItem {
 
 export interface DocumentSummary {
   id: string;
+  kind?: 'PROJECT_DOC' | 'TASK_DOC';
   taskId: string | null;
   title: string;
   createdById: string;
@@ -163,11 +164,91 @@ const projectResourcesPath = (workspaceId: string, projectId: string, suffix = '
 
 // ─── Overview dashboard ────────────────────────────────────────────────────────
 
-export function getOverview(
+interface RawOverview {
+  recent?: Array<{ id: string; itemType: string; itemId: string; openedAt: string }>;
+  recentItems?: OverviewData['recentItems'];
+  docs?: Array<{
+    id: string; kind?: 'PROJECT_DOC' | 'TASK_DOC'; taskId?: string | null; title: string; createdById?: string;
+    createdByName?: string; createdBy?: { id: string; name: string }; updatedAt: string;
+  }>;
+  bookmarks?: Bookmark[];
+  folders?: Array<{ id: string; name: string; workspaceId?: string; parentId?: string | null; itemCount?: number; createdAt?: string; updatedAt?: string }>;
+  files?: Array<{ id: string; name?: string; fileName?: string; mimeType?: string; sizeBytes?: number; uploadedById?: string; createdAt?: string }>;
+  lists?: TaskListSummary[];
+  workload?: WorkloadEntry[];
+  workloadByStatus?: Array<{ status: string; total: number; assignees: Array<{ userId: string; name: string; count: number }> }>;
+}
+
+/** Maps the backend overview shape to the shape the dashboard cards expect. Never throws on missing keys. */
+function normalizeOverview(raw: RawOverview, projectId: string): OverviewData {
+  const docs = raw.docs ?? [];
+  const files = raw.files ?? [];
+  const bookmarks = raw.bookmarks ?? [];
+  const titleById = new Map<string, string>();
+  for (const d of docs) titleById.set(d.id, d.title);
+  for (const f of files) titleById.set(f.id, f.name ?? f.fileName ?? 'File');
+  for (const b of bookmarks) titleById.set(b.id, b.title);
+
+  const recentItems: OverviewData['recentItems'] = [...(raw.recentItems ?? [])];
+  if (!raw.recentItems) {
+    for (const r of raw.recent ?? []) {
+      const common = { id: r.id, updatedAt: r.openedAt, projectId };
+      if (r.itemType === 'TASK') {
+        recentItems.push({ ...common, type: 'task', title: titleById.get(r.itemId) ?? 'Task', url: `/app/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(r.itemId)}` });
+      } else if (r.itemType === 'DOCUMENT') {
+        recentItems.push({ ...common, type: 'doc', title: titleById.get(r.itemId) ?? 'Document', url: '/app/documents' });
+      } else if (r.itemType === 'FILE') {
+        recentItems.push({ ...common, type: 'file', title: titleById.get(r.itemId) ?? 'File', url: '/app/files' });
+      }
+    }
+  }
+
+  const byUser = new Map<string, WorkloadEntry>();
+  for (const st of raw.workloadByStatus ?? []) {
+    for (const a of st.assignees) {
+      const key = a.userId || 'unassigned';
+      const entry = byUser.get(key) ?? { userId: key, user: { id: key, name: a.name }, statusCounts: {}, total: 0 };
+      entry.statusCounts[st.status] = (entry.statusCounts[st.status] ?? 0) + a.count;
+      entry.total += a.count;
+      byUser.set(key, entry);
+    }
+  }
+
+  return {
+    projectId,
+    recentItems,
+    docs: docs.map((d) => ({
+      id: d.id,
+      kind: d.kind,
+      taskId: d.taskId ?? null,
+      title: d.title,
+      createdById: d.createdById ?? '',
+      createdBy: d.createdBy ?? { id: d.createdById ?? '', name: d.createdByName ?? '' },
+      updatedAt: d.updatedAt,
+    })),
+    bookmarks,
+    folders: (raw.folders ?? []).map((f) => ({
+      id: f.id,
+      workspaceId: f.workspaceId ?? '',
+      parentId: f.parentId ?? null,
+      name: f.name,
+      itemCount: f.itemCount ?? 0,
+      createdAt: f.createdAt ?? '',
+      updatedAt: f.updatedAt ?? '',
+    })),
+    // Backend sends `name`; the cards read `fileName`. Keep both.
+    files: files.map((f) => ({ ...f, fileName: f.fileName ?? f.name ?? '' })) as unknown as OverviewData['files'],
+    lists: raw.lists ?? [],
+    workload: raw.workload ?? [...byUser.values()],
+  };
+}
+
+export async function getOverview(
   workspaceId: string,
   projectId: string,
 ): Promise<OverviewData> {
-  return request(projectResourcesPath(workspaceId, projectId, '/dashboard/overview'));
+  const raw = await request<RawOverview>(projectResourcesPath(workspaceId, projectId, '/dashboard/overview'));
+  return normalizeOverview(raw ?? {}, projectId);
 }
 
 // ─── Dashboard preferences (project-scoped) ────────────────────────────────────
@@ -207,8 +288,12 @@ export function listFolders(
 export function createFolder(
   workspaceId: string,
   input: CreateFolderInput,
+  projectId?: string | null,
 ): Promise<FolderSummary> {
-  return request<FolderSummary>(wsResourcesPath(workspaceId, '/folders'), {
+  const path = projectId
+    ? projectResourcesPath(workspaceId, projectId, '/folders')
+    : wsResourcesPath(workspaceId, '/folders');
+  return request<FolderSummary>(path, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -262,8 +347,12 @@ export function listBookmarks(workspaceId: string): Promise<Bookmark[]> {
 export function createBookmark(
   workspaceId: string,
   input: CreateBookmarkInput,
+  projectId?: string | null,
 ): Promise<Bookmark> {
-  return request<Bookmark>(wsResourcesPath(workspaceId, '/bookmarks'), {
+  const path = projectId
+    ? projectResourcesPath(workspaceId, projectId, '/bookmarks')
+    : wsResourcesPath(workspaceId, '/bookmarks');
+  return request<Bookmark>(path, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -351,4 +440,22 @@ export function uploadFolder(params: UploadFolderParams): {
       abortRequested = true;
     },
   };
+}
+
+/** Uploads one file into a project's resource library (ResourceFile, shown on the Overview Files card). */
+export function uploadProjectFile(
+  params: Parameters<typeof uploadFile>[0] & { projectId: string; folderId?: string | null },
+): { promise: Promise<FileSummary>; abort: () => void } {
+  const controller = new AbortController();
+  const form = new FormData();
+  form.append('file', params.file);
+  if (params.folderId) form.append('folderId', params.folderId);
+  const promise = request<FileSummary>(
+    projectResourcesPath(params.workspaceId, params.projectId, '/files'),
+    { method: 'POST', body: form, signal: controller.signal },
+  ).then((result) => {
+    params.onProgress?.(100);
+    return result;
+  });
+  return { promise, abort: () => controller.abort() };
 }

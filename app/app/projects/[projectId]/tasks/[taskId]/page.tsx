@@ -716,6 +716,7 @@ export default function TaskDetailPage() {
   // Submission / review handlers
   // ---------------------------------------------------------------------------
 
+  // TODO: switch to POST /start when available
   async function handleStart() {
     if (!activeWorkspace || !task) return;
     setSubmissionBusy(true); setError(null);
@@ -724,7 +725,11 @@ export default function TaskDetailPage() {
       setTask(updated);
       router.push(`/app/projects/${projectId}/tasks/${task.id}/work`);
     } catch (cause) {
-      setError(requestError(cause, 'The task could not be started.'));
+      setError(
+        cause instanceof ApiRequestError && cause.status === 403 && cause.message
+          ? cause.message
+          : requestError(cause, 'The task could not be started.'),
+      );
     } finally {
       setSubmissionBusy(false);
     }

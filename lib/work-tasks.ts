@@ -32,6 +32,9 @@ export async function listMyTasks(
     );
     return { items: result.items };
   } catch (error) {
+    // GET /workspaces/{workspaceId}/tasks/mine exists in the current backend, but it is not
+    // documented and older supported deployments may still return 404. Keep the per-project
+    // fallback until every deployment exposes the route; other failures must surface directly.
     if ((error as { status?: number }).status !== 404) throw error;
     return listMyTasksLegacy(workspaceId, userId, query);
   }

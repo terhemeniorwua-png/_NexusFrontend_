@@ -35,7 +35,7 @@ export default function WorkMyTasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<TaskStatus | ''>('');
-  const [filterPriority, setFilterPriority] = useState<string | ''>('');
+  const [filterPriority, setFilterPriority] = useState<TaskPriority | ''>('');
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
@@ -58,9 +58,8 @@ export default function WorkMyTasksPage() {
       try {
         setError(null);
         const result = await listMyTasks(activeWorkspaceId, userId, {
-          assigneeId: '',
           status: filterStatus || undefined,
-          priority: filterPriority as TaskPriority | undefined,
+          priority: filterPriority || undefined,
           limit: 50,
         });
         setTasks(result.items.map((t) => ({
@@ -204,7 +203,7 @@ export default function WorkMyTasksPage() {
             </div>
             <div className="min-w-32">
               <select
-                onChange={(e) => setFilterPriority(e.target.value)}
+                onChange={(e) => setFilterPriority(e.target.value as TaskPriority | '')}
                 className="flex h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] placeholder-text-[var(--color-text-muted)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
               >
                 <option value="">All priorities</option>

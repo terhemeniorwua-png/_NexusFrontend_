@@ -36,10 +36,12 @@ export default function WorkMyTasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<TaskStatus | ''>('');
   const [filterPriority, setFilterPriority] = useState<TaskPriority | ''>('');
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectState, setProjectState] = useState<{
+    workspaceId: string;
+    items: ProjectSummary[];
+  } | null>(null);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedProjectOverride, setSelectedProjectOverride] = useState<string | null>(null);
   const highlightTaskId = searchParams.get('highlight') ?? undefined;
   const highlightRef = useRef<string | null>(highlightTaskId);
 
@@ -82,31 +84,30 @@ export default function WorkMyTasksPage() {
   }, [activeWorkspaceId, userId, filterStatus, filterPriority, highlightTaskId]);
 
   useEffect(() => {
-    if (!activeWorkspaceId) {
-      setProjects([]);
-      setSelectedProjectId('');
-      setProjectsLoading(false);
-      return;
-    }
+    if (!activeWorkspaceId) return;
     let active = true;
-    setProjectsLoading(true);
     void listProjects(activeWorkspaceId, { limit: 100 })
       .then((result) => {
         if (!active) return;
         const available = result.items.filter((project) => project.status !== 'ARCHIVED');
-        setProjects(available);
-        setSelectedProjectId(available[0]?.id ?? '');
+        setProjectState({ workspaceId: activeWorkspaceId, items: available });
         setShowProjectPicker(false);
       })
       .catch(() => {
         if (!active) return;
-        setProjects([]);
-        setSelectedProjectId('');
+        setProjectState({ workspaceId: activeWorkspaceId, items: [] });
         setShowProjectPicker(false);
-      })
-      .finally(() => { if (active) setProjectsLoading(false); });
+      });
     return () => { active = false; };
   }, [activeWorkspaceId]);
+
+  const currentProjectState = projectState?.workspaceId === activeWorkspaceId ? projectState : null;
+  const projects = currentProjectState?.items ?? [];
+  const projectsLoading = Boolean(activeWorkspaceId) && !currentProjectState;
+  const selectedProjectId =
+    selectedProjectOverride && projects.some((project) => project.id === selectedProjectOverride)
+      ? selectedProjectOverride
+      : projects[0]?.id ?? '';
 
   if (loading || projectsLoading || !activeWorkspace) {
     return (
@@ -146,7 +147,7 @@ export default function WorkMyTasksPage() {
         <select
           id="create-task-project"
           value={selectedProjectId}
-          onChange={(event) => setSelectedProjectId(event.target.value)}
+          onChange={(event) => setSelectedProjectOverride(event.target.value)}
           className="h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
         >
           {projects.map((project) => (

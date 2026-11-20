@@ -25,6 +25,7 @@ import {
   reportTaskBlocker,
   resolveTaskBlocker,
   submitTask,
+  updateComment,
   updateTask,
   updateTaskTimeEntry,
   type TaskActivityItem,
@@ -413,6 +414,8 @@ export default function TaskWorkPage() {
         error={commentsError}
         busy={commentsBusy}
         canDelete={(c) => c.authorId === currentUserId}
+        canEdit={can('task.comment')}
+        currentUserId={currentUserId}
         workspaceId={activeWorkspaceId ?? undefined}
         projectId={projectId}
         onAdd={async (body, mentionedUserIds) => {
@@ -423,6 +426,11 @@ export default function TaskWorkPage() {
         onDelete={async (commentId) => {
           setCommentsBusy(true);
           try { await deleteComment(activeWorkspaceId, projectId, taskId, commentId); await loadComments(); }
+          finally { setCommentsBusy(false); }
+        }}
+        onEdit={async (commentId, body) => {
+          setCommentsBusy(true);
+          try { await updateComment(activeWorkspaceId, projectId, taskId, commentId, body); await loadComments(); }
           finally { setCommentsBusy(false); }
         }}
       />

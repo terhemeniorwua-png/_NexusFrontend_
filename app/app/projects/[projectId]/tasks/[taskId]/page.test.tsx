@@ -145,6 +145,12 @@ describe('TaskDetailPage — four roles', () => {
     mocks.listProjectMembers.mockResolvedValue([]);
     mocks.reviewTask.mockResolvedValue({ ...task1, status: 'APPROVED' });
     mocks.submitTask.mockResolvedValue({ ...task1, status: 'SUBMITTED' });
+    mocks.addDependency.mockResolvedValue({
+      taskId: 'task-1',
+      dependsOnTaskId: 'task-2',
+      dependsOnTask: { id: 'task-2', key: 'NX-2', title: 'Setup', status: 'ASSIGNED' },
+    });
+    mocks.removeDependency.mockResolvedValue({ taskId: 'task-1', dependsOnTaskId: 'task-2', removed: true });
     mocks.completeTask.mockResolvedValue({ status: 'APPROVED', completedAt: '2026-01-01T00:00:00.000Z' });
   });
 
@@ -485,5 +491,91 @@ describe('TaskDetailPage — four roles', () => {
 
     expect(await within(dialog).findByText('Expected deliverables are missing')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('adds a dependency through the verified endpoint', async () => {
+    setRole('PROJECT_MANAGER');
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    const input = await screen.findByLabelText(/^Depends on/);
+    await user.type(input, 'task-2');
+    await user.click(screen.getByRole('button', { name: 'Add dependency' }));
+
+    await waitFor(() => {
+      expect(mocks.addDependency).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', 'task-2');
+      expect(input).toHaveValue('');
+    });
+  });
+
+  it('surfaces duplicate and circular dependency errors', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.addDependency
+      .mockRejectedValueOnce(new ApiRequestError('This dependency already exists', 409, 'DEPENDENCY_EXISTS'))
+      .mockRejectedValueOnce(new ApiRequestError('Adding this dependency would create a circular reference', 409, 'CIRCULAR_DEPENDENCY'));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    const input = await screen.findByLabelText(/^Depends on/);
+    await user.type(input, 'task-2');
+    await user.click(screen.getByRole('button', { name: 'Add dependency' }));
+    expect(await screen.findByText('This dependency already exists.')).toBeInTheDocument();
+
+    await user.type(input, 'task-3');
+    await user.click(screen.getByRole('button', { name: 'Add dependency' }));
+    expect(await screen.findByText('Adding this dependency would create a circular reference.')).toBeInTheDocument();
+  });
+
+  it('removes only the outgoing dependency and leaves blockers read-only', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.getTask.mockResolvedValue({
+      ...task1,
+      dependencies: [{
+        taskId: 'task-1',
+        dependsOnTaskId: 'task-2',
+        dependsOnTask: { id: 'task-2', key: 'NX-2', title: 'Setup', status: 'ASSIGNED' },
+      }],
+      blockers: [{
+        taskId: 'task-3',
+        dependsOnTaskId: 'task-1',
+        task: { id: 'task-3', key: 'NX-3', title: 'Follow-up', status: 'ASSIGNED' },
+      }],
+    });
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('NX-2')).toBeInTheDocument();
+    expect(screen.getByText('NX-3')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove dependency on NX-3' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Remove dependency on NX-2' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(/Only this task's dependency on the selected task is removed/);
+    await user.click(within(dialog).getByRole('button', { name: 'Remove dependency' }));
+
+    await waitFor(() => {
+      expect(mocks.removeDependency).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', 'task-2');
+    });
+  });
+
+  it('surfaces a missing directional dependency on removal', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.getTask.mockResolvedValue({
+      ...task1,
+      dependencies: [{
+        taskId: 'task-1',
+        dependsOnTaskId: 'task-2',
+        dependsOnTask: { id: 'task-2', key: 'NX-2', title: 'Setup', status: 'ASSIGNED' },
+      }],
+    });
+    mocks.removeDependency.mockRejectedValueOnce(new ApiRequestError('That dependency does not exist', 404, 'DEPENDENCY_NOT_FOUND'));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Remove dependency on NX-2' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove dependency' }));
+
+    expect(await screen.findByText('That dependency does not exist.')).toBeInTheDocument();
   });
 });

@@ -119,6 +119,25 @@ function requestError(cause: unknown, fallback: string): string {
   return cause.message;
 }
 
+function dependencyRequestError(cause: unknown, fallback: string): string {
+  if (!(cause instanceof ApiRequestError)) return fallback;
+  if (cause.status === 403) return 'Your current role does not allow this action.';
+  // These codes are part of the backend dependency contract. Keep the wording
+  // stable even if the backend message changes.
+  switch (cause.code) {
+    case 'TASK_SELF_DEPENDENCY':
+      return 'A task cannot depend on itself.';
+    case 'DEPENDENCY_EXISTS':
+      return 'This dependency already exists.';
+    case 'CIRCULAR_DEPENDENCY':
+      return 'Adding this dependency would create a circular reference.';
+    case 'DEPENDENCY_NOT_FOUND':
+      return 'That dependency does not exist.';
+    default:
+      return cause.message || fallback;
+  }
+}
+
 const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: 'ASSIGNED', label: 'Assigned' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
@@ -600,7 +619,7 @@ export default function TaskDetailPage() {
       setNotice('Dependency added.');
       await load();
     } catch (cause) {
-      setDepError(requestError(cause, 'Dependency could not be added.'));
+      setDepError(dependencyRequestError(cause, 'Dependency could not be added.'));
     } finally {
       setDepBusy(false);
     }
@@ -614,7 +633,7 @@ export default function TaskDetailPage() {
       setNotice('Dependency removed.');
       await load();
     } catch (cause) {
-      setDepError(requestError(cause, 'Dependency could not be removed.'));
+      setDepError(dependencyRequestError(cause, 'Dependency could not be removed.'));
     } finally {
       setDepBusy(false);
     }
@@ -1789,7 +1808,7 @@ export default function TaskDetailPage() {
         onClose={() => setRemoveDepTarget(null)}
         onConfirm={() => void handleRemoveDependency()}
         title="Remove dependency?"
-        description="This task will no longer depend on the selected task."
+        description="Only this task's dependency on the selected task is removed. Tasks waiting on this task are unaffected."
         confirmLabel="Remove dependency"
         loading={depBusy}
       />

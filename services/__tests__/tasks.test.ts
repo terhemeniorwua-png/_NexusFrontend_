@@ -289,6 +289,60 @@ describe('tasks service', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Submission, review, and cross-project task list
+  // ---------------------------------------------------------------------------
+
+  it('submitTask sends POST to the submit path with workSummary', async () => {
+    mocks.apiRequest.mockResolvedValue({ id: TID, status: 'SUBMITTED' });
+    const { submitTask } = await import('../tasks');
+    await submitTask(WS, PID, TID, 'Completed the fix');
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/${TID}/submit`,
+      expect.objectContaining({ method: 'POST', authenticated: true }),
+    );
+    const body = JSON.parse((mocks.apiRequest.mock.calls[0][1] as { body: string }).body) as { workSummary: string };
+    expect(body).toEqual({ workSummary: 'Completed the fix' });
+  });
+
+  it('reviewTask sends POST to the review path with decision and feedback', async () => {
+    mocks.apiRequest.mockResolvedValue({ id: TID, status: 'APPROVED' });
+    const { reviewTask } = await import('../tasks');
+    await reviewTask(WS, PID, TID, 'REQUEST_CHANGES', 'Please add tests');
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/${TID}/review`,
+      expect.objectContaining({ method: 'POST', authenticated: true }),
+    );
+    const body = JSON.parse((mocks.apiRequest.mock.calls[0][1] as { body: string }).body) as {
+      decision: string;
+      feedback: string;
+    };
+    expect(body).toEqual({ decision: 'REQUEST_CHANGES', feedback: 'Please add tests' });
+  });
+
+  it('reviewTask omits feedback when no feedback is provided', async () => {
+    mocks.apiRequest.mockResolvedValue({ id: TID, status: 'APPROVED' });
+    const { reviewTask } = await import('../tasks');
+    await reviewTask(WS, PID, TID, 'APPROVE');
+
+    const body = JSON.parse((mocks.apiRequest.mock.calls[0][1] as { body: string }).body) as Record<string, unknown>;
+    expect(body).toEqual({ decision: 'APPROVE' });
+  });
+
+  it('listMineTasks calls the workspace-scoped mine route', async () => {
+    mocks.apiRequest.mockResolvedValue({ items: [], nextCursor: null });
+    const { listMineTasks } = await import('../tasks');
+    await listMineTasks(WS, { status: 'IN_PROGRESS', priority: 'HIGH', limit: 25 });
+
+    const url: string = mocks.apiRequest.mock.calls[0][0] as string;
+    expect(url).toContain(`/workspaces/${WS}/tasks/mine?`);
+    expect(url).toContain('status=IN_PROGRESS');
+    expect(url).toContain('priority=HIGH');
+    expect(url).toContain('limit=25');
+  });
+
+  // ---------------------------------------------------------------------------
   // Session refresh retry
   // ---------------------------------------------------------------------------
 

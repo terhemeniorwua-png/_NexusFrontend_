@@ -26,6 +26,11 @@ import {
 } from '@/services/projects';
 import { getOverview } from '@/services/resources';
 import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
+import { CreateDocDialog } from '@/components/dashboard/CreateDocDialog';
+import { CreateFolderDialog } from '@/components/dashboard/CreateFolderDialog';
+import { BookmarkDialog } from '@/components/resources/BookmarkDialog';
+import { UploadDialog } from '@/components/resources/ResourcesPage';
+import { Modal } from '@/components/ui/Modal';
 
 function visibilityLabel(v: ProjectVisibility): string {
   if (v === 'WORKSPACE') return 'Organisation-wide';
@@ -50,6 +55,10 @@ function requestError(cause: unknown, fallback: string): string {
 export default function ProjectOverviewPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
+  const [docOpen, setDocOpen] = useState(false);
+  const [bookmarkOpen, setBookmarkOpen] = useState(false);
+  const [folderOpen, setFolderOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const { can, isLoading: permissionsLoading } = usePermissions();
   const router = useRouter();
   useWorkspaceRedirect();
@@ -358,20 +367,46 @@ export default function ProjectOverviewPage() {
         onRetry={() => {
           void loadDashboard();
         }}
-        onAddDoc={() => {
-          router.push(`${projectHref}/tasks`);
-        }}
-        onAddBookmark={() => {
-          // Bookmark dialog handled by resources page; here just navigate
-          router.push(`${projectHref}/tasks`);
-        }}
-        onAddFolder={() => {
-          router.push(`${projectHref}/tasks`);
-        }}
-        onUploadFiles={() => {
-          router.push(`${projectHref}/tasks`);
-        }}
+        onAddDoc={() => setDocOpen(true)}
+        onAddBookmark={() => setBookmarkOpen(true)}
+        onAddFolder={() => setFolderOpen(true)}
+        onUploadFiles={() => setUploadOpen(true)}
       />
+
+      <CreateDocDialog
+        open={docOpen}
+        onClose={() => setDocOpen(false)}
+        workspaceId={activeWorkspace.id}
+        onCreated={() => { void loadDashboard(); }}
+      />
+
+      <BookmarkDialog
+        open={bookmarkOpen}
+        onClose={() => setBookmarkOpen(false)}
+        workspaceId={activeWorkspace.id}
+        onAdded={() => { void loadDashboard(); }}
+      />
+
+      <CreateFolderDialog
+        open={folderOpen}
+        onClose={() => setFolderOpen(false)}
+        workspaceId={activeWorkspace.id}
+        onCreated={() => { void loadDashboard(); }}
+      />
+
+      <Modal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        title="Upload files"
+        maxWidth="lg"
+      >
+        <UploadDialog
+          open={uploadOpen}
+          onClose={() => setUploadOpen(false)}
+          workspaceId={activeWorkspace.id}
+          onUploaded={() => { void loadDashboard(); }}
+        />
+      </Modal>
 
       <Card className="p-4">
         <p className="text-xs text-[var(--color-text-muted)]">Created</p>

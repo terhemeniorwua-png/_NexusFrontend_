@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiRequestError } from '@/lib/api';
 import TaskDetailPage from './page';
 
 const mocks = vi.hoisted(() => ({
@@ -231,5 +232,18 @@ describe('TaskDetailPage — four roles', () => {
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Mark complete' }));
     await waitFor(() => expect(mocks.completeTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1'));
+  });
+
+  it('shows the backend 403 message when Start fails and keeps the task status unchanged', async () => {
+    setRole('MEMBER');
+    mocks.updateTask.mockRejectedValueOnce(new ApiRequestError('Only the assignee can start this task', 403));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    const startButton = await screen.findByRole('button', { name: 'Start' });
+    await user.click(startButton);
+
+    expect(await screen.findByText('Only the assignee can start this task')).toBeInTheDocument();
+    expect(mocks.updateTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', { status: 'IN_PROGRESS' });
+    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
   });
 });

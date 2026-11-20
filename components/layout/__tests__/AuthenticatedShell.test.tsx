@@ -31,6 +31,7 @@ vi.mock('@/providers/AvatarUrlProvider', () => ({ useAvatarUrl: () => ({ avatarU
 vi.mock('@/services/auth', () => ({ signOut: mocks.signOut }));
 vi.mock('@/services/profile', () => ({ getUserProfile: mocks.getUserProfile }));
 vi.mock('@/services/notifications', () => ({ getUnreadCount: vi.fn().mockResolvedValue({ unreadCount: 0 }) }));
+vi.mock('@/services/onboarding', () => ({ getOnboardingStatus: vi.fn().mockResolvedValue({ required: false, completedAt: null }) }));
 
 const company: Record<string, unknown> = {
   id: 'workspace-company',
@@ -77,10 +78,10 @@ describe('AuthenticatedShell', () => {
     window.localStorage.clear();
   });
 
-  it('mounts the shared navigation for the active workspace', () => {
+  it('mounts the shared navigation for the active workspace', async () => {
     render(<ThemeProvider><AuthenticatedShell><p>Page body</p></AuthenticatedShell></ThemeProvider>);
 
-    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
+    expect(await screen.findByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Workspace' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Work' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Communication' })).toBeInTheDocument();
@@ -96,7 +97,7 @@ describe('AuthenticatedShell', () => {
     mocks.context.switchToWorkspace.mockResolvedValue(true);
     render(<ThemeProvider><AuthenticatedShell><p>Page body</p></AuthenticatedShell></ThemeProvider>);
 
-    await user.click(screen.getByRole('button', { name: 'Switch workspace: PITERON Studio' }));
+    await user.click(await screen.findByRole('button', { name: 'Switch workspace: PITERON Studio' }));
     await user.click(screen.getByRole('menuitem', { name: 'Personal' }));
 
     expect(mocks.context.switchToWorkspace).toHaveBeenCalledWith('workspace-personal');
@@ -106,18 +107,19 @@ describe('AuthenticatedShell', () => {
     const user = userEvent.setup();
     render(<ThemeProvider><AuthenticatedShell><p>Page body</p></AuthenticatedShell></ThemeProvider>);
 
-    await user.click(screen.getByRole('button', { name: 'Account menu for Ada' }));
+    await user.click(await screen.findByRole('button', { name: 'Account menu for Ada' }));
     await user.click(screen.getByRole('menuitem', { name: 'Sign out' }));
 
     await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
     expect(mocks.router.push).toHaveBeenCalledWith('/');
   });
 
-  it('renders the page without chrome while the session is loading', () => {
+  it('shows a loading status instead of the page while the session is loading', () => {
     mocks.context.loading = true;
     render(<ThemeProvider><AuthenticatedShell><p>Loading body</p></AuthenticatedShell></ThemeProvider>);
 
-    expect(screen.getByText('Loading body')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading your workspace');
+    expect(screen.queryByText('Loading body')).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument();
   });
 });

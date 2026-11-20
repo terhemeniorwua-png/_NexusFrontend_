@@ -511,7 +511,7 @@ describe('TaskDetailPage — four roles', () => {
   it('surfaces duplicate and circular dependency errors', async () => {
     setRole('PROJECT_MANAGER');
     mocks.addDependency
-      .mockRejectedValueOnce(new ApiRequestError('This dependency already exists', 409, 'DEPENDENCY_EXISTS'))
+      .mockRejectedValueOnce(new ApiRequestError('This dependency already exists', 409, 'DEPENDENCY_ALREADY_EXISTS'))
       .mockRejectedValueOnce(new ApiRequestError('Adding this dependency would create a circular reference', 409, 'CIRCULAR_DEPENDENCY'));
     render(<TaskDetailPage />);
     const user = userEvent.setup();

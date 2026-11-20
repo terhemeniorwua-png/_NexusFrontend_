@@ -115,6 +115,18 @@ function timeLabel(value: string): string {
 
 function requestError(cause: unknown, fallback: string): string {
   if (!(cause instanceof ApiRequestError)) return fallback;
+  switch (cause.code) {
+    case 'ASSIGNEE_NOT_PROJECT_MEMBER':
+      return 'That person is not an active member of this project.';
+    case 'INVALID_STATUS_TRANSITION':
+      return cause.message || 'That status change is not allowed from the current status.';
+    case 'TASK_BLOCKED_BY_DEPENDENCIES':
+      return 'This task is blocked until its dependencies are approved.';
+    case 'TASK_MAX_DEPTH_EXCEEDED':
+      return 'Subtasks can only be nested up to 3 levels deep.';
+    case 'TASK_PARENT_CYCLE':
+      return 'A task cannot be moved under itself or one of its own subtasks.';
+  }
   if (cause.status === 403) return 'Your current role does not allow this action.';
   return cause.message;
 }
@@ -127,6 +139,7 @@ function dependencyRequestError(cause: unknown, fallback: string): string {
   switch (cause.code) {
     case 'TASK_SELF_DEPENDENCY':
       return 'A task cannot depend on itself.';
+    case 'DEPENDENCY_ALREADY_EXISTS':
     case 'DEPENDENCY_EXISTS':
       return 'This dependency already exists.';
     case 'CIRCULAR_DEPENDENCY':

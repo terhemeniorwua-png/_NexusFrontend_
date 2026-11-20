@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
-import { listTasks } from '@/services/tasks';
 
 type TaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED' | 'COMPLETED';
 
@@ -49,7 +48,6 @@ export default function WorkEnvironmentPage() {
     projectId: string;
     projectKey: string;
     dueDate: string | null;
-    progress: number;
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +62,6 @@ export default function WorkEnvironmentPage() {
       try {
         setError(null);
         const result = await listMyTasks(activeWorkspace.id, user?.id ?? '', {
-          assigneeId: '',
           limit: 100,
         });
         const allTasks = result.items.map((t) => ({
@@ -75,9 +72,6 @@ export default function WorkEnvironmentPage() {
           projectId: t.projectId,
           projectKey: t.projectName || (t.key?.split('-')[0] ?? ''),
           dueDate: t.dueDate,
-          progress: t.subTaskCount > 0
-            ? Math.round((t.commentCount / t.subTaskCount) * 100)
-            : 0,
         }));
         setTasks(allTasks.filter((t) => {
           const s = t.status as string;
@@ -133,20 +127,6 @@ export default function WorkEnvironmentPage() {
                     </p>
                   </div>
                   <Badge variant="success">{statusLabel(task.status)}</Badge>
-                </div>
-                <div className="mt-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-[var(--color-text-secondary)]">Progress</span>
-                    <span className="text-sm font-medium">{task.progress}%</span>
-                  </div>
-                  <div>
-                    <div className="h-2 bg-[var(--color-surface-secondary)] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[var(--color-primary)] rounded-full transition-all duration-500"
-                        style={{ width: `${task.progress}%` }}
-                      ></div>
-                    </div>
-                  </div>
                 </div>
               </div>
               <div className="mt-3 pt-3 border-t border-[var(--color-border)]">

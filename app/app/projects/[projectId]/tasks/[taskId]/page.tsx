@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Textarea } from '@/components/ui/Textarea';
@@ -38,6 +39,7 @@ import {
   addComment,
   updateComment,
   deleteComment,
+  reviewTask,
   listProjectCustomFields,
   getTaskCustomFieldValues,
   setTaskCustomFieldValues,
@@ -48,6 +50,7 @@ import {
   type ProjectCustomField,
   type TaskRecurrenceFrequency,
   type TaskRecurrenceRule,
+  type TaskReviewDecision,
   type TaskSummary,
   type TaskStatus,
   type TaskPriority,
@@ -228,6 +231,9 @@ export default function TaskDetailPage() {
 
   // Submission / review actions
   const [submissionBusy, setSubmissionBusy] = useState(false);
+  const [reviewFeedbackSource, setReviewFeedbackSource] = useState<'reject' | 'request-revision' | null>(null);
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [reviewFeedbackError, setReviewFeedbackError] = useState<string | null>(null);
 
   // Custom fields (project definitions + task values)
   const [customFields, setCustomFields] = useState<ProjectCustomField[]>([]);
@@ -746,6 +752,50 @@ export default function TaskDetailPage() {
       setNotice(message);
     } catch (cause) {
       setError(requestError(cause, 'The task status could not be updated.'));
+    } finally {
+      setSubmissionBusy(false);
+    }
+  }
+
+  async function handleReview(decision: Exclude<TaskReviewDecision, 'REQUEST_CHANGES'>, message: string) {
+    if (!activeWorkspace || !task) return;
+    setSubmissionBusy(true); setError(null);
+    try {
+      setTask(await reviewTask(activeWorkspace.id, projectId, task.id, decision));
+      setNotice(message);
+    } catch (cause) {
+      setError(requestError(cause, 'The review could not be submitted.'));
+    } finally {
+      setSubmissionBusy(false);
+    }
+  }
+
+  function openReviewFeedback(source: 'reject' | 'request-revision') {
+    setReviewFeedbackSource(source);
+    setReviewFeedback('');
+    setReviewFeedbackError(null);
+    setError(null);
+  }
+
+  async function confirmReviewFeedback() {
+    if (!activeWorkspace || !task || !reviewFeedbackSource) return;
+    const feedback = reviewFeedback.trim();
+    if (!feedback) {
+      setReviewFeedbackError('Feedback is required when requesting changes.');
+      return;
+    }
+
+    setSubmissionBusy(true); setError(null); setReviewFeedbackError(null);
+    try {
+      // The backend has no REJECT decision. Both the Reject and Request revision
+      // controls submit REQUEST_CHANGES with the reviewer's required comment.
+      setTask(await reviewTask(activeWorkspace.id, projectId, task.id, 'REQUEST_CHANGES', feedback));
+      setNotice('Changes requested.');
+      setReviewFeedbackSource(null);
+    } catch (cause) {
+      const message = requestError(cause, 'The review could not be submitted.');
+      setError(message);
+      setReviewFeedbackError(message);
     } finally {
       setSubmissionBusy(false);
     }
@@ -1470,7 +1520,7 @@ export default function TaskDetailPage() {
                     variant="secondary"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('UNDER_REVIEW', 'Review started.')}
+                    onClick={() => void handleReview('START_REVIEW', 'Review started.')}
                   >
                     Start review
                   </Button>
@@ -1480,7 +1530,7 @@ export default function TaskDetailPage() {
                     size="sm"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('APPROVED', 'Submission approved.')}
+                    onClick={() => void handleReview('APPROVE', 'Submission approved.')}
                   >
                     Approve
                   </Button>
@@ -1491,7 +1541,7 @@ export default function TaskDetailPage() {
                     variant="secondary"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('CHANGES_REQUESTED', 'Changes requested.')}
+                    onClick={() => openReviewFeedback('request-revision')}
                   >
                     Request revision
                   </Button>
@@ -1502,7 +1552,7 @@ export default function TaskDetailPage() {
                     variant="destructive"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('CHANGES_REQUESTED', 'Submission rejected. Changes are required.')}
+                    onClick={() => openReviewFeedback('reject')}
                   >
                     Reject
                   </Button>
@@ -1592,6 +1642,35 @@ export default function TaskDetailPage() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={Boolean(reviewFeedbackSource)}
+        onClose={() => setReviewFeedbackSource(null)}
+        title={reviewFeedbackSource === 'reject' ? 'Reject submission' : 'Request changes'}
+        description="Feedback is required. The reviewer will see this as requested changes."
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setReviewFeedbackSource(null)} disabled={submissionBusy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void confirmReviewFeedback()} loading={submissionBusy} disabled={submissionBusy}>
+              Request changes
+            </Button>
+          </>
+        }
+      >
+        <Textarea
+          id="review-feedback"
+          label="Feedback"
+          required
+          value={reviewFeedback}
+          onChange={(e) => { setReviewFeedback(e.target.value); setReviewFeedbackError(null); }}
+          errorMessage={reviewFeedbackError ?? undefined}
+          placeholder="Describe what needs to change before approval"
+          disabled={submissionBusy}
+        />
+      </Modal>
 
       {/* ------------------------------------------------------------------ */}
       {/* Confirm dialogs */}

@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   addComment: vi.fn(),
   updateComment: vi.fn(),
   deleteComment: vi.fn(),
+  reviewTask: vi.fn(),
   listFiles: vi.fn(),
   uploadFile: vi.fn(),
   deleteFile: vi.fn(),
@@ -103,6 +104,7 @@ vi.mock('@/services/tasks', () => ({
   addComment: mocks.addComment,
   updateComment: mocks.updateComment,
   deleteComment: mocks.deleteComment,
+  reviewTask: mocks.reviewTask,
 }));
 
 vi.mock('@/services/projects', () => ({
@@ -139,6 +141,7 @@ describe('TaskDetailPage — four roles', () => {
     mocks.listComments.mockResolvedValue([]);
     mocks.listFiles.mockResolvedValue({ items: [], nextCursor: null, totalBytes: 0 });
     mocks.listProjectMembers.mockResolvedValue([]);
+    mocks.reviewTask.mockResolvedValue({ ...task1, status: 'APPROVED' });
     mocks.completeTask.mockResolvedValue({ status: 'APPROVED', completedAt: '2026-01-01T00:00:00.000Z' });
   });
 
@@ -206,6 +209,99 @@ describe('TaskDetailPage — four roles', () => {
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Request revision' })).toBeInTheDocument();
+  });
+
+  it('starts review through the verified review endpoint', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.user = { id: 'user-3', name: 'Carol', email: 'carol@example.com' };
+    mocks.getTask.mockResolvedValue({ ...task1, status: 'SUBMITTED' });
+    mocks.reviewTask.mockResolvedValueOnce({ ...task1, status: 'UNDER_REVIEW' });
+    render(<TaskDetailPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Start review' }));
+
+    await waitFor(() => {
+      expect(mocks.reviewTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', 'START_REVIEW');
+      expect(mocks.updateTask).not.toHaveBeenCalled();
+    });
+  });
+
+  it('approves through the verified review endpoint', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.user = { id: 'user-3', name: 'Carol', email: 'carol@example.com' };
+    mocks.getTask.mockResolvedValue({ ...task1, status: 'SUBMITTED' });
+    render(<TaskDetailPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+
+    await waitFor(() => {
+      expect(mocks.reviewTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', 'APPROVE');
+      expect(mocks.updateTask).not.toHaveBeenCalled();
+    });
+  });
+
+  it('requires feedback before recording a request for changes', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.user = { id: 'user-3', name: 'Carol', email: 'carol@example.com' };
+    mocks.getTask.mockResolvedValue({ ...task1, status: 'SUBMITTED' });
+    render(<TaskDetailPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Request revision' }));
+    const dialog = await screen.findByRole('dialog');
+    const confirm = within(dialog).getByRole('button', { name: 'Request changes' });
+
+    await userEvent.click(confirm);
+    expect(await within(dialog).findByText('Feedback is required when requesting changes.')).toBeInTheDocument();
+    expect(mocks.reviewTask).not.toHaveBeenCalled();
+
+    await userEvent.type(within(dialog).getByLabelText(/Feedback/), 'Add the missing tests');
+    await userEvent.click(confirm);
+
+    await waitFor(() => {
+      expect(mocks.reviewTask).toHaveBeenCalledWith(
+        'ws-1',
+        'project-1',
+        'task-1',
+        'REQUEST_CHANGES',
+        'Add the missing tests',
+      );
+    });
+  });
+
+  it('maps Reject to REQUEST_CHANGES with the same required feedback', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.user = { id: 'user-3', name: 'Carol', email: 'carol@example.com' };
+    mocks.getTask.mockResolvedValue({ ...task1, status: 'SUBMITTED' });
+    render(<TaskDetailPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Reject' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Reject submission' })).toBeInTheDocument();
+
+    await userEvent.type(within(dialog).getByLabelText(/Feedback/), 'Does not meet the acceptance criteria');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Request changes' }));
+
+    await waitFor(() => {
+      expect(mocks.reviewTask).toHaveBeenCalledWith(
+        'ws-1',
+        'project-1',
+        'task-1',
+        'REQUEST_CHANGES',
+        'Does not meet the acceptance criteria',
+      );
+    });
+  });
+
+  it('shows the backend error when a review fails', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.user = { id: 'user-3', name: 'Carol', email: 'carol@example.com' };
+    mocks.getTask.mockResolvedValue({ ...task1, status: 'SUBMITTED' });
+    mocks.reviewTask.mockRejectedValueOnce(new ApiRequestError('Review already completed', 409));
+    render(<TaskDetailPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+
+    expect(await screen.findByText('Review already completed')).toBeInTheDocument();
   });
 
   it('shows AccessState when the task load fails with 403', async () => {

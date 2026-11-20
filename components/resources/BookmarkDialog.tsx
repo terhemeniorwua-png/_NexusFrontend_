@@ -10,6 +10,7 @@ interface BookmarkDialogProps {
   open: boolean;
   onClose: () => void;
   workspaceId: string;
+  projectId?: string | null;
   onAdded: () => void;
 }
 
@@ -17,6 +18,7 @@ export function BookmarkDialog({
   open,
   onClose,
   workspaceId,
+  projectId,
   onAdded,
 }: BookmarkDialogProps) {
   const [title, setTitle] = useState('');
@@ -45,7 +47,7 @@ export function BookmarkDialog({
     }
     setBusy(true);
     try {
-      await createBookmark(workspaceId, { title: title.trim(), url: url.trim() });
+      await createBookmark(workspaceId, { title: title.trim(), url: url.trim() }, projectId);
       onAdded();
       onClose();
       setTitle('');

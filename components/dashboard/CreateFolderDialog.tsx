@@ -12,6 +12,7 @@ interface CreateFolderDialogProps {
   open: boolean;
   onClose: () => void;
   workspaceId: string;
+  projectId?: string | null;
   onCreated: () => void;
 }
 
@@ -19,6 +20,7 @@ export function CreateFolderDialog({
   open,
   onClose,
   workspaceId,
+  projectId,
   onCreated,
 }: CreateFolderDialogProps) {
   const [name, setName] = useState('');
@@ -41,7 +43,7 @@ export function CreateFolderDialog({
     setBusy(true);
     setError(null);
     try {
-      await createFolder(workspaceId, { name: name.trim() });
+      await createFolder(workspaceId, { name: name.trim() }, projectId);
       setName('');
       onCreated();
       onClose();

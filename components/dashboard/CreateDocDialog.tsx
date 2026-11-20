@@ -13,6 +13,7 @@ interface CreateDocDialogProps {
   open: boolean;
   onClose: () => void;
   workspaceId: string;
+  projectId?: string | null;
   onCreated: () => void;
 }
 
@@ -20,6 +21,7 @@ export function CreateDocDialog({
   open,
   onClose,
   workspaceId,
+  projectId,
   onCreated,
 }: CreateDocDialogProps) {
   const [title, setTitle] = useState('');
@@ -44,7 +46,7 @@ export function CreateDocDialog({
     setBusy(true);
     setError(null);
     try {
-      await createDocument(workspaceId, { title: title.trim(), content });
+      await createDocument(workspaceId, { title: title.trim(), content, projectId: projectId ?? null });
       setTitle('');
       setContent('');
       onCreated();

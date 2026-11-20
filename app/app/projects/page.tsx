@@ -19,6 +19,7 @@ import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import {
+  PROJECT_TYPE_LABELS,
   archiveProject,
   createProject,
   listProjects,
@@ -372,6 +373,9 @@ export default function ProjectsPage() {
                         </Badge>
                         <Badge variant={statusVariant(project.status)}>
                           {statusLabel(project.status)}
+                        </Badge>
+                        <Badge variant="outline">
+                          {PROJECT_TYPE_LABELS[project.type ?? 'GENERAL']}
                         </Badge>
                       </div>
                       {project.description && (

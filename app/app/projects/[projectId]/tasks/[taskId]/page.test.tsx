@@ -223,6 +223,23 @@ describe('TaskDetailPage — four roles', () => {
     expect(await screen.findByText(/task.*access/i)).toBeInTheDocument();
   });
 
+  it('shows a comment load failure with a working Retry action', async () => {
+    setRole('MEMBER');
+    mocks.listComments
+      .mockRejectedValueOnce(new ApiRequestError('Comment service failed', 500))
+      .mockResolvedValueOnce([{
+        id: 'comment-1', taskId: 'task-1', authorId: 'user-1',
+        author: { id: 'user-1', name: 'Alice' }, body: 'Loaded after retry',
+        parentId: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      }]);
+    const user = userEvent.setup();
+    render(<TaskDetailPage />);
+    expect(await screen.findByText('Comment service failed')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Loaded after retry')).toBeInTheDocument();
+    expect(mocks.listComments).toHaveBeenCalledTimes(2);
+  });
+
   it('marks a task complete when complete is clicked', async () => {
     setRole('PROJECT_MANAGER');
     render(<TaskDetailPage />);

@@ -197,6 +197,7 @@ export default function TaskDetailPage() {
   // Comments state
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsLoadError, setCommentsLoadError] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState('');
   const [mentionMembers, setMentionMembers] = useState<MentionMember[]>([]);
   useEffect(() => {
@@ -284,11 +285,12 @@ export default function TaskDetailPage() {
   const loadComments = useCallback(async () => {
     if (!activeWorkspace) return;
     setCommentsLoading(true);
+    setCommentsLoadError(null);
     try {
       const data = await listComments(activeWorkspace.id, projectId, taskId, 50);
       setComments(data);
-    } catch {
-      // Non-blocking — comments load failures don't hide the task
+    } catch (cause) {
+      setCommentsLoadError(requestError(cause, 'Comments could not be loaded.'));
     } finally {
       setCommentsLoading(false);
     }
@@ -1264,6 +1266,16 @@ export default function TaskDetailPage() {
           {/* Comments */}
           <Card className="p-5">
             <h2 className="font-semibold mb-3">Comments <span className="text-[var(--color-text-muted)] font-normal">({task.commentCount})</span></h2>
+            {commentsLoadError && (
+              <Alert variant="error" className="mb-3" title="Comments unavailable">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{commentsLoadError}</span>
+                  <Button size="sm" variant="secondary" disabled={commentsLoading} onClick={() => void loadComments()}>
+                    Retry
+                  </Button>
+                </div>
+              </Alert>
+            )}
             {commentError && <Alert variant="error" className="mb-3">{commentError}</Alert>}
 
             {commentsLoading ? (

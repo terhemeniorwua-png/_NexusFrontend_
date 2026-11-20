@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskWorkPage from './page';
@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   permissionState: null as unknown,
   getTaskWorkspace: vi.fn(),
   getProject: vi.fn(),
+  createTask: vi.fn(),
+  deleteTask: vi.fn(),
   submitTask: vi.fn(),
   listComments: vi.fn(),
   listFiles: vi.fn(),
@@ -18,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   resolveTaskBlocker: vi.fn(),
   completeSubtask: vi.fn(),
   updateTask: vi.fn(),
+  subtaskProps: null as null | Record<string, unknown>,
   replace: vi.fn(),
   push: vi.fn(),
 }));
@@ -42,8 +45,10 @@ vi.mock('@/providers/ProjectPermissionsProvider', () => ({
 vi.mock('@/services/tasks', () => ({
   addComment: vi.fn(),
   completeSubtask: mocks.completeSubtask,
+  createTask: mocks.createTask,
   createTaskTimeEntry: vi.fn(),
   deleteComment: vi.fn(),
+  deleteTask: mocks.deleteTask,
   deleteTaskTimeEntry: vi.fn(),
   getTaskWorkspace: mocks.getTaskWorkspace,
   listComments: mocks.listComments,
@@ -110,7 +115,12 @@ vi.mock('@/components/task-workspace/TaskSubmissionPanel', () => ({
   ),
 }));
 
-vi.mock('@/components/task-workspace/SubtaskManager', () => ({ SubtaskManager: () => null }));
+vi.mock('@/components/task-workspace/SubtaskManager', () => ({
+  SubtaskManager: (props: Record<string, unknown>) => {
+    mocks.subtaskProps = props;
+    return null;
+  },
+}));
 vi.mock('@/components/task-workspace/AttachmentManager', () => ({ AttachmentManager: () => null }));
 vi.mock('@/components/task-workspace/TaskDiscussion', () => ({ TaskDiscussion: () => null }));
 vi.mock('@/components/task-workspace/TaskActivityTimeline', () => ({ TaskActivityTimeline: () => null }));
@@ -119,7 +129,7 @@ vi.mock('@/components/task-workspace/WorkDocuments', () => ({ WorkDocuments: () 
 vi.mock('@/components/task-workspace/TaskTimeTracking', () => ({ TaskTimeTracking: () => null }));
 vi.mock('@/components/task-workspace/TaskDevelopment', () => ({ TaskDevelopment: () => null }));
 
-function workspaceData(status = 'IN_PROGRESS') {
+function workspaceData(status = 'IN_PROGRESS', parentTaskId: string | null = null) {
   const task = {
     id: 'task-1',
     projectId: 'project-1',
@@ -133,7 +143,7 @@ function workspaceData(status = 'IN_PROGRESS') {
     startDate: null,
     dueDate: null,
     position: 0,
-    parentTaskId: null,
+    parentTaskId,
     creatorId: 'user-1',
     creator: { id: 'user-1', name: 'Alice' },
     assignees: [{ userId: 'user-2', user: { id: 'user-2', name: 'Bob', email: 'bob@example.com' }, assignedBy: 'user-1', createdAt: '' }],
@@ -162,6 +172,8 @@ function workspaceData(status = 'IN_PROGRESS') {
 describe('TaskWorkPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState(null, '', '/');
+    mocks.subtaskProps = null;
     mocks.activeWorkspace = {
       id: 'ws-1',
       name: 'Acme',
@@ -174,13 +186,15 @@ describe('TaskWorkPage', () => {
     mocks.permissionState = {
       isLoading: false,
       accessStatus: null,
-      can: (permission: string) => ['task.view', 'task.comment', 'submission.submit'].includes(permission),
+      can: (permission: string) => ['task.view', 'task.comment', 'task.create', 'task.delete', 'submission.submit'].includes(permission),
       canAny: () => true,
       canAll: () => true,
-      permissions: ['task.view', 'task.comment', 'submission.submit'],
+      permissions: ['task.view', 'task.comment', 'task.create', 'task.delete', 'submission.submit'],
     };
     mocks.getTaskWorkspace.mockResolvedValue(workspaceData());
     mocks.getProject.mockResolvedValue({ name: 'Alpha' });
+    mocks.createTask.mockResolvedValue({ id: 'subtask-1' });
+    mocks.deleteTask.mockResolvedValue({ id: 'subtask-1', deleted: true });
     mocks.submitTask.mockResolvedValue({ id: 'task-1', status: 'SUBMITTED' });
     mocks.listTaskActivity.mockResolvedValue({ items: [], nextCursor: null });
     mocks.listTaskTimeEntries.mockResolvedValue({ items: [], totalMinutes: 0 });
@@ -199,5 +213,37 @@ describe('TaskWorkPage', () => {
       expect(mocks.getTaskWorkspace).toHaveBeenCalledTimes(2);
     });
     expect(await screen.findByTestId('save-state')).toHaveTextContent('saved');
+  });
+
+  it('wires subtask create and delete through the verified services', async () => {
+    window.location.hash = '#subtasks';
+    render(<TaskWorkPage />);
+
+    await waitFor(() => expect(mocks.subtaskProps).not.toBeNull());
+    expect(mocks.subtaskProps).toEqual(expect.objectContaining({
+      canCreateSubtask: true,
+      canDeleteSubtask: true,
+    }));
+
+    const input = { title: 'Write tests', parentTaskId: 'task-1', position: 0, weight: 2 };
+    const onCreate = mocks.subtaskProps?.onCreate as (value: typeof input) => Promise<void>;
+    await act(async () => { await onCreate(input); });
+    expect(mocks.createTask).toHaveBeenCalledWith('ws-1', 'project-1', input);
+
+    const onDelete = mocks.subtaskProps?.onDelete as (sub: { id: string }) => Promise<void>;
+    await act(async () => { await onDelete({ id: 'subtask-1' }); });
+    expect(mocks.deleteTask).toHaveBeenCalledWith('ws-1', 'project-1', 'subtask-1');
+  });
+
+  it('does not offer subtask creation on a subtask', async () => {
+    window.location.hash = '#subtasks';
+    mocks.getTaskWorkspace.mockResolvedValue(workspaceData('IN_PROGRESS', 'parent-1'));
+    render(<TaskWorkPage />);
+
+    await waitFor(() => expect(mocks.subtaskProps).not.toBeNull());
+    expect(mocks.subtaskProps).toEqual(expect.objectContaining({
+      canCreateSubtask: false,
+      canDeleteSubtask: true,
+    }));
   });
 });

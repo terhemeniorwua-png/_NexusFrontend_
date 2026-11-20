@@ -105,6 +105,30 @@ describe('tasks service', () => {
     expect(body.labels).toEqual(['bug']);
   });
 
+  it('createTask preserves subtask parent, position, and weight fields', async () => {
+    mocks.apiRequest.mockResolvedValue({ id: TID });
+    const { createTask } = await import('../tasks');
+    await createTask(WS, PID, {
+      title: 'Write tests',
+      parentTaskId: TID,
+      position: 2,
+      weight: 3,
+    });
+    const callOptions = mocks.apiRequest.mock.calls[0][1] as { body: string };
+    const body = JSON.parse(callOptions.body) as {
+      title: string;
+      parentTaskId: string;
+      position: number;
+      weight: number;
+    };
+    expect(body).toEqual({
+      title: 'Write tests',
+      parentTaskId: TID,
+      position: 2,
+      weight: 3,
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // updateTask
   // ---------------------------------------------------------------------------

@@ -15,8 +15,10 @@ import { getProject, type ProjectSummary } from '@/services/projects';
 import {
   addComment,
   completeSubtask,
+  createTask,
   createTaskTimeEntry,
   deleteComment,
+  deleteTask,
   deleteTaskTimeEntry,
   getTaskWorkspace,
   listComments,
@@ -364,6 +366,14 @@ export default function TaskWorkPage() {
         busyId={subtaskBusyId}
         isAssigneeOf={(st) => Boolean(currentUserId && st.assignees.some((a) => a.userId === currentUserId))}
         canEditWeight={can('task.update')}
+        canCreateSubtask={can('task.create') && !task.parentTaskId}
+        canDeleteSubtask={can('task.delete')}
+        onCreate={async (input) => {
+          await refreshAfterMutation(async () => { await createTask(activeWorkspaceId, projectId, input); });
+        }}
+        onDelete={async (sub) => {
+          await refreshAfterMutation(async () => { await deleteTask(activeWorkspaceId, projectId, sub.id); });
+        }}
         onComplete={async (sub) => {
           setSubtaskBusyId(sub.id);
           try {

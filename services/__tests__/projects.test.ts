@@ -61,11 +61,27 @@ describe('projects service', () => {
   it('createProject sends POST with the documented body fields', async () => {
     mocks.apiRequest.mockResolvedValue({ id: PID });
     const { createProject } = await import('../projects');
-    await createProject(WS, { name: 'PITERON', key: 'PIT', visibility: 'WORKSPACE' });
+    await createProject(WS, { name: 'PITERON', key: 'PIT', type: 'ENGINEERING', visibility: 'WORKSPACE' });
     expect(mocks.apiRequest).toHaveBeenCalledWith(
       `/workspaces/${WS}/projects`,
       expect.objectContaining({ method: 'POST', authenticated: true }),
     );
+    const options = mocks.apiRequest.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(options.body)) as Record<string, unknown>;
+    expect(body.type).toBe('ENGINEERING');
+  });
+
+  it('updateProject includes type in the PATCH body', async () => {
+    mocks.apiRequest.mockResolvedValue({ id: PID });
+    const { updateProject } = await import('../projects');
+    await updateProject(WS, PID, { type: 'DESIGN' });
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}`,
+      expect.objectContaining({ method: 'PATCH', authenticated: true }),
+    );
+    const options = mocks.apiRequest.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(options.body)) as Record<string, unknown>;
+    expect(body).toEqual({ type: 'DESIGN' });
   });
 
   it('archiveProject sends POST to the archive sub-path', async () => {

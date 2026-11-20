@@ -53,6 +53,11 @@ vi.mock('@/providers/ProjectPermissionsProvider', () => ({
   usePermissions: () => mocks.permissionState,
 }));
 vi.mock('@/services/projects', () => ({
+  PROJECT_TYPES: ['GENERAL', 'ENGINEERING', 'DESIGN', 'OPERATIONS', 'MARKETING', 'HR'],
+  PROJECT_TYPE_LABELS: {
+    GENERAL: 'General', ENGINEERING: 'Engineering', DESIGN: 'Design',
+    OPERATIONS: 'Operations', MARKETING: 'Marketing', HR: 'HR',
+  },
   getProject: mocks.getProject,
   updateProject: mocks.updateProject,
   archiveProject: mocks.archiveProject,
@@ -71,7 +76,7 @@ vi.mock('@/services/workspaces', () => ({
 
 const makeProject = (overrides: Record<string, unknown> = {}) => ({
   id: 'project-1', workspaceId: 'ws-1', name: 'PITERON', key: 'NX', description: null,
-  category: null, labels: [], status: 'ACTIVE', visibility: 'DEPARTMENT_TEAM',
+  category: null, labels: [], status: 'ACTIVE', type: 'GENERAL', visibility: 'DEPARTMENT_TEAM',
   startDate: null, dueDate: null, ownerId: 'user-1', owner: { id: 'user-1', name: 'Alice' },
   memberCount: 1, taskCount: 0, myRole: 'PROJECT_MANAGER',
   createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
@@ -127,6 +132,25 @@ describe('ProjectSettingsPage — organizational access', () => {
     render(<SettingsPage />);
     await screen.findByText('Project settings');
     expect(screen.queryByText('Organizational access')).not.toBeInTheDocument();
+  });
+
+  it('shows the project type and saves a changed type', async () => {
+    const user = userEvent.setup();
+    mocks.getProject.mockResolvedValue(makeProject({ type: 'GENERAL', visibility: 'WORKSPACE' }));
+    mocks.updateProject.mockResolvedValue(makeProject({ type: 'DESIGN', visibility: 'WORKSPACE' }));
+    render(<SettingsPage />);
+
+    const typeSelect = await screen.findByLabelText('Type');
+    expect(typeSelect).toHaveValue('GENERAL');
+    await user.selectOptions(typeSelect, 'DESIGN');
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() =>
+      expect(mocks.updateProject).toHaveBeenCalledWith(
+        'ws-1', 'project-1', expect.objectContaining({ type: 'DESIGN' }),
+      ),
+    );
+    expect(await screen.findByText('Project settings saved.')).toBeInTheDocument();
   });
 });
 

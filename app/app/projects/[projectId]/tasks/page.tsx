@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 
@@ -150,6 +150,9 @@ function buildCurrentConfig(input: { search: string; statusFilter: TaskStatus | 
 
 export default function ProjectTasksPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const createParamHandled = useRef(false);
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
   const { can, isLoading: permissionsLoading } = usePermissions();
@@ -290,6 +293,15 @@ export default function ProjectTasksPage() {
 
   useEffect(() => { if (!activeWorkspace || !canView) return; let active = true; void Promise.resolve().then(() => { if (active) { void load(); void loadAdvancedMeta(); } }); return () => { active = false; }; }, [activeWorkspace, canView]);
   useEffect(() => { if (!activeWorkspace || !canManageAssignees) return; let active = true; void listProjectMembers(activeWorkspace.id, projectId).then((list) => { if (active) setMembers(list); }).catch(() => {}); return () => { active = false; }; }, [activeWorkspace, projectId, canManageAssignees]);
+  useEffect(() => {
+    if (permissionsLoading || !canCreate || searchParams.get('create') !== '1' || createParamHandled.current) return;
+    createParamHandled.current = true;
+    setShowCreate(true);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('create');
+    const query = nextParams.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  }, [canCreate, pathname, permissionsLoading, router, searchParams]);
 
   const sortedVisibleTasks = useMemo(() => tasks, [tasks]);
 

@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   addAssignee: vi.fn(),
   removeAssignee: vi.fn(),
   listProjectMembers: vi.fn(),
+  replace: vi.fn(),
+  createParam: null as string | null,
 }));
 
 function setPermissions(permissions: string[], overrides: Record<string, unknown> = {}) {
@@ -44,9 +46,10 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: mocks.replace }),
   usePathname: () => '/app/projects/project-1/tasks',
   useParams: () => ({ projectId: 'project-1' }),
+  useSearchParams: () => new URLSearchParams(mocks.createParam ? `create=${mocks.createParam}` : ''),
 }));
 
 vi.mock('@/providers/WorkspaceProvider', () => ({
@@ -96,6 +99,7 @@ const task1 = {
 describe('TaskListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.createParam = null;
     mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
     mocks.user = { id: 'user-1', name: 'Alice', email: 'alice@example.com' };
     mocks.listTasks.mockResolvedValue({ items: [task1], nextCursor: null });
@@ -145,6 +149,13 @@ describe('TaskListPage', () => {
     await user.click(btn);
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent(/new task/i);
+  });
+
+  it('opens the create modal from ?create=1 once and removes the parameter', async () => {
+    mocks.createParam = '1';
+    render(<TaskListPage />);
+    expect(await screen.findAllByRole('dialog')).toHaveLength(1);
+    await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith('/app/projects/project-1/tasks'));
   });
 
   it('shows Load more button when nextCursor is present', async () => {

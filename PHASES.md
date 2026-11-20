@@ -1358,6 +1358,32 @@ Additional implementation on `feature/phase-9-projects` after initial commit (`1
 
 Live-backend and manual responsive checks remain unverified.
 
+#### Phase 9 follow-up — FE-1 project type consumers (2026-11-20)
+
+Branch: `feature/frontend-project-type-consumers` (from `816bd1a`). Reapplies the project-type work from `feature/frontend-project-type` and reconciles it with the fixed BE-1 contract.
+
+- Canonical contract in `lib/project-type.ts`: `PROJECT_TYPES` / `ProjectType` = `GENERAL | ENGINEERING | DESIGN | OPERATIONS | MARKETING | HR`, `DEFAULT_PROJECT_TYPE = 'GENERAL'`, labels, `normaliseProjectType()` and `projectTypeLabel()`. `services/projects.ts` re-exports these so existing service mocks keep working.
+- Project list and detail pages render a type badge via `projectTypeLabel()`; missing/unknown values fall back to `GENERAL` so older responses cannot crash the UI.
+- Create modal shows a permission-gated type select (`workspaceCan(activeWorkspace, 'workspace:update')`) and sends `type` in the create payload.
+- Settings page normalises the loaded type and shows the type select only for `can('project.update')`. All `GENERAL` and other types still use the existing generic work page — no team-specific environment is introduced in this phase.
+- Project `type` is a display classification only: it selects which environment renders and grants **no** access. It is never used in permission checks.
+- Docs updated: `docs/FE_BE_GAPS.md` (project type gap resolved), `docs/backend/openapi.yaml` (`ProjectSummary`, `ProjectCreateRequest`, `ProjectUpdateRequest`).
+
+Files created: `lib/project-type.ts`, `lib/__tests__/project-type.test.ts`.
+Files modified: `services/projects.ts`, `app/app/projects/page.tsx`, `app/app/projects/[projectId]/page.tsx`, `app/app/projects/[projectId]/settings/page.tsx`, `app/app/projects/page.test.tsx`, `app/app/projects/[projectId]/settings/page.test.tsx`, `docs/FE_BE_GAPS.md`, `docs/backend/openapi.yaml`, `PHASES.md`.
+
+**Follow-up validation:**
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Passed (exit 0) |
+| `npm run lint` | Exit 1 — 16 errors / 52 warnings, all pre-existing and in untouched files (`app/app/integrations/*`, `app/app/messages/page.tsx`, task-work pages, `MeetingRoomLive`, `WorkDocuments`, etc.). Baseline checkout reports the identical 68 problems. No new lint issues introduced. |
+| `npm test -- --maxWorkers=1` | Passed (113 files, 966 tests, exit 0) |
+| Affected suites | 5 files, 60 tests passed: `page.test.tsx` (13), `settings/page.test.tsx` (10), `workspace-switch.test.tsx` (5), `services/__tests__/projects.test.ts` (23), `lib/__tests__/project-type.test.ts` (9) |
+| `npm run build` | Passed (exit 0). First attempt failed only because the worktree's symlinked `node_modules` sits outside the Turbopack workspace root; a local hard-link copy resolved it with no source changes. |
+
+Blocker before merge: BE-1 (project type backend contract) must be merged and deployed. Live-backend verification was not performed.
+
 #### Remaining gaps
 
 - Live backend verification not performed; all tests use mocked API responses.
@@ -3390,7 +3416,7 @@ Status reflects contract inspection against `../__NexusBackend__/docs/API.md` an
 | FE-6 | Membership, join requests and invitations UI | BE-5 — Membership, invitations and join requests | `/workspaces/discover`, `/workspaces/join*`, `/workspaces/{workspaceId}/join-requests*`, `/invitations*`, workspace invitations and members |
 | FE-7 | Roles, access control and lifecycle UI | BE-4 — Ownership lifecycle; BE-3 — Privacy/account APIs; BE-5 — Membership authorization | Workspace member role/state routes; owner transfer incoming/accept/reject/billing acceptance; `POST /privacy-requests`, `/privacy-requests/mine*` |
 | FE-8 | Departments, teams and institution groups UI | BE-7 — Teams and organizational structure | Workspace departments, teams, and institution-group routes; department roster and team activity are real gaps |
-| FE-9 | Projects and project visibility UI | BE-8 — Projects and project visibility | Project routes in OpenAPI; verify visibility and resource contracts before FE-9 work |
+| FE-9 | Projects and project visibility UI | BE-8 — Projects and project visibility; BE-1 — Project type | Project routes in OpenAPI; visibility and resource contracts verified. Project type consumed on list/detail/create/settings: `type` is classification only (no access), defaults to `GENERAL`, and unknown/missing values fall back to `GENERAL`. Type selects gated by existing edit permissions. |
 | FE-10 | Tasks and work management UI | BE-8 — Projects / task module | Task API fully registered: `GET/POST /workspaces/{workspaceId}/projects/{projectId}/tasks`, `GET/PATCH/DELETE /{taskId}`, `POST /{taskId}/archive`, `/{taskId}/restore`, `/{taskId}/complete`, `/{taskId}/reopen`, `/{taskId}/assignees`, `/{taskId}/dependencies`, `/{taskId}/comments`. All routes verified in backend source. |
 | FE-11 | Real-time messaging and conversations UI | Backend messaging contract phase not yet documented in the active backend roadmap | OpenAPI/API.md message and channel contracts; verify persistence and event support before implementation |
 | FE-12 | Notification centre and activity feed UI | Backend contract phase not yet mapped | Use only registered notification/activity contracts; verify before implementation |

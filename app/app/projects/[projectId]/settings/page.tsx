@@ -17,6 +17,12 @@ import { AccessState } from '@/components/shared/AccessState';
 import { PageAccessState } from '@/components/shared/PageAccessState';
 import { PermissionButton } from '@/components/shared/PermissionButton';
 import { ApiRequestError } from '@/lib/api';
+import {
+  normaliseProjectType,
+  PROJECT_TYPES,
+  PROJECT_TYPE_LABELS,
+  type ProjectType,
+} from '@/lib/project-type';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
@@ -28,12 +34,9 @@ import {
   transferProjectOwnership,
   updateProject,
   updateProjectOrganizationAccess,
-  PROJECT_TYPE_LABELS,
-  PROJECT_TYPES,
   type ProjectCommentPolicy,
   type ProjectStatus,
   type ProjectSummary,
-  type ProjectType,
   type ProjectVisibility,
 } from '@/services/projects';
 import {
@@ -173,7 +176,7 @@ export default function ProjectSettingsPage() {
       setKey(data.key);
       setDescription(data.description ?? '');
       setStatus(data.status === 'ARCHIVED' ? 'ACTIVE' : data.status);
-      setType(data.type ?? 'GENERAL');
+      setType(normaliseProjectType(data.type));
       setVisibility(data.visibility);
       setCommentPolicy(data.commentPolicy ?? 'ASSIGNEES_ONLY');
       setStartDate(data.startDate ? new Date(data.startDate).toISOString().slice(0, 10) : '');
@@ -440,16 +443,18 @@ export default function ProjectSettingsPage() {
               helperText="Archived status is set using the Archive button below, not through this field."
             />
           </div>
-          <div>
-            <Select
-              id="settings-type"
-              label="Type"
-              value={type}
-              onChange={(event) => setType(event.target.value as ProjectType)}
-              options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
-              helperText="Changing the project type does not delete or hide existing project data."
-            />
-          </div>
+          {can('project.update') && (
+            <div>
+              <Select
+                id="settings-type"
+                label="Type"
+                value={type}
+                onChange={(event) => setType(event.target.value as ProjectType)}
+                options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
+                helperText="Classification only: it selects the project environment and grants no access. Changing it does not delete or hide existing data."
+              />
+            </div>
+          )}
           <div>
             <Select
               id="settings-visibility"

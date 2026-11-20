@@ -152,6 +152,29 @@ describe('ProjectSettingsPage — organizational access', () => {
     );
     expect(await screen.findByText('Project settings saved.')).toBeInTheDocument();
   });
+
+  it('hides the type select from users without project.update permission', async () => {
+    setPermissions(['project.view', 'project.settings.manage']);
+    mocks.getProject.mockResolvedValue(makeProject({ visibility: 'WORKSPACE' }));
+    render(<SettingsPage />);
+
+    expect(await screen.findByText('Project settings')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Type')).not.toBeInTheDocument();
+  });
+
+  it('shows the existing error state when a type update is forbidden', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    const user = userEvent.setup();
+    mocks.getProject.mockResolvedValue(makeProject({ visibility: 'WORKSPACE' }));
+    mocks.updateProject.mockRejectedValue(new ApiRequestError('Forbidden', 403));
+    render(<SettingsPage />);
+
+    const typeSelect = await screen.findByLabelText('Type');
+    await user.selectOptions(typeSelect, 'DESIGN');
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByText('Your current role does not allow this action. Project manager permission is required.')).toBeInTheDocument();
+  });
 });
 
 describe('ProjectSettingsPage — ownership transfer', () => {

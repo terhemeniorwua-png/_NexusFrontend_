@@ -49,7 +49,6 @@ export default function WorkSubmissionsPage() {
       try {
         setError(null);
         const result = await listMyTasks(activeWorkspace.id, user?.id ?? '', {
-          assigneeId: '',
           limit: 100,
         });
         const allTasks = result.items.map((t) => ({

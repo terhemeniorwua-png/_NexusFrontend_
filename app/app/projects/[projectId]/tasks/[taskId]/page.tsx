@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Textarea } from '@/components/ui/Textarea';
@@ -38,6 +39,8 @@ import {
   addComment,
   updateComment,
   deleteComment,
+  reviewTask,
+  submitTask,
   listProjectCustomFields,
   getTaskCustomFieldValues,
   setTaskCustomFieldValues,
@@ -48,6 +51,7 @@ import {
   type ProjectCustomField,
   type TaskRecurrenceFrequency,
   type TaskRecurrenceRule,
+  type TaskReviewDecision,
   type TaskSummary,
   type TaskStatus,
   type TaskPriority,
@@ -111,8 +115,40 @@ function timeLabel(value: string): string {
 
 function requestError(cause: unknown, fallback: string): string {
   if (!(cause instanceof ApiRequestError)) return fallback;
+  switch (cause.code) {
+    case 'ASSIGNEE_NOT_PROJECT_MEMBER':
+      return 'That person is not an active member of this project.';
+    case 'INVALID_STATUS_TRANSITION':
+      return cause.message || 'That status change is not allowed from the current status.';
+    case 'TASK_BLOCKED_BY_DEPENDENCIES':
+      return 'This task is blocked until its dependencies are approved.';
+    case 'TASK_MAX_DEPTH_EXCEEDED':
+      return 'Subtasks can only be nested up to 3 levels deep.';
+    case 'TASK_PARENT_CYCLE':
+      return 'A task cannot be moved under itself or one of its own subtasks.';
+  }
   if (cause.status === 403) return 'Your current role does not allow this action.';
   return cause.message;
+}
+
+function dependencyRequestError(cause: unknown, fallback: string): string {
+  if (!(cause instanceof ApiRequestError)) return fallback;
+  if (cause.status === 403) return 'Your current role does not allow this action.';
+  // These codes are part of the backend dependency contract. Keep the wording
+  // stable even if the backend message changes.
+  switch (cause.code) {
+    case 'TASK_SELF_DEPENDENCY':
+      return 'A task cannot depend on itself.';
+    case 'DEPENDENCY_ALREADY_EXISTS':
+    case 'DEPENDENCY_EXISTS':
+      return 'This dependency already exists.';
+    case 'CIRCULAR_DEPENDENCY':
+      return 'Adding this dependency would create a circular reference.';
+    case 'DEPENDENCY_NOT_FOUND':
+      return 'That dependency does not exist.';
+    default:
+      return cause.message || fallback;
+  }
 }
 
 const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
@@ -197,6 +233,7 @@ export default function TaskDetailPage() {
   // Comments state
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsLoadError, setCommentsLoadError] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState('');
   const [mentionMembers, setMentionMembers] = useState<MentionMember[]>([]);
   useEffect(() => {
@@ -227,6 +264,12 @@ export default function TaskDetailPage() {
 
   // Submission / review actions
   const [submissionBusy, setSubmissionBusy] = useState(false);
+  const [reviewFeedbackSource, setReviewFeedbackSource] = useState<'reject' | 'request-revision' | null>(null);
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [reviewFeedbackError, setReviewFeedbackError] = useState<string | null>(null);
+  const [submitSummaryOpen, setSubmitSummaryOpen] = useState(false);
+  const [submitSummary, setSubmitSummary] = useState('');
+  const [submitSummaryError, setSubmitSummaryError] = useState<string | null>(null);
 
   // Custom fields (project definitions + task values)
   const [customFields, setCustomFields] = useState<ProjectCustomField[]>([]);
@@ -284,11 +327,12 @@ export default function TaskDetailPage() {
   const loadComments = useCallback(async () => {
     if (!activeWorkspace) return;
     setCommentsLoading(true);
+    setCommentsLoadError(null);
     try {
       const data = await listComments(activeWorkspace.id, projectId, taskId, 50);
       setComments(data);
-    } catch {
-      // Non-blocking — comments load failures don't hide the task
+    } catch (cause) {
+      setCommentsLoadError(requestError(cause, 'Comments could not be loaded.'));
     } finally {
       setCommentsLoading(false);
     }
@@ -588,7 +632,7 @@ export default function TaskDetailPage() {
       setNotice('Dependency added.');
       await load();
     } catch (cause) {
-      setDepError(requestError(cause, 'Dependency could not be added.'));
+      setDepError(dependencyRequestError(cause, 'Dependency could not be added.'));
     } finally {
       setDepBusy(false);
     }
@@ -602,7 +646,7 @@ export default function TaskDetailPage() {
       setNotice('Dependency removed.');
       await load();
     } catch (cause) {
-      setDepError(requestError(cause, 'Dependency could not be removed.'));
+      setDepError(dependencyRequestError(cause, 'Dependency could not be removed.'));
     } finally {
       setDepBusy(false);
     }
@@ -735,15 +779,78 @@ export default function TaskDetailPage() {
     }
   }
 
-  async function handleSubmission(nextStatus: TaskStatus, message: string) {
+  function openSubmitSummary() {
+    setSubmitSummary(task?.submissionSummary ?? '');
+    setSubmitSummaryError(null);
+    setError(null);
+    setSubmitSummaryOpen(true);
+  }
+
+  async function confirmSubmit() {
+    if (!activeWorkspace || !task) return;
+    const workSummary = submitSummary.trim();
+    if (!workSummary) {
+      setSubmitSummaryError('Work summary is required.');
+      return;
+    }
+    if (workSummary.length > 10_000) {
+      setSubmitSummaryError('Work summary must be at most 10 000 characters.');
+      return;
+    }
+
+    setSubmissionBusy(true); setError(null); setSubmitSummaryError(null);
+    try {
+      setTask(await submitTask(activeWorkspace.id, projectId, task.id, workSummary));
+      setNotice('Work submitted for review.');
+      setSubmitSummaryOpen(false);
+    } catch (cause) {
+      const message = requestError(cause, 'The work could not be submitted.');
+      setError(message);
+      setSubmitSummaryError(message);
+    } finally {
+      setSubmissionBusy(false);
+    }
+  }
+
+  async function handleReview(decision: Exclude<TaskReviewDecision, 'REQUEST_CHANGES'>, message: string) {
     if (!activeWorkspace || !task) return;
     setSubmissionBusy(true); setError(null);
     try {
-      const updated = await updateTask(activeWorkspace.id, projectId, task.id, { status: nextStatus });
-      setTask(updated);
+      setTask(await reviewTask(activeWorkspace.id, projectId, task.id, decision));
       setNotice(message);
     } catch (cause) {
-      setError(requestError(cause, 'The task status could not be updated.'));
+      setError(requestError(cause, 'The review could not be submitted.'));
+    } finally {
+      setSubmissionBusy(false);
+    }
+  }
+
+  function openReviewFeedback(source: 'reject' | 'request-revision') {
+    setReviewFeedbackSource(source);
+    setReviewFeedback('');
+    setReviewFeedbackError(null);
+    setError(null);
+  }
+
+  async function confirmReviewFeedback() {
+    if (!activeWorkspace || !task || !reviewFeedbackSource) return;
+    const feedback = reviewFeedback.trim();
+    if (!feedback) {
+      setReviewFeedbackError('Feedback is required when requesting changes.');
+      return;
+    }
+
+    setSubmissionBusy(true); setError(null); setReviewFeedbackError(null);
+    try {
+      // The backend has no REJECT decision. Both the Reject and Request revision
+      // controls submit REQUEST_CHANGES with the reviewer's required comment.
+      setTask(await reviewTask(activeWorkspace.id, projectId, task.id, 'REQUEST_CHANGES', feedback));
+      setNotice('Changes requested.');
+      setReviewFeedbackSource(null);
+    } catch (cause) {
+      const message = requestError(cause, 'The review could not be submitted.');
+      setError(message);
+      setReviewFeedbackError(message);
     } finally {
       setSubmissionBusy(false);
     }
@@ -1264,6 +1371,16 @@ export default function TaskDetailPage() {
           {/* Comments */}
           <Card className="p-5">
             <h2 className="font-semibold mb-3">Comments <span className="text-[var(--color-text-muted)] font-normal">({task.commentCount})</span></h2>
+            {commentsLoadError && (
+              <Alert variant="error" className="mb-3" title="Comments unavailable">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{commentsLoadError}</span>
+                  <Button size="sm" variant="secondary" disabled={commentsLoading} onClick={() => void loadComments()}>
+                    Retry
+                  </Button>
+                </div>
+              </Alert>
+            )}
             {commentError && <Alert variant="error" className="mb-3">{commentError}</Alert>}
 
             {commentsLoading ? (
@@ -1447,7 +1564,7 @@ export default function TaskDetailPage() {
                     size="sm"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('SUBMITTED', 'Work submitted for review.')}
+                    onClick={openSubmitSummary}
                   >
                     Submit for review
                   </Button>
@@ -1458,7 +1575,7 @@ export default function TaskDetailPage() {
                     variant="secondary"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('UNDER_REVIEW', 'Review started.')}
+                    onClick={() => void handleReview('START_REVIEW', 'Review started.')}
                   >
                     Start review
                   </Button>
@@ -1468,7 +1585,7 @@ export default function TaskDetailPage() {
                     size="sm"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('APPROVED', 'Submission approved.')}
+                    onClick={() => void handleReview('APPROVE', 'Submission approved.')}
                   >
                     Approve
                   </Button>
@@ -1479,7 +1596,7 @@ export default function TaskDetailPage() {
                     variant="secondary"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('CHANGES_REQUESTED', 'Changes requested.')}
+                    onClick={() => openReviewFeedback('request-revision')}
                   >
                     Request revision
                   </Button>
@@ -1490,7 +1607,7 @@ export default function TaskDetailPage() {
                     variant="destructive"
                     loading={submissionBusy}
                     disabled={submissionBusy}
-                    onClick={() => void handleSubmission('CHANGES_REQUESTED', 'Submission rejected. Changes are required.')}
+                    onClick={() => openReviewFeedback('reject')}
                   >
                     Reject
                   </Button>
@@ -1581,6 +1698,66 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
+      <Modal
+        open={submitSummaryOpen}
+        onClose={() => setSubmitSummaryOpen(false)}
+        title="Submit work for review"
+        description="Describe what you completed so the reviewer can evaluate the submission."
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setSubmitSummaryOpen(false)} disabled={submissionBusy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void confirmSubmit()} loading={submissionBusy} disabled={submissionBusy}>
+              Submit for review
+            </Button>
+          </>
+        }
+      >
+        <Textarea
+          id="submit-work-summary"
+          label="Work summary"
+          required
+          value={submitSummary}
+          onChange={(e) => { setSubmitSummary(e.target.value); setSubmitSummaryError(null); }}
+          errorMessage={submitSummaryError ?? undefined}
+          placeholder="Describe what you completed, links, or notes for the reviewer"
+          maxLength={10_000}
+          rows={5}
+          disabled={submissionBusy}
+        />
+      </Modal>
+
+      <Modal
+        open={Boolean(reviewFeedbackSource)}
+        onClose={() => setReviewFeedbackSource(null)}
+        title={reviewFeedbackSource === 'reject' ? 'Reject submission' : 'Request changes'}
+        description="Feedback is required. The reviewer will see this as requested changes."
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setReviewFeedbackSource(null)} disabled={submissionBusy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void confirmReviewFeedback()} loading={submissionBusy} disabled={submissionBusy}>
+              Request changes
+            </Button>
+          </>
+        }
+      >
+        <Textarea
+          id="review-feedback"
+          label="Feedback"
+          required
+          value={reviewFeedback}
+          onChange={(e) => { setReviewFeedback(e.target.value); setReviewFeedbackError(null); }}
+          errorMessage={reviewFeedbackError ?? undefined}
+          placeholder="Describe what needs to change before approval"
+          disabled={submissionBusy}
+        />
+      </Modal>
+
       {/* ------------------------------------------------------------------ */}
       {/* Confirm dialogs */}
       {/* ------------------------------------------------------------------ */}
@@ -1644,7 +1821,7 @@ export default function TaskDetailPage() {
         onClose={() => setRemoveDepTarget(null)}
         onConfirm={() => void handleRemoveDependency()}
         title="Remove dependency?"
-        description="This task will no longer depend on the selected task."
+        description="Only this task's dependency on the selected task is removed. Tasks waiting on this task are unaffected."
         confirmLabel="Remove dependency"
         loading={depBusy}
       />

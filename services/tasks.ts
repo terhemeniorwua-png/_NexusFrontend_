@@ -263,6 +263,21 @@ export interface ListTasksQuery {
   includeArchived?: boolean;
 }
 
+// These are the only query keys accepted by GET /tasks. Unsupported filters
+// such as dueFrom, dueTo, and overdue are deliberately not forwarded.
+const SUPPORTED_TASK_QUERY_KEYS: readonly (keyof ListTasksQuery)[] = [
+  'cursor',
+  'limit',
+  'status',
+  'priority',
+  'assigneeId',
+  'labels',
+  'search',
+  'sortBy',
+  'sortOrder',
+  'includeArchived',
+];
+
 // ---------------------------------------------------------------------------
 // Internal request helper (same pattern as projects.ts)
 // ---------------------------------------------------------------------------
@@ -294,6 +309,7 @@ export function listTasks(
 ): Promise<TaskPage> {
   const params = new URLSearchParams();
   Object.entries(query).forEach(([key, value]) => {
+    if (!SUPPORTED_TASK_QUERY_KEYS.includes(key as keyof ListTasksQuery)) return;
     if (value === undefined || value === '') return;
     if (Array.isArray(value)) {
       if (value.length > 0) params.set(key, value.join(','));

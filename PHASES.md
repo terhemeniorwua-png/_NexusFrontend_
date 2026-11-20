@@ -1405,6 +1405,12 @@ Build the complete task management experience.
 - Multiple task views.
 - Task details and collaboration.
 
+#### Task-management audit fixes — 2026-11-20
+
+Branch: `fix/task-audit-frontend-2`. The audit closed the following frontend gaps against the verified backend contract: backend 403 text on start failure; create-task shortcut project resolution; inline comment editing and retryable comment-load errors; zero-subtask progress empty state; removal of fabricated Projects/environment figures; `/tasks/mine` 404 fallback with direct reporting of other failures; blocker and workspace-header test coverage; verified review and submit endpoints; one-level subtask create/delete; dependency error mapping and directional removal; unsupported filter hardening; and My Tasks query alignment.
+
+Backend gaps confirmed during verification (not implemented in the frontend): no `REJECT` review decision (`REQUEST_CHANGES` with required feedback is used instead); no `dueFrom`, `dueTo`, or `overdue` task filters; `GET /tasks/mine` ignores `assigneeId`, `labels`, `search`, `sortBy`, and `sortOrder`; dependency removal is directional and the backend provides no other-side removal; the backend does not enforce subtask nesting depth and soft-deleting a parent leaves subtasks active. `GET /workspaces/{workspaceId}/tasks/mine` exists but is undocumented, so the project-scoped fallback remains for older deployments.
+
 ### Phase 10 Status — In Progress (2026-11-06)
 
 Branch: `feature/phase-9-projects`.

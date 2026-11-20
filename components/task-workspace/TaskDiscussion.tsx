@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { z } from 'zod';
 import { MentionTextarea, extractMentionIds, type MentionMember } from '@/components/ui/MentionTextarea';
 import { listProjectMembers } from '@/services/projects';
 import { Button } from '@/components/ui/Button';
@@ -11,13 +12,20 @@ import { Alert } from '@/components/ui/Alert';
 import { PermissionButton } from '@/components/shared/PermissionButton';
 import type { TaskComment } from '@/services/tasks';
 
+const editSchema = z.object({
+  body: z.string().trim().min(1, 'Comment cannot be empty').max(10000, 'Comment must be at most 10 000 characters'),
+});
+
 export function TaskDiscussion({
   comments,
   loading,
   error,
   onAdd,
   onDelete,
+  onEdit,
   canDelete,
+  canEdit = false,
+  currentUserId,
   busy,
   workspaceId,
   projectId,
@@ -27,7 +35,10 @@ export function TaskDiscussion({
   error: string | null;
   onAdd: (body: string, mentionedUserIds: string[]) => Promise<void> | void;
   onDelete: (commentId: string) => Promise<void> | void;
+  onEdit?: (commentId: string, body: string) => Promise<void> | void;
   canDelete: (comment: TaskComment) => boolean;
+  canEdit?: boolean;
+  currentUserId?: string;
   busy: boolean;
   workspaceId?: string;
   projectId?: string;
@@ -35,6 +46,9 @@ export function TaskDiscussion({
   const [body, setBody] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
   const [members, setMembers] = useState<MentionMember[]>([]);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!workspaceId || !projectId) return;
@@ -49,7 +63,9 @@ export function TaskDiscussion({
     <section aria-labelledby="discussion-heading" className="space-y-4">
       <Card className="p-4 sm:p-5">
         <h2 id="discussion-heading" className="mb-3 text-base font-semibold">Discussion</h2>
-        {error || localError ? <Alert variant="error" title="Discussion error">{localError ?? error}</Alert> : null}
+        {error || localError || editError ? (
+          <Alert variant="error" title="Discussion error">{editError ?? localError ?? error}</Alert>
+        ) : null}
         <div className="mb-4 space-y-2">
           <MentionTextarea id="task-comment" ariaLabel="Add a comment" value={body} onChange={setBody} members={members} placeholder="Write a comment… type @ to mention" rows={3} />
           <div className="flex justify-end">
@@ -82,12 +98,75 @@ export function TaskDiscussion({
                   <div className="text-sm">
                     <span className="font-medium">{comment.author?.name ?? 'User'}</span>
                     <span className="ml-2 text-xs text-[var(--color-text-secondary)]">{new Date(comment.createdAt).toLocaleString()}</span>
+                    {comment.updatedAt && comment.createdAt !== comment.updatedAt ? (
+                      <span className="ml-2 text-xs italic text-[var(--color-text-muted)]">(edited)</span>
+                    ) : null}
                   </div>
-                  {canDelete(comment) ? (
-                    <Button size="sm" variant="secondary" onClick={() => void onDelete(comment.id)} disabled={busy}>Delete</Button>
-                  ) : null}
+                  <div className="flex gap-1">
+                    {canEdit && onEdit && currentUserId === comment.authorId ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Edit comment"
+                        disabled={busy}
+                        onClick={() => {
+                          setEditError(null);
+                          setEditingCommentId(comment.id);
+                          setEditBody(comment.body);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    ) : null}
+                    {canDelete(comment) ? (
+                      <Button size="sm" variant="secondary" onClick={() => void onDelete(comment.id)} disabled={busy}>Delete</Button>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="whitespace-pre-wrap text-sm">{comment.body}</p>
+                {editingCommentId === comment.id ? (
+                  <div className="mt-2 space-y-2">
+                    <Textarea
+                      id={`edit-comment-${comment.id}`}
+                      label="Edit comment"
+                      value={editBody}
+                      onChange={(event) => setEditBody(event.target.value)}
+                      rows={3}
+                      maxLength={10000}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        loading={busy}
+                        onClick={async () => {
+                          const parsed = editSchema.safeParse({ body: editBody });
+                          if (!parsed.success) {
+                            setEditError(parsed.error.issues[0]?.message ?? 'Could not update comment.');
+                            return;
+                          }
+                          setEditError(null);
+                          try {
+                            await onEdit?.(comment.id, parsed.data.body);
+                            setEditingCommentId(null);
+                          } catch (cause) {
+                            setEditError(cause instanceof Error ? cause.message : 'Could not update comment.');
+                          }
+                        }}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => { setEditingCommentId(null); setEditError(null); }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm">{comment.body}</p>
+                )}
               </li>
             ))}
           </ul>

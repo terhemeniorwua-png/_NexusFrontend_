@@ -1,8 +1,24 @@
 import { listProjects } from '@/services/projects';
-import { listMineTasks, listTasks, type ListTasksQuery } from '@/services/tasks';
+import {
+  listMineTasks,
+  listTasks,
+  type TaskPriority,
+  type TaskStatus,
+} from '@/services/tasks';
 
 type TaskItem = Awaited<ReturnType<typeof listTasks>>['items'][number];
 export type MyTask = TaskItem & { projectName: string; projectKeyLabel: string };
+
+/**
+ * Query fields honoured by GET /tasks/mine. Generic task-list filters such as
+ * assigneeId, labels, search, sortBy, and sortOrder are ignored by that route
+ * and must not be presented as supported My Tasks filters.
+ */
+export interface MyTasksQuery {
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  limit?: number;
+}
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -24,7 +40,7 @@ function withTimeout<T>(promise: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T
 export async function listMyTasks(
   workspaceId: string,
   userId: string,
-  query: ListTasksQuery = {},
+  query: MyTasksQuery = {},
 ): Promise<{ items: MyTask[] }> {
   try {
     const result = await withTimeout(
@@ -32,6 +48,9 @@ export async function listMyTasks(
     );
     return { items: result.items };
   } catch (error) {
+    // GET /workspaces/{workspaceId}/tasks/mine exists in the current backend, but it is not
+    // documented and older supported deployments may still return 404. Keep the per-project
+    // fallback until every deployment exposes the route; other failures must surface directly.
     if ((error as { status?: number }).status !== 404) throw error;
     return listMyTasksLegacy(workspaceId, userId, query);
   }
@@ -40,12 +59,17 @@ export async function listMyTasks(
 async function listMyTasksLegacy(
   workspaceId: string,
   userId: string,
-  query: ListTasksQuery = {},
+  query: MyTasksQuery = {},
 ): Promise<{ items: MyTask[] }> {
   const projects = await withTimeout(listProjects(workspaceId, { limit: 100 }));
   const results = await Promise.allSettled(
     projects.items.map(async (project) => {
-      const page = await withTimeout(listTasks(workspaceId, project.id, { ...query, assigneeId: userId, limit: 100 }));
+      const page = await withTimeout(listTasks(workspaceId, project.id, {
+        status: query.status,
+        priority: query.priority,
+        assigneeId: userId,
+        limit: 100,
+      }));
       return page.items.map((t) => ({
         ...t,
         projectName: project.name,

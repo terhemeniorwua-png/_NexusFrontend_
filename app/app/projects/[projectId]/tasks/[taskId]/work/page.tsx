@@ -15,8 +15,10 @@ import { getProject, type ProjectSummary } from '@/services/projects';
 import {
   addComment,
   completeSubtask,
+  createTask,
   createTaskTimeEntry,
   deleteComment,
+  deleteTask,
   deleteTaskTimeEntry,
   getTaskWorkspace,
   listComments,
@@ -25,6 +27,7 @@ import {
   reportTaskBlocker,
   resolveTaskBlocker,
   submitTask,
+  updateComment,
   updateTask,
   updateTaskTimeEntry,
   type TaskActivityItem,
@@ -363,6 +366,14 @@ export default function TaskWorkPage() {
         busyId={subtaskBusyId}
         isAssigneeOf={(st) => Boolean(currentUserId && st.assignees.some((a) => a.userId === currentUserId))}
         canEditWeight={can('task.update')}
+        canCreateSubtask={can('task.create') && !task.parentTaskId}
+        canDeleteSubtask={can('task.delete')}
+        onCreate={async (input) => {
+          await refreshAfterMutation(async () => { await createTask(activeWorkspaceId, projectId, input); });
+        }}
+        onDelete={async (sub) => {
+          await refreshAfterMutation(async () => { await deleteTask(activeWorkspaceId, projectId, sub.id); });
+        }}
         onComplete={async (sub) => {
           setSubtaskBusyId(sub.id);
           try {
@@ -413,6 +424,8 @@ export default function TaskWorkPage() {
         error={commentsError}
         busy={commentsBusy}
         canDelete={(c) => c.authorId === currentUserId}
+        canEdit={can('task.comment')}
+        currentUserId={currentUserId}
         workspaceId={activeWorkspaceId ?? undefined}
         projectId={projectId}
         onAdd={async (body, mentionedUserIds) => {
@@ -423,6 +436,11 @@ export default function TaskWorkPage() {
         onDelete={async (commentId) => {
           setCommentsBusy(true);
           try { await deleteComment(activeWorkspaceId, projectId, taskId, commentId); await loadComments(); }
+          finally { setCommentsBusy(false); }
+        }}
+        onEdit={async (commentId, body) => {
+          setCommentsBusy(true);
+          try { await updateComment(activeWorkspaceId, projectId, taskId, commentId, body); await loadComments(); }
           finally { setCommentsBusy(false); }
         }}
       />

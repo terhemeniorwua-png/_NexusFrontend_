@@ -9,7 +9,6 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
-import { listTasks } from '@/services/tasks';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 
 export default function WorkOverviewPage() {
@@ -17,7 +16,6 @@ export default function WorkOverviewPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { activeWorkspace, user } = useWorkspaceContext();
-  const [projects, setProjects] = useState<number>(0);
   const [tasks, setTasks] = useState<number>(0);
   const [submissions, setSubmissions] = useState<number>(0);
   const [completed, setCompleted] = useState<number>(0);
@@ -33,19 +31,16 @@ export default function WorkOverviewPage() {
       try {
         setError(null);
         const result = await listMyTasks(activeWorkspace.id, user?.id ?? '', {
-          assigneeId: '',
-          limit: 1,
+          limit: 100,
         });
         const allTasks = result.items.map((t) => t.status);
         const countAssigned = allTasks.filter((s: string) => s === 'ASSIGNED').length;
         const countInProgress = allTasks.filter((s: string) => s === 'IN_PROGRESS' || s === 'SUBMITTED' || s === 'UNDER_REVIEW').length;
         const countSubmitted = allTasks.filter((s: string) => s === 'SUBMITTED').length;
         const countCompleted = allTasks.filter((s: string) => s === 'APPROVED' || s === 'COMPLETED').length;
-        setProjects(1); // placeholder - would fetch from API
         setTasks(countAssigned + countInProgress);
         setSubmissions(countSubmitted);
         setCompleted(countCompleted);
-        highlightTaskId;
       } catch (e) {
         setError('Your work summary could not be loaded. Retrying shortly.');
       }
@@ -74,20 +69,7 @@ export default function WorkOverviewPage() {
         {highlightTaskId && <span className="text-sm text-[var(--color-text-secondary)]">(highlighted: {highlightTaskId})</span>}
       </h2>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {/* Projects card */}
-        <Card>
-          <div className="p-6">
-            <div className="flex items-baseline gap-2">
-              <Badge variant="outline" className="text-4xl font-bold">{projects}</Badge>
-              <div>
-                <p className="text-sm text-[var(--color-text-secondary)]">Projects</p>
-                <p className="text-xs text-[var(--color-text-muted)]">Active workspaces</p>
-              </div>
-            </div>
-          </div>
-        </Card>
-
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {/* Tasks card */}
         <Card>
           <div className="p-6">

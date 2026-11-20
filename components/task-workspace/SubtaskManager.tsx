@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { PermissionButton } from '@/components/shared/PermissionButton';
 import type { TaskProgress, TaskSummary } from '@/services/tasks';
 import { TaskProgressTracker } from './TaskProgressTracker';
@@ -18,6 +20,10 @@ export function SubtaskManager({
   isAssigneeOf,
   canEditWeight = false,
   onUpdateWeight,
+  canCreateSubtask = false,
+  canDeleteSubtask = false,
+  onCreate,
+  onDelete,
 }: {
   parentTaskId: string;
   subtasks: TaskSummary[];
@@ -27,11 +33,28 @@ export function SubtaskManager({
   isAssigneeOf: (task: TaskSummary) => boolean;
   canEditWeight?: boolean;
   onUpdateWeight?: (subtaskId: string, weight: number) => Promise<void> | void;
+  canCreateSubtask?: boolean;
+  canDeleteSubtask?: boolean;
+  onCreate?: (input: {
+    title: string;
+    parentTaskId: string;
+    position: number;
+    weight: number;
+  }) => Promise<void> | void;
+  onDelete?: (subtask: TaskSummary) => Promise<void> | void;
 }) {
   const [localBusy, setLocalBusy] = useState<string | null>(null);
   const [editingWeightId, setEditingWeightId] = useState<string | null>(null);
   const [draftWeight, setDraftWeight] = useState<string>('1');
   const [weightError, setWeightError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newWeight, setNewWeight] = useState('1');
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TaskSummary | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function saveWeight(subtask: TaskSummary) {
     setWeightError(null);
@@ -49,11 +72,104 @@ export function SubtaskManager({
     }
   }
 
+  async function createSubtask() {
+    setCreateError(null);
+    const title = newTitle.trim();
+    const parsedWeight = Number(newWeight);
+    if (title.length < 2 || title.length > 200) {
+      setCreateError('Title must be between 2 and 200 characters.');
+      return;
+    }
+    if (!Number.isInteger(parsedWeight) || parsedWeight < 1) {
+      setCreateError('Weight must be a positive integer.');
+      return;
+    }
+    if (!onCreate) return;
+
+    setCreateBusy(true);
+    try {
+      await onCreate({
+        title,
+        parentTaskId,
+        position: subtasks.length,
+        weight: parsedWeight,
+      });
+      setNewTitle('');
+      setNewWeight('1');
+      setShowCreate(false);
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : 'Could not create subtask.');
+    } finally {
+      setCreateBusy(false);
+    }
+  }
+
+  async function deleteSubtask() {
+    if (!deleteTarget || !onDelete) return;
+    setDeleteBusy(true); setDeleteError(null);
+    try {
+      await onDelete(deleteTarget);
+      setDeleteTarget(null);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete subtask.');
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   return (
     <section aria-labelledby="subtasks-heading" className="space-y-4">
       <Card className="p-4 sm:p-5">
         <h2 id="subtasks-heading" className="mb-3 text-base font-semibold">Subtasks</h2>
         <TaskProgressTracker progress={progress} className="mb-4" />
+
+        {canCreateSubtask && onCreate ? (
+          <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+            {showCreate ? (
+              <div className="space-y-3">
+                <Input
+                  id="subtask-title"
+                  label="Title"
+                  required
+                  value={newTitle}
+                  onChange={(e) => { setNewTitle(e.target.value); setCreateError(null); }}
+                  placeholder="Describe the subtask"
+                  disabled={createBusy}
+                />
+                <Input
+                  id="subtask-weight"
+                  label="Weight"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={newWeight}
+                  onChange={(e) => { setNewWeight(e.target.value); setCreateError(null); }}
+                  disabled={createBusy}
+                />
+                {createError ? <p className="text-sm text-[var(--color-danger)]" role="alert">{createError}</p> : null}
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => void createSubtask()} loading={createBusy} disabled={createBusy}>
+                    Create subtask
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => { setShowCreate(false); setCreateError(null); }}
+                    disabled={createBusy}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button size="sm" variant="secondary" onClick={() => { setShowCreate(true); setCreateError(null); }}>
+                Add subtask
+              </Button>
+            )}
+          </div>
+        ) : null}
+
+        {deleteError ? <p className="mb-3 text-sm text-[var(--color-danger)]" role="alert">{deleteError}</p> : null}
         {weightError ? <p className="mb-3 text-sm text-[var(--color-danger)]" role="alert">{weightError}</p> : null}
         {subtasks.length === 0 ? (
           <EmptyState title="No subtasks" description="This task has no subtasks yet." />
@@ -125,6 +241,17 @@ export function SubtaskManager({
                     ) : (
                       <span className="text-xs text-[var(--color-text-secondary)]">{done ? 'Done' : 'Pending review'}</span>
                     )}
+                    {canDeleteSubtask && onDelete ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => { setDeleteTarget(sub); setDeleteError(null); }}
+                        disabled={loading || deleteBusy}
+                        aria-label={`Delete ${sub.title}`}
+                      >
+                        Delete
+                      </Button>
+                    ) : null}
                   </div>
                 </li>
               );
@@ -132,6 +259,17 @@ export function SubtaskManager({
           </ul>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void deleteSubtask()}
+        title={`Delete ${deleteTarget?.title ?? 'subtask'}?`}
+        description="The subtask will be removed from this list. Its deletion is recorded by the backend."
+        confirmLabel="Delete subtask"
+        destructive
+        loading={deleteBusy}
+      />
     </section>
   );
 }

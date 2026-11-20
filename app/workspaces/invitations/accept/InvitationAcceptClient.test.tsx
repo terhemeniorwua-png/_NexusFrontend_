@@ -42,7 +42,7 @@ vi.mock('@/services/invitations', () => ({
 }));
 
 const preview = {
-  workspace: { id: 'workspace-1', name: 'Nexus Studio', slug: 'nexus-studio' },
+  workspace: { id: 'workspace-1', name: 'PITERON Studio', slug: 'nexus-studio' },
   invitedBy: { id: 'user-1', name: 'Grace' },
   role: 'MEMBER' as const,
   organizationRole: 'COMPANY_COLLABORATOR' as const,
@@ -55,7 +55,7 @@ const preview = {
 const savedIntent: InvitationIntent = {
   token: 'token_-123',
   workspaceId: 'workspace-1',
-  workspaceName: 'Nexus Studio',
+  workspaceName: 'PITERON Studio',
   workspaceSlug: 'piteron-studio',
   invitedByName: 'Grace',
   maskedEmail: 'a***@example.com',
@@ -113,7 +113,7 @@ describe('InvitationAcceptClient', () => {
     mocks.acceptInvitation.mockResolvedValue({
       id: 'invitation-1',
       workspaceId: 'workspace-1',
-      workspaceName: 'Nexus Studio',
+      workspaceName: 'PITERON Studio',
       status: 'ACCEPTED',
     });
     const user = userEvent.setup();
@@ -130,7 +130,7 @@ describe('InvitationAcceptClient', () => {
     mocks.getAccessToken.mockReturnValue('access-token');
     mocks.declineInvitation.mockResolvedValue({
       workspaceId: 'workspace-1',
-      workspaceName: 'Nexus Studio',
+      workspaceName: 'PITERON Studio',
     });
     const user = userEvent.setup();
     render(<InvitationAcceptClient />);

@@ -30,7 +30,7 @@ describe('globalSearch', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok([fakeResult()]));
     await globalSearch({ q: 'piteron' });
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/backend/search?q=nexus'),
+      expect.stringContaining('/api/backend/search?q=piteron'),
       expect.any(Object),
     );
   });

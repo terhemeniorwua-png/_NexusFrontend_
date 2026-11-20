@@ -142,7 +142,7 @@ export default function ProjectOverviewPage() {
           id: d.id,
           title: d.title,
           updatedAt: d.updatedAt,
-          url: `/app/projects/${encodeURIComponent(projectId)}/tasks`, // link to tasks/work documents
+          url: d.kind === 'PROJECT_DOC' ? '/app/documents' : `/app/projects/${encodeURIComponent(projectId)}/tasks`,
         })),
         bookmarks: data.bookmarks.map((b) => ({
           id: b.id,
@@ -377,6 +377,7 @@ export default function ProjectOverviewPage() {
         open={docOpen}
         onClose={() => setDocOpen(false)}
         workspaceId={activeWorkspace.id}
+        projectId={project.id}
         onCreated={() => { void loadDashboard(); }}
       />
 
@@ -384,6 +385,7 @@ export default function ProjectOverviewPage() {
         open={bookmarkOpen}
         onClose={() => setBookmarkOpen(false)}
         workspaceId={activeWorkspace.id}
+        projectId={project.id}
         onAdded={() => { void loadDashboard(); }}
       />
 
@@ -391,6 +393,7 @@ export default function ProjectOverviewPage() {
         open={folderOpen}
         onClose={() => setFolderOpen(false)}
         workspaceId={activeWorkspace.id}
+        projectId={project.id}
         onCreated={() => { void loadDashboard(); }}
       />
 
@@ -404,6 +407,7 @@ export default function ProjectOverviewPage() {
           open={uploadOpen}
           onClose={() => setUploadOpen(false)}
           workspaceId={activeWorkspace.id}
+          projectId={project.id}
           onUploaded={() => { void loadDashboard(); }}
         />
       </Modal>

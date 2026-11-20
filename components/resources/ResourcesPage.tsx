@@ -24,6 +24,7 @@ import {
   ApiRequestError,
 } from '@/services/files';
 import { BookmarkDialog } from './BookmarkDialog';
+import { uploadProjectFile } from '@/services/resources';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -199,6 +200,7 @@ interface UploadDialogProps {
   open: boolean;
   onClose: () => void;
   workspaceId: string;
+  projectId?: string | null;
   onUploaded: () => void;
 }
 
@@ -206,6 +208,7 @@ export function UploadDialog({
   open,
   onClose,
   workspaceId,
+  projectId,
   onUploaded,
 }: UploadDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -269,7 +272,10 @@ export function UploadDialog({
       prev.map((u) => (u.id === upload.id ? { ...u, status: 'uploading' } : u)),
     );
 
-    const { promise, abort } = uploadFile({
+    const startUpload = projectId
+      ? (args: Parameters<typeof uploadFile>[0]) => uploadProjectFile({ ...args, projectId })
+      : uploadFile;
+    const { promise, abort } = startUpload({
       workspaceId,
       file: upload.file,
       onProgress: (percent) => {

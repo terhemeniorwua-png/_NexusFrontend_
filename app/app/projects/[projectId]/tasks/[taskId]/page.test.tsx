@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   uploadFile: vi.fn(),
   deleteFile: vi.fn(),
   listProjectMembers: vi.fn(),
+  push: vi.fn(),
 }));
 
 function setRole(role: 'PROJECT_MANAGER' | 'MEMBER' | 'COLLABORATOR' | 'VIEWER') {
@@ -69,7 +70,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: mocks.push }),
   useParams: () => ({ projectId: 'project-1', taskId: 'task-1' }),
   usePathname: () => '/app/projects/project-1/tasks/task-1',
 }));
@@ -262,5 +263,91 @@ describe('TaskDetailPage — four roles', () => {
     expect(await screen.findByText('Only the assignee can start this task')).toBeInTheDocument();
     expect(mocks.updateTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', { status: 'IN_PROGRESS' });
     expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
+  });
+
+  it('starts an assigned task and opens its workspace', async () => {
+    setRole('MEMBER');
+    mocks.updateTask.mockResolvedValueOnce({ ...task1, status: 'IN_PROGRESS' });
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Start' }));
+
+    await waitFor(() => {
+      expect(mocks.updateTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', { status: 'IN_PROGRESS' });
+      expect(mocks.push).toHaveBeenCalledWith('/app/projects/project-1/tasks/task-1/work');
+    });
+  });
+
+  it('resumes a task with requested changes and opens its workspace', async () => {
+    setRole('MEMBER');
+    mocks.getTask.mockResolvedValue({ ...task1, status: 'CHANGES_REQUESTED' });
+    mocks.updateTask.mockResolvedValueOnce({ ...task1, status: 'IN_PROGRESS' });
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Resume' }));
+
+    await waitFor(() => {
+      expect(mocks.updateTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', { status: 'IN_PROGRESS' });
+      expect(mocks.push).toHaveBeenCalledWith('/app/projects/project-1/tasks/task-1/work');
+    });
+  });
+
+  it('shows the backend error when Resume fails', async () => {
+    setRole('MEMBER');
+    mocks.getTask.mockResolvedValue({ ...task1, status: 'CHANGES_REQUESTED' });
+    mocks.updateTask.mockRejectedValueOnce(new ApiRequestError('Resolve review feedback first', 409));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Resume' }));
+
+    expect(await screen.findByText('Resolve review feedback first')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resume' })).toBeInTheDocument();
+  });
+
+  it('shows the backend error when Complete fails', async () => {
+    setRole('MEMBER');
+    mocks.completeTask.mockRejectedValueOnce(new ApiRequestError('Task has open blockers', 409));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Mark complete' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Mark complete' }));
+
+    expect(await screen.findByText('Task has open blockers')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark complete' })).toBeInTheDocument();
+  });
+
+  it('shows the backend error when Reopen fails', async () => {
+    setRole('MEMBER');
+    mocks.getTask.mockResolvedValue({
+      ...task1,
+      status: 'APPROVED',
+      completedAt: '2026-01-02T00:00:00.000Z',
+    });
+    mocks.reopenTask.mockRejectedValueOnce(new ApiRequestError('Reopen window has closed', 409));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Reopen' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reopen task' }));
+
+    expect(await screen.findByText('Reopen window has closed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reopen' })).toBeInTheDocument();
+  });
+
+  it('shows a permission error when a status edit fails', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.updateTask.mockRejectedValueOnce(new ApiRequestError('Forbidden', 403));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Edit task' }));
+    await user.selectOptions(screen.getByLabelText('Status'), 'IN_PROGRESS');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText('Your current role does not allow this action.')).toBeInTheDocument();
+    expect(mocks.updateTask).toHaveBeenCalledWith(
+      'ws-1',
+      'project-1',
+      'task-1',
+      expect.objectContaining({ status: 'IN_PROGRESS' }),
+    );
   });
 });

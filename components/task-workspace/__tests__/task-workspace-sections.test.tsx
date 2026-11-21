@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { TaskOverview } from '../TaskOverview';
@@ -14,6 +14,12 @@ import type { FileSummary } from '@/services/files';
 const permMocks = vi.hoisted(() => ({
   permissions: [] as string[],
   isLoading: false,
+}));
+
+const fileVersionMocks = vi.hoisted(() => ({
+  listFileVersions: vi.fn(),
+  listFileVersionFeedback: vi.fn(),
+  createReview: vi.fn(),
 }));
 
 vi.mock('@/providers/ProjectPermissionsProvider', () => ({
@@ -34,9 +40,15 @@ vi.mock('@/services/files', async () => {
     deleteFile: vi.fn(async () => undefined),
     downloadFile: vi.fn(async () => undefined),
     listFiles: vi.fn(),
+    listFileVersions: fileVersionMocks.listFileVersions,
+    listFileVersionFeedback: fileVersionMocks.listFileVersionFeedback,
     formatBytes: (n: number) => `${n} B`,
   };
 });
+
+vi.mock('@/services/reviews', () => ({
+  createReview: fileVersionMocks.createReview,
+}));
 
 function setRole(role: 'PROJECT_MANAGER' | 'MEMBER' | 'COLLABORATOR' | 'VIEWER') {
   const perms: Record<string, string[]> = {
@@ -59,7 +71,27 @@ const baseTask: TaskSummary = {
 };
 
 describe('Task workspace sections', () => {
-  beforeEach(() => setRole('MEMBER'));
+  beforeEach(() => {
+    setRole('MEMBER');
+    vi.clearAllMocks();
+    fileVersionMocks.listFileVersions.mockResolvedValue({
+      items: [{
+        id: 'version-1',
+        attachmentId: 'file-1',
+        versionNumber: 1,
+        isCurrent: true,
+        fileName: 'report.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 100,
+        uploadedById: 'u1',
+        changeNote: null,
+        createdAt: '',
+      }],
+      nextCursor: null,
+    });
+    fileVersionMocks.listFileVersionFeedback.mockResolvedValue({ items: [], nextCursor: null });
+    fileVersionMocks.createReview.mockResolvedValue({ review: { id: 'review-1' } });
+  });
 
   it('TaskOverview renders loaded content and next action', () => {
     render(<TaskOverview task={baseTask} progress={{ percent: 0, completed: 0, total: 2 }} projectName="Proj" />);
@@ -118,6 +150,41 @@ describe('Task workspace sections', () => {
       <AttachmentManager workspaceId="w" projectId="p" taskId="t" files={[]} loading={false} error="Boom" onReload={vi.fn()} />,
     );
     expect(screen.getByText('Boom')).toBeInTheDocument();
+  });
+
+  it('AttachmentManager forwards the review submission entry point to file versions', async () => {
+    const user = userEvent.setup();
+    const file: FileSummary = {
+      id: 'file-1',
+      workspaceId: 'w',
+      projectId: 'p',
+      taskId: 't',
+      uploadedById: 'u1',
+      fileName: 'report.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 100,
+      createdAt: '',
+    };
+
+    render(
+      <AttachmentManager
+        workspaceId="w"
+        projectId="p"
+        taskId="t"
+        files={[file]}
+        loading={false}
+        error={null}
+        onReload={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Versions' }));
+    const submit = await screen.findByRole('button', { name: 'Submit for review' });
+    await user.click(submit);
+
+    await waitFor(() => expect(fileVersionMocks.createReview).toHaveBeenCalledWith('w', 'p', {
+      attachmentVersionId: 'version-1',
+    }));
   });
 
   it('TaskDiscussion shows empty and loaded states and gates comment for viewer', () => {

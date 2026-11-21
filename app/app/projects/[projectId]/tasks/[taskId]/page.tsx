@@ -1724,6 +1724,8 @@ export default function TaskDetailPage() {
                         canManage={canUpload}
                         canDeleteAny={canDeleteAnyFile}
                         currentUserId={user?.id}
+                        projectId={projectId}
+                        canSubmitReview={canSubmit}
                       />
                       {canDeleteFile(file) && (
                         <Button

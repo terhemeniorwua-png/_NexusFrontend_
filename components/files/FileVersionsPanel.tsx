@@ -14,6 +14,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
+import { SubmitForReviewButton } from '@/components/reviews/SubmitForReviewButton';
 import { ApiRequestError } from '@/lib/api';
 import {
   ALLOWED_MIME_TYPES,
@@ -46,6 +47,10 @@ interface FileVersionsPanelProps {
   /** Admin capability used to delete other people's feedback. */
   canDeleteAny?: boolean;
   currentUserId?: string | null;
+  /** Project context enables the per-version review submission entry point. */
+  projectId?: string;
+  canSubmitReview?: boolean;
+  onReviewSubmitted?: (versionId: string, reviewId: string) => void;
 }
 
 function messageFor(error: unknown, fallback: string): string {
@@ -80,6 +85,9 @@ export function FileVersionsPanel({
   canManage,
   canDeleteAny = false,
   currentUserId = null,
+  projectId,
+  canSubmitReview = false,
+  onReviewSubmitted,
 }: FileVersionsPanelProps) {
   const idPrefix = useId();
   const [open, setOpen] = useState(false);
@@ -439,6 +447,17 @@ export function FileVersionsPanel({
                           >
                             Delete version
                           </Button>
+                        ) : null}
+                        {projectId && versionId ? (
+                          <SubmitForReviewButton
+                            workspaceId={workspaceId}
+                            projectId={projectId}
+                            target={{ attachmentVersionId: versionId }}
+                            canSubmit={canSubmitReview}
+                            disabled={isBusy}
+                            size="sm"
+                            onSubmitted={(reviewId) => onReviewSubmitted?.(versionId, reviewId)}
+                          />
                         ) : null}
                       </div>
                     </div>

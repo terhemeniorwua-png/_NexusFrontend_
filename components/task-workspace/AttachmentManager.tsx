@@ -112,6 +112,8 @@ export function AttachmentManager({
                     canManage={canManageVersions}
                     canDeleteAny={canDeleteAnyFeedback}
                     currentUserId={currentUserId}
+                    projectId={projectId}
+                    canSubmitReview={can('submission.submit')}
                   />
                   <PermissionButton permission={['file.delete.own', 'file.delete.any']} mode="any" size="sm" variant="secondary" onClick={() => void onDelete(file.id)} deniedReason="You do not have permission to delete this file.">
                     Delete

@@ -18,12 +18,17 @@ const mocks = vi.hoisted(() => ({
   updateFileVersionFeedback: vi.fn(),
   deleteFileVersionFeedback: vi.fn(),
   downloadFileVersion: vi.fn(),
+  createReview: vi.fn(),
 }));
 
 vi.mock('@/services/files', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/files')>();
   return { ...actual, ...mocks };
 });
+
+vi.mock('@/services/reviews', () => ({
+  createReview: mocks.createReview,
+}));
 
 const WS = 'workspace-1';
 const FILE_ID = 'file-1';
@@ -94,6 +99,7 @@ describe('FileVersionsPanel', () => {
     mocks.updateFileVersionFeedback.mockResolvedValue(ownFeedback);
     mocks.deleteFileVersionFeedback.mockResolvedValue(undefined);
     mocks.downloadFileVersion.mockResolvedValue(undefined);
+    mocks.createReview.mockResolvedValue({ review: { id: 'review-1' } });
   });
 
   it('renders versions newest first with the current badge and version details', async () => {
@@ -303,6 +309,62 @@ describe('FileVersionsPanel', () => {
 
     expect(await screen.findByText('The last live version cannot be deleted')).toBeInTheDocument();
     await waitFor(() => expect(mocks.listFileVersions).toHaveBeenCalledTimes(2));
+  });
+
+  it('submits a specific version for review and reports the created review id', async () => {
+    const user = userEvent.setup();
+    const onReviewSubmitted = vi.fn();
+    mocks.listFileVersions.mockResolvedValue({ items: [oldVersion, currentVersion], nextCursor: null });
+
+    render(
+      <FileVersionsPanel
+        workspaceId={WS}
+        file={file}
+        canManage
+        canDeleteAny={false}
+        currentUserId={CURRENT_USER}
+        projectId="project-1"
+        canSubmitReview
+        onReviewSubmitted={onReviewSubmitted}
+      />,
+    );
+    await openPanel(user);
+
+    const list = await screen.findByRole('list', { name: 'File versions' });
+    const rows = within(list).getAllByRole('listitem');
+    const oldVersionRow = rows.find((row) => row.textContent?.includes('Version 1'));
+    if (!oldVersionRow) throw new Error('Version 1 row not found');
+    await user.click(within(oldVersionRow).getByRole('button', { name: 'Submit for review' }));
+
+    await waitFor(() => expect(mocks.createReview).toHaveBeenCalledWith(WS, 'project-1', {
+      attachmentVersionId: 'version-1',
+    }));
+    expect(onReviewSubmitted).toHaveBeenCalledWith('version-1', 'review-1');
+    const currentVersionRow = rows.find((row) => row.textContent?.includes('Version 2'));
+    if (!currentVersionRow) throw new Error('Version 2 row not found');
+    expect(within(currentVersionRow).getByRole('button', { name: 'Submit for review' })).toBeInTheDocument();
+  });
+
+  it('hides the review submission entry point when the user cannot submit', async () => {
+    const user = userEvent.setup();
+    mocks.listFileVersions.mockResolvedValue({ items: [oldVersion], nextCursor: null });
+
+    render(
+      <FileVersionsPanel
+        workspaceId={WS}
+        file={file}
+        canManage
+        canDeleteAny={false}
+        currentUserId={CURRENT_USER}
+        projectId="project-1"
+        canSubmitReview={false}
+      />,
+    );
+    await openPanel(user);
+
+    expect(await screen.findByText('Version 1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Submit for review' })).not.toBeInTheDocument();
+    expect(mocks.createReview).not.toHaveBeenCalled();
   });
 
   it('renders a version with missing fields without crashing', async () => {

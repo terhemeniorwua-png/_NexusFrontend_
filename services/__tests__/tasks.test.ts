@@ -374,6 +374,77 @@ describe('tasks service', () => {
     expect(body).toEqual({ decision: 'APPROVE' });
   });
 
+  // ---------------------------------------------------------------------------
+  // Assignee acceptance actions
+  // ---------------------------------------------------------------------------
+
+  it('acceptTask sends POST to the accept path with an empty body', async () => {
+    mocks.apiRequest.mockResolvedValue({ task: { id: TID }, assignee: { acceptanceStatus: 'ACCEPTED' } });
+    const { acceptTask } = await import('../tasks');
+    await acceptTask(WS, PID, TID);
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/${TID}/accept`,
+      expect.objectContaining({ method: 'POST', authenticated: true }),
+    );
+    const body = JSON.parse((mocks.apiRequest.mock.calls[0][1] as { body: string }).body) as Record<string, unknown>;
+    expect(body).toEqual({});
+  });
+
+  it('declineTask sends POST to the decline path with the reason', async () => {
+    mocks.apiRequest.mockResolvedValue({ task: { id: TID }, assignee: { acceptanceStatus: 'DECLINED' } });
+    const { declineTask } = await import('../tasks');
+    await declineTask(WS, PID, TID, 'Not available this week');
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/${TID}/decline`,
+      expect.objectContaining({ method: 'POST', authenticated: true }),
+    );
+    const body = JSON.parse((mocks.apiRequest.mock.calls[0][1] as { body: string }).body) as { reason: string };
+    expect(body).toEqual({ reason: 'Not available this week' });
+  });
+
+  it('startTask sends POST to the start path with an empty body', async () => {
+    mocks.apiRequest.mockResolvedValue({ task: { id: TID, status: 'IN_PROGRESS' }, assignee: { acceptanceStatus: 'ACCEPTED' } });
+    const { startTask } = await import('../tasks');
+    await startTask(WS, PID, TID);
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/${TID}/start`,
+      expect.objectContaining({ method: 'POST', authenticated: true }),
+    );
+    const body = JSON.parse((mocks.apiRequest.mock.calls[0][1] as { body: string }).body) as Record<string, unknown>;
+    expect(body).toEqual({});
+  });
+
+  it('acceptTask propagates an invalid acceptance state error without refreshing the session', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    const error = new ApiRequestError('This assignment cannot be accepted in its current state', 409, 'INVALID_ACCEPTANCE_STATE');
+    mocks.apiRequest.mockRejectedValueOnce(error);
+    const { acceptTask } = await import('../tasks');
+    await expect(acceptTask(WS, PID, TID)).rejects.toBe(error);
+    expect(mocks.refreshSession).not.toHaveBeenCalled();
+    expect(mocks.apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('declineTask propagates an invalid decline reason error', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    const error = new ApiRequestError('A decline reason of at least 3 characters is required', 400, 'INVALID_DECLINE_REASON');
+    mocks.apiRequest.mockRejectedValueOnce(error);
+    const { declineTask } = await import('../tasks');
+    await expect(declineTask(WS, PID, TID, 'no')).rejects.toBe(error);
+    expect(mocks.refreshSession).not.toHaveBeenCalled();
+  });
+
+  it('startTask propagates an invalid status transition error', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    const error = new ApiRequestError('Cannot transition task from SUBMITTED to IN_PROGRESS', 409, 'INVALID_STATUS_TRANSITION');
+    mocks.apiRequest.mockRejectedValueOnce(error);
+    const { startTask } = await import('../tasks');
+    await expect(startTask(WS, PID, TID)).rejects.toBe(error);
+    expect(mocks.refreshSession).not.toHaveBeenCalled();
+  });
+
   it('listMineTasks calls the workspace-scoped mine route', async () => {
     mocks.apiRequest.mockResolvedValue({ items: [], nextCursor: null });
     const { listMineTasks } = await import('../tasks');

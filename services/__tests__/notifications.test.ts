@@ -44,8 +44,8 @@ describe('notifications service', () => {
 
   // ── Metadata ───────────────────────────────────────────────────────────────
 
-  it('exports all 22 notification types', () => {
-    expect(ALL_NOTIFICATION_TYPES).toHaveLength(22);
+  it('exports all 25 notification types', () => {
+    expect(ALL_NOTIFICATION_TYPES).toHaveLength(25);
     expect(ALL_NOTIFICATION_TYPES).toContain('MENTION');
     expect(ALL_NOTIFICATION_TYPES).toContain('PROJECT_UPDATE');
   });
@@ -56,10 +56,26 @@ describe('notifications service', () => {
     }
   });
 
-  it('groups cover all 22 types without duplication', () => {
+  it('groups cover all 25 types without duplication', () => {
     const flat = NOTIFICATION_TYPE_GROUPS.flatMap((g) => g.types);
-    expect(flat).toHaveLength(22);
-    expect(new Set(flat).size).toBe(22);
+    expect(flat).toHaveLength(25);
+    expect(new Set(flat).size).toBe(25);
+  });
+
+  it('matches the backend NotificationType enum exactly', () => {
+    expect(ALL_NOTIFICATION_TYPES).toEqual([
+      'MENTION', 'TASK_ASSIGNED', 'TASK_REASSIGNED', 'TASK_SUBMITTED', 'TASK_APPROVED',
+      'CHANGES_REQUESTED', 'COMMENT_REPLY', 'MEMBERSHIP_CHANGED', 'MEMBERSHIP_SUSPENDED',
+      'MEMBERSHIP_RESTORED', 'INVITATION_ACCEPTED', 'JOIN_REQUEST_RECEIVED',
+      'JOIN_REQUEST_APPROVED', 'JOIN_REQUEST_REJECTED', 'MEETING_INVITE',
+      'MEETING_RESCHEDULED', 'MEETING_CANCELLED', 'PROJECT_UPDATE', 'TASK_BLOCKER_REPORTED',
+      'TASK_BLOCKER_RESOLVED', 'TASK_DUE_SOON', 'TASK_OVERDUE', 'TASK_DECLINED',
+      'INTEGRATION_RECONNECT_REQUIRED', 'SECURITY_ALERT',
+    ]);
+    for (const type of ['TASK_DECLINED', 'INTEGRATION_RECONNECT_REQUIRED', 'SECURITY_ALERT'] as const) {
+      expect(NOTIFICATION_TYPE_LABELS[type]).toBeTruthy();
+      expect(NOTIFICATION_TYPE_GROUPS.flatMap((g) => g.types)).toContain(type);
+    }
   });
 
   // ── listNotifications ──────────────────────────────────────────────────────

@@ -158,6 +158,17 @@ function acceptanceActionError(cause: unknown, fallback: string): { message: str
   return { message: requestError(cause, fallback), refresh: false };
 }
 
+/**
+ * Reviewer changes surface the backend message for rejected updates and refresh
+ * the task so reviewer-scoped state is reconciled with the authoritative response.
+ */
+function reviewerActionError(cause: unknown, fallback: string): { message: string; refresh: boolean } {
+  if (cause instanceof ApiRequestError && [400, 403, 409].includes(cause.status)) {
+    return { message: cause.message || fallback, refresh: true };
+  }
+  return { message: requestError(cause, fallback), refresh: false };
+}
+
 function dependencyRequestError(cause: unknown, fallback: string): string {
   if (!(cause instanceof ApiRequestError)) return fallback;
   if (cause.status === 403) return 'Your current role does not allow this action.';
@@ -201,7 +212,7 @@ const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
 export default function TaskDetailPage() {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
   const { activeWorkspace, user, loading: workspaceLoading } = useWorkspaceContext();
-  const { can, isLoading: permissionsLoading } = usePermissions();
+  const { can, roleDefinitions, isLoading: permissionsLoading } = usePermissions();
   const router = useRouter();
   useWorkspaceRedirect();
 
@@ -209,6 +220,8 @@ export default function TaskDetailPage() {
   const canUpdate = can('task.update');
   const canAssign = can('task.assign');
   const canReassign = can('task.reassign');
+  // Backend requires both task.update and task.assign to change a reviewer.
+  const canManageReviewer = canUpdate && canAssign;
   const canComment = can('task.comment');
   const canUpload = can('file.upload');
   const canDeleteAnyFile = can('file.delete.any');
@@ -581,6 +594,22 @@ export default function TaskDetailPage() {
       setNotice('Task updated.');
     } catch (cause) {
       setError(requestError(cause, 'Task could not be updated.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleReviewerChange(reviewerId: string | null) {
+    if (!activeWorkspace || !task || !canManageReviewer) return;
+    setBusy(true); setError(null);
+    try {
+      const updated = await updateTask(activeWorkspace.id, projectId, task.id, { reviewerId });
+      setTask(updated);
+      setNotice(reviewerId ? 'Reviewer updated.' : 'Reviewer cleared.');
+    } catch (cause) {
+      const { message, refresh } = reviewerActionError(cause, 'Reviewer could not be updated.');
+      setError(message);
+      if (refresh) void load({ preserveError: true });
     } finally {
       setBusy(false);
     }
@@ -1023,6 +1052,21 @@ export default function TaskDetailPage() {
   const memberOptions = members
     .filter((m) => !assignedIds.has(m.userId))
     .map((m) => ({ value: m.userId, label: `${m.user.name} (${m.user.email})` }));
+
+  const reviewerRoles = new Set(
+    roleDefinitions
+      .filter((definition) => definition.permissions.includes('submission.review') || definition.permissions.includes('submission.approve'))
+      .map((definition) => definition.role),
+  );
+  const reviewerOptions = [
+    { value: '', label: 'No reviewer' },
+    ...members
+      .filter((m) => reviewerRoles.has(m.role) && !assignedIds.has(m.userId))
+      .map((m) => ({ value: m.userId, label: `${m.user.name} (${m.user.email})` })),
+  ];
+  const reviewerName = task.reviewerId
+    ? (task.reviewer?.name ?? members.find((m) => m.userId === task.reviewerId)?.user.name ?? 'Unknown reviewer')
+    : 'No reviewer';
 
   const isCompleted = task.status === 'APPROVED';
   const isArchived = Boolean(task.archivedAt);
@@ -1781,6 +1825,25 @@ export default function TaskDetailPage() {
               <div>
                 <dt className="text-xs text-[var(--color-text-muted)]">Priority</dt>
                 <dd className="mt-0.5"><Badge variant={task.priority}>{priorityLabel(task.priority)}</Badge></dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[var(--color-text-muted)]">Reviewer</dt>
+                <dd className="mt-0.5 font-medium">
+                  {canManageReviewer ? (
+                    <Select
+                      id="task-reviewer"
+                      label="Reviewer"
+                      srOnlyLabel
+                      size="sm"
+                      value={task.reviewerId ?? ''}
+                      onChange={(event) => void handleReviewerChange(event.target.value || null)}
+                      options={reviewerOptions}
+                      disabled={busy}
+                    />
+                  ) : (
+                    reviewerName
+                  )}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-[var(--color-text-muted)]">Start date</dt>

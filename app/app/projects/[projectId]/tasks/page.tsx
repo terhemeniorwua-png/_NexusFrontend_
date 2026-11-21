@@ -104,6 +104,10 @@ function requestError(cause: unknown, fallback: string): string {
   if (cause.status === 403) return 'Your current role does not allow this action.';
   return cause.message;
 }
+function reviewerRequestError(cause: unknown, fallback: string): string {
+  if (cause instanceof ApiRequestError && /reviewer/i.test(cause.message)) return cause.message;
+  return requestError(cause, fallback);
+}
 function monthGrid(year: number, month: number): Date[] {
   const firstOfMonth = new Date(year, month, 1);
   const startDay = firstOfMonth.getDay();
@@ -155,7 +159,7 @@ export default function ProjectTasksPage() {
   const createParamHandled = useRef(false);
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
-  const { can, isLoading: permissionsLoading } = usePermissions();
+  const { can, roleDefinitions, isLoading: permissionsLoading } = usePermissions();
   useWorkspaceRedirect();
 
   const canView = can('task.view');
@@ -166,6 +170,7 @@ export default function ProjectTasksPage() {
   const canComplete = can('task.complete');
   const canUpdate = can('task.update');
   const canManageAssignees = canAssign || canReassign;
+  const canManageReviewer = canAssign;
   const canManageProject = can('project.update') || canUpdate;
 
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
@@ -202,6 +207,7 @@ export default function ProjectTasksPage() {
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
   const [createTemplateId, setCreateTemplateId] = useState('');
   const [createCustomValues, setCreateCustomValues] = useState<Record<string, unknown>>({});
+  const [createReviewerId, setCreateReviewerId] = useState('');
 
   const [archiveTarget, setArchiveTarget] = useState<TaskSummary | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<TaskSummary | null>(null);
@@ -305,7 +311,16 @@ export default function ProjectTasksPage() {
 
   const sortedVisibleTasks = useMemo(() => tasks, [tasks]);
 
-  function resetCreateForm() { setCreateTitle(''); setCreateDescription(''); setCreatePriority('MEDIUM'); setCreateStatus('ASSIGNED'); setCreateStartDate(''); setCreateDueDate(''); setCreateLabels(''); setCreateErrors({}); setCreateTemplateId(''); setCreateCustomValues({}); }
+  const reviewerRoles = useMemo(
+    () => new Set(roleDefinitions.filter((definition) => definition.permissions.includes('submission.review') || definition.permissions.includes('submission.approve')).map((definition) => definition.role)),
+    [roleDefinitions],
+  );
+  const reviewerOptions = useMemo(
+    () => [{ value: '', label: 'No reviewer' }, ...members.filter((member) => reviewerRoles.has(member.role)).map((member) => ({ value: member.user.id, label: member.user.name }))],
+    [members, reviewerRoles],
+  );
+
+  function resetCreateForm() { setCreateTitle(''); setCreateDescription(''); setCreatePriority('MEDIUM'); setCreateStatus('ASSIGNED'); setCreateStartDate(''); setCreateDueDate(''); setCreateLabels(''); setCreateErrors({}); setCreateTemplateId(''); setCreateCustomValues({}); setCreateReviewerId(''); }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!activeWorkspace) return;
@@ -321,12 +336,12 @@ export default function ProjectTasksPage() {
     if (!parsed.success) { const errors: Record<string, string> = {}; for (const issue of parsed.error.issues) errors[issue.path[0] as string] = issue.message; setCreateErrors(errors); return; }
     setBusy(true); setError(null); setCreateErrors({});
     try {
-      const input: CreateTaskInput = { title: parsed.data.title, ...(parsed.data.description ? { description: parsed.data.description } : {}), status: parsed.data.status, priority: parsed.data.priority, ...(parsed.data.startDate ? { startDate: parsed.data.startDate } : {}), ...(parsed.data.dueDate ? { dueDate: parsed.data.dueDate } : {}), ...(parsed.data.labels ? { labels: parsed.data.labels.split(',').map((l) => l.trim()).filter(Boolean) } : {}) };
+      const input: CreateTaskInput = { title: parsed.data.title, ...(parsed.data.description ? { description: parsed.data.description } : {}), status: parsed.data.status, priority: parsed.data.priority, ...(parsed.data.startDate ? { startDate: parsed.data.startDate } : {}), ...(parsed.data.dueDate ? { dueDate: parsed.data.dueDate } : {}), ...(parsed.data.labels ? { labels: parsed.data.labels.split(',').map((l) => l.trim()).filter(Boolean) } : {}), ...(canManageReviewer && createReviewerId ? { reviewerId: createReviewerId } : {}) };
       const created = await createTask(activeWorkspace.id, projectId, input);
       const cfPairs = Object.entries(createCustomValues).filter(([, v]) => v !== null && v !== undefined && v !== '');
       if (cfPairs.length > 0) { try { await setTaskCustomFieldValues(activeWorkspace.id, projectId, created.id, cfPairs.map(([fieldId, value]) => ({ fieldId, value }))); } catch {} }
       setShowCreate(false); resetCreateForm(); setNotice('Task created.'); await load();
-    } catch (cause) { setError(requestError(cause, 'Task could not be created.')); } finally { setBusy(false); }
+    } catch (cause) { setError(reviewerRequestError(cause, 'Task could not be created.')); } finally { setBusy(false); }
   }
 
   async function handleArchive() { if (!activeWorkspace || !archiveTarget) return; setBusy(true); setError(null); try { await archiveTask(activeWorkspace.id, projectId, archiveTarget.id); setArchiveTarget(null); setNotice(`Task ${archiveTarget.key} archived.`); await load(); } catch (cause) { setError(requestError(cause, 'Task could not be archived.')); } finally { setBusy(false); } }
@@ -488,7 +503,7 @@ export default function ProjectTasksPage() {
         <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
           <div><label htmlFor="create-task-template" className="block text-sm font-medium text-[var(--color-text-primary)]">Task template <span className="text-[var(--color-text-muted)] font-normal">(optional)</span></label><select id="create-task-template" value={createTemplateId} onChange={(e) => setCreateTemplateId(e.target.value)} className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"><option value="">None — create manually</option>{taskTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>{createTemplateId && <p className="mt-1 text-xs text-[var(--color-text-muted)]">When using a template, title/dates below can override template defaults.</p>}</div>
           <Input id="create-task-title" label={createTemplateId ? 'Title override (optional)' : 'Title'} value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} required={!createTemplateId} minLength={createTemplateId ? undefined : 2} maxLength={200} errorMessage={createErrors.title} />
-          {!createTemplateId && (<><Textarea id="create-task-description" label="Description (optional)" value={createDescription} onChange={(e) => setCreateDescription(e.target.value)} maxLength={10000} rows={3} errorMessage={createErrors.description} /><div className="grid grid-cols-2 gap-4"><Select id="create-task-priority" label="Priority" value={createPriority} onChange={(e) => setCreatePriority(e.target.value as TaskPriority)} options={[{ value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'HIGH', label: 'High' }, { value: 'URGENT', label: 'Urgent' }]} /><Select id="create-task-status" label="Status" value={createStatus} onChange={(e) => setCreateStatus(e.target.value as TaskStatus)} options={STATUS_COLUMNS.map((s) => ({ value: s, label: statusLabel(s) }))} /></div><Input id="create-task-labels" label="Labels (optional)" placeholder="e.g. bug, frontend, urgent" value={createLabels} onChange={(e) => setCreateLabels(e.target.value)} helperText="Comma-separated labels" />{customFields.length > 0 && <div className="space-y-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3"><p className="text-sm font-medium text-[var(--color-text-primary)]">Custom fields</p>{customFields.map((f) => <CustomFieldInput key={f.id} field={f} idPrefix="create-cf" value={createCustomValues[f.id] ?? null} onChange={(v) => setCreateCustomValues((prev) => ({ ...prev, [f.id]: v }))} />)}</div>}</>)}
+          {!createTemplateId && (<><Textarea id="create-task-description" label="Description (optional)" value={createDescription} onChange={(e) => setCreateDescription(e.target.value)} maxLength={10000} rows={3} errorMessage={createErrors.description} /><div className="grid grid-cols-2 gap-4"><Select id="create-task-priority" label="Priority" value={createPriority} onChange={(e) => setCreatePriority(e.target.value as TaskPriority)} options={[{ value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'HIGH', label: 'High' }, { value: 'URGENT', label: 'Urgent' }]} /><Select id="create-task-status" label="Status" value={createStatus} onChange={(e) => setCreateStatus(e.target.value as TaskStatus)} options={STATUS_COLUMNS.map((s) => ({ value: s, label: statusLabel(s) }))} /></div><Input id="create-task-labels" label="Labels (optional)" placeholder="e.g. bug, frontend, urgent" value={createLabels} onChange={(e) => setCreateLabels(e.target.value)} helperText="Comma-separated labels" />{canManageReviewer && <Select id="create-task-reviewer" label="Reviewer (optional)" value={createReviewerId} onChange={(e) => setCreateReviewerId(e.target.value)} options={reviewerOptions} helperText="Eligible reviewers are project members with review or approval permission." />}{customFields.length > 0 && <div className="space-y-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3"><p className="text-sm font-medium text-[var(--color-text-primary)]">Custom fields</p>{customFields.map((f) => <CustomFieldInput key={f.id} field={f} idPrefix="create-cf" value={createCustomValues[f.id] ?? null} onChange={(v) => setCreateCustomValues((prev) => ({ ...prev, [f.id]: v }))} />)}</div>}</>)}
           <div className="grid grid-cols-2 gap-4"><div><label htmlFor="create-task-start-date" className="block text-sm font-medium text-[var(--color-text-primary)]">Start date <span className="text-[var(--color-text-muted)] font-normal">(optional)</span></label><input id="create-task-start-date" type="date" value={createStartDate} onChange={(e) => setCreateStartDate(e.target.value)} className="mt-1 h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]" /></div><div><label htmlFor="create-task-due-date" className="block text-sm font-medium text-[var(--color-text-primary)]">Due date <span className="text-[var(--color-text-muted)] font-normal">(optional)</span></label><input id="create-task-due-date" type="date" value={createDueDate} onChange={(e) => setCreateDueDate(e.target.value)} className="mt-1 h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]" />{createErrors.dueDate && <p className="mt-1 text-xs text-[var(--color-error)]">{createErrors.dueDate}</p>}</div></div>
           <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={() => { setShowCreate(false); resetCreateForm(); }}>Cancel</Button><Button type="submit" loading={busy}>{createTemplateId ? 'Create from template' : 'Create task'}</Button></div>
         </form>

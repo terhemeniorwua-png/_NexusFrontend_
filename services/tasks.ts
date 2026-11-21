@@ -128,6 +128,8 @@ export interface TaskSummary {
   /** Optional so older responses and existing fixtures stay valid. */
   acceptanceStatus?: TaskAcceptanceStatus;
   reviewerId?: string | null;
+  /** Optional so older responses and existing fixtures stay valid. */
+  reviewer?: TaskPersonRef | null;
 }
 
 export interface TaskProgress {

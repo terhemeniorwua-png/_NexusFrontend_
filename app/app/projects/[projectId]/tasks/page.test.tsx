@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskListPage from './page';
@@ -28,7 +28,11 @@ function setPermissions(permissions: string[], overrides: Record<string, unknown
     workspaceRole: 'OWNER',
     accessSource: 'workspace_admin',
     assignableRoles: ['PROJECT_MANAGER', 'MEMBER', 'COLLABORATOR', 'VIEWER'],
-    roleDefinitions: [],
+    roleDefinitions: [
+      { role: 'PROJECT_MANAGER', label: 'Project Manager', description: '', permissions: ['task.view', 'task.update', 'task.assign', 'submission.review', 'submission.approve'] },
+      { role: 'MEMBER', label: 'Member', description: '', permissions: ['task.view', 'task.create', 'task.update'] },
+      { role: 'VIEWER', label: 'Viewer', description: '', permissions: ['task.view'] },
+    ],
     isLoading: false,
     accessStatus: null,
     error: null,
@@ -149,6 +153,53 @@ describe('TaskListPage', () => {
     await user.click(btn);
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent(/new task/i);
+  });
+
+  it('lists only eligible reviewers and sends reviewerId when creating a task', async () => {
+    mocks.listProjectMembers.mockResolvedValue([
+      { userId: 'user-2', role: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z', user: { id: 'user-2', name: 'Bob', email: 'bob@example.com' } },
+      { userId: 'user-3', role: 'MEMBER', createdAt: '2026-01-01T00:00:00.000Z', user: { id: 'user-3', name: 'Carol', email: 'carol@example.com' } },
+    ]);
+    const user = userEvent.setup();
+    render(<TaskListPage />);
+    await user.click(await screen.findByRole('button', { name: /new task/i }));
+
+    const picker = await screen.findByLabelText('Reviewer (optional)');
+    expect(within(picker).getByRole('option', { name: 'No reviewer' })).toBeInTheDocument();
+    expect(within(picker).getByRole('option', { name: 'Bob' })).toBeInTheDocument();
+    expect(within(picker).queryByRole('option', { name: 'Carol' })).not.toBeInTheDocument();
+
+    await user.selectOptions(picker, 'user-2');
+    await user.type(screen.getByLabelText(/^Title/), 'Reviewer task');
+    await user.click(screen.getByRole('button', { name: 'Create task' }));
+
+    await waitFor(() => expect(mocks.createTask).toHaveBeenCalledWith('ws-1', 'project-1', expect.objectContaining({ title: 'Reviewer task', reviewerId: 'user-2' })));
+  });
+
+  it('hides the reviewer picker from users without task.assign', async () => {
+    setPermissions(['project.view', 'task.view', 'task.create', 'task.update']);
+    const user = userEvent.setup();
+    render(<TaskListPage />);
+    await user.click(await screen.findByRole('button', { name: /new task/i }));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Reviewer (optional)')).not.toBeInTheDocument();
+  });
+
+  it('shows the backend error when a reviewer is rejected on create', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    mocks.listProjectMembers.mockResolvedValue([
+      { userId: 'user-2', role: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z', user: { id: 'user-2', name: 'Bob', email: 'bob@example.com' } },
+    ]);
+    mocks.createTask.mockRejectedValue(new ApiRequestError('The selected reviewer is not eligible', 403, 'REVIEWER_NOT_ELIGIBLE'));
+    const user = userEvent.setup();
+    render(<TaskListPage />);
+    await user.click(await screen.findByRole('button', { name: /new task/i }));
+    await user.selectOptions(await screen.findByLabelText('Reviewer (optional)'), 'user-2');
+    await user.type(screen.getByLabelText(/^Title/), 'Bad reviewer task');
+    await user.click(screen.getByRole('button', { name: 'Create task' }));
+
+    expect(await screen.findByText(/not eligible/i)).toBeInTheDocument();
   });
 
   it('opens the create modal from ?create=1 once and removes the parameter', async () => {

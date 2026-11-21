@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { SubmitForReviewButton } from '@/components/reviews/SubmitForReviewButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -311,6 +312,7 @@ export default function ProjectChecklistsPage() {
 
   const canManage = can('project.update');
   const canApprove = can('submission.approve');
+  const canSubmitReview = can('submission.submit');
   const currentUserId = user?.id ?? '';
 
   const [checklistsList, setChecklistsList] = useState<ChecklistSummary[]>([]);
@@ -728,16 +730,26 @@ export default function ProjectChecklistsPage() {
                     {progressFor(selected.id).completed}/{progressFor(selected.id).total} items complete
                   </p>
                 </div>
-                {canManage && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
+                <div className="flex flex-wrap items-start gap-2">
+                  <SubmitForReviewButton
+                    workspaceId={workspaceId}
+                    projectId={projectId}
+                    target={{ checklistId: selected.id }}
+                    canSubmit={canSubmitReview}
                     disabled={busy}
-                    onClick={() => setDeleteChecklistId(selected.id)}
-                  >
-                    Delete checklist
-                  </Button>
-                )}
+                    size="sm"
+                  />
+                  {canManage && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => setDeleteChecklistId(selected.id)}
+                    >
+                      Delete checklist
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {canManage && (

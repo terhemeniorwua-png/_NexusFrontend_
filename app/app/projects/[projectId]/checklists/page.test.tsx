@@ -27,18 +27,19 @@ const mocks = vi.hoisted(() => ({
   updateChecklistFeedback: vi.fn(),
   deleteChecklistFeedback: vi.fn(),
   listWorkspaceMembers: vi.fn(),
+  createReview: vi.fn(),
 }));
 
 type Role = 'PROJECT_MANAGER' | 'MEMBER' | 'COLLABORATOR' | 'VIEWER';
 
-function setRole(role: Role) {
+function setRole(role: Role, extraPermissions: string[] = []) {
   const permissions: Record<Role, string[]> = {
     PROJECT_MANAGER: ['project.view', 'project.update', 'submission.approve'],
     MEMBER: ['project.view'],
     COLLABORATOR: ['project.view'],
     VIEWER: ['project.view'],
   };
-  const granted = permissions[role];
+  const granted = [...permissions[role], ...extraPermissions];
   mocks.permissionState = {
     permissions: granted,
     projectRole: role,
@@ -97,6 +98,10 @@ vi.mock('@/services/checklists', () => ({
 
 vi.mock('@/services/workspaces', () => ({
   listWorkspaceMembers: mocks.listWorkspaceMembers,
+}));
+
+vi.mock('@/services/reviews', () => ({
+  createReview: mocks.createReview,
 }));
 
 const checklist = {
@@ -182,6 +187,7 @@ describe('ProjectChecklistsPage', () => {
       feedback: { id: 'f-1', authorId: 'user-1', body: 'Revised' },
     });
     mocks.deleteChecklistFeedback.mockResolvedValue({ ok: true });
+    mocks.createReview.mockResolvedValue({ review: { id: 'review-1' } });
   });
 
   it('lists checklists with derived progress and supports cursor load-more', async () => {
@@ -579,12 +585,27 @@ describe('ProjectChecklistsPage', () => {
     expect(screen.queryByRole('button', { name: 'Complete' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sign off' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Move up/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Submit for review' })).not.toBeInTheDocument();
+    expect(mocks.createReview).not.toHaveBeenCalled();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Feedback for item-1' }));
     expect(await screen.findByText('No feedback yet.')).toBeInTheDocument();
     expect(screen.queryByLabelText('Add feedback')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add feedback' })).not.toBeInTheDocument();
+  });
+
+  it('submits the selected checklist for review when submission is permitted', async () => {
+    const user = userEvent.setup();
+    setRole('PROJECT_MANAGER', ['submission.submit']);
+    await renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Submit for review' }));
+
+    await waitFor(() => expect(mocks.createReview).toHaveBeenCalledWith('ws-1', 'project-1', {
+      checklistId: 'cl-1',
+    }));
+    expect(mocks.createReview).toHaveBeenCalledTimes(1);
   });
 
   it('renders older responses with missing optional fields', async () => {

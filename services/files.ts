@@ -32,6 +32,19 @@
  * DELETE /workspaces/:workspaceId/files/:fileId
  *   response: { ok: true }
  *   Only the uploader, project manager, or workspace owner/admin can delete.
+ *
+ * ─── Attachment versions (verified 2026-11-21) ─────────────────────────────
+ *
+ * GET    /workspaces/:workspaceId/files/:fileId/versions
+ * POST   /workspaces/:workspaceId/files/:fileId/versions
+ * GET    /workspaces/:workspaceId/files/:fileId/versions/:versionId
+ * GET    /workspaces/:workspaceId/files/:fileId/versions/:versionId/download
+ * POST   /workspaces/:workspaceId/files/:fileId/versions/:versionId/make-current
+ * DELETE /workspaces/:workspaceId/files/:fileId/versions/:versionId
+ * GET    /workspaces/:workspaceId/files/:fileId/versions/:versionId/feedback
+ * POST   /workspaces/:workspaceId/files/:fileId/versions/:versionId/feedback
+ * PATCH  /workspaces/:workspaceId/files/:fileId/versions/:versionId/feedback/:feedbackId
+ * DELETE /workspaces/:workspaceId/files/:fileId/versions/:versionId/feedback/:feedbackId
  * ─────────────────────────────────────────────────────────────────────────
  */
 
@@ -71,6 +84,60 @@ export interface ListFilesParams {
   limit?: number;
   projectId?: string;
   taskId?: string;
+}
+
+/**
+ * Backend currently returns every field. They are typed optional so an older
+ * or degraded response is still renderable instead of crashing the panel.
+ */
+export interface AttachmentVersionSummary {
+  id?: string;
+  attachmentId?: string;
+  versionNumber?: number;
+  isCurrent?: boolean;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  uploadedById?: string;
+  changeNote?: string | null;
+  createdAt?: string;
+}
+
+export interface AttachmentVersionFeedbackSummary {
+  id?: string;
+  attachmentVersionId?: string;
+  authorId?: string;
+  body?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  editedAt?: string | null;
+}
+
+export interface ListFileVersionsParams {
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ListFileVersionsResult {
+  items: AttachmentVersionSummary[];
+  nextCursor: string | null;
+}
+
+export interface UploadFileVersionParams {
+  workspaceId: string;
+  fileId: string;
+  file: File;
+  changeNote?: string;
+}
+
+export interface ListVersionFeedbackParams {
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ListVersionFeedbackResult {
+  items: AttachmentVersionFeedbackSummary[];
+  nextCursor: string | null;
 }
 
 /** Allowed MIME types (mirrors file.schemas.ts ALLOWED_MIME_TYPES). */
@@ -217,10 +284,23 @@ export function uploadFile(params: UploadFileParams): {
 
 // ─── Download file ────────────────────────────────────────────────────────────
 
+/** Trigger a browser save dialog for a blob. */
+function triggerBlobDownload(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  // Revoke after a short delay so the download can start
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 /**
  * Download a file and trigger a browser save dialog.
  * The backend returns raw bytes (not JSON), so we use a direct fetch.
- * Object URLs are revoked immediately after the download is initiated.
  */
 export async function downloadFile(
   workspaceId: string,
@@ -232,17 +312,7 @@ export async function downloadFile(
     { authenticated: true },
   ));
 
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.style.display = 'none';
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  // Revoke after a short delay so the download can start
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  triggerBlobDownload(await response.blob(), fileName);
 }
 
 // ─── Preview file ─────────────────────────────────────────────────────────────
@@ -264,6 +334,149 @@ export async function fetchFileBlob(workspaceId: string, fileId: string): Promis
 export async function deleteFile(workspaceId: string, fileId: string): Promise<void> {
   await withAuthRetry(() => apiRequest<unknown>(
     `/workspaces/${workspaceId}/files/${fileId}`,
+    { method: 'DELETE', authenticated: true },
+  ));
+}
+
+// ─── Attachment versions ──────────────────────────────────────────────────────
+
+export async function listFileVersions(
+  workspaceId: string,
+  fileId: string,
+  params: ListFileVersionsParams = {},
+): Promise<ListFileVersionsResult> {
+  const search = new URLSearchParams();
+  if (params.cursor) search.set('cursor', params.cursor);
+  if (params.limit) search.set('limit', String(params.limit));
+  const qs = search.toString();
+
+  const result = await withAuthRetry(() => apiRequest<ListFileVersionsResult>(
+    `/workspaces/${workspaceId}/files/${fileId}/versions${qs ? `?${qs}` : ''}`,
+    { authenticated: true },
+  ));
+  return { items: result?.items ?? [], nextCursor: result?.nextCursor ?? null };
+}
+
+export async function getFileVersion(
+  workspaceId: string,
+  fileId: string,
+  versionId: string,
+): Promise<AttachmentVersionSummary> {
+  const result = await withAuthRetry(() => apiRequest<{ version?: AttachmentVersionSummary }>(
+    `/workspaces/${workspaceId}/files/${fileId}/versions/${versionId}`,
+    { authenticated: true },
+  ));
+  return result?.version ?? {};
+}
+
+/** Upload the next version with a multipart `file` and optional `changeNote`. */
+export async function uploadFileVersion(
+  params: UploadFileVersionParams,
+): Promise<AttachmentVersionSummary> {
+  const form = new FormData();
+  form.append('file', params.file);
+  const changeNote = params.changeNote?.trim();
+  if (changeNote) form.append('changeNote', changeNote);
+
+  const result = await withAuthRetry(() => apiRequest<{ version?: AttachmentVersionSummary }>(
+    `/workspaces/${params.workspaceId}/files/${params.fileId}/versions`,
+    { method: 'POST', body: form, authenticated: true },
+  ));
+  return result?.version ?? {};
+}
+
+/** Download one version's raw bytes and trigger a browser save dialog. */
+export async function downloadFileVersion(
+  workspaceId: string,
+  fileId: string,
+  versionId: string,
+  fileName: string,
+): Promise<void> {
+  const response = await withAuthRetry(() => apiRawRequest(
+    `/workspaces/${workspaceId}/files/${fileId}/versions/${versionId}/download`,
+    { authenticated: true },
+  ));
+  triggerBlobDownload(await response.blob(), fileName);
+}
+
+export async function makeFileVersionCurrent(
+  workspaceId: string,
+  fileId: string,
+  versionId: string,
+): Promise<AttachmentVersionSummary> {
+  const result = await withAuthRetry(() => apiRequest<{ version?: AttachmentVersionSummary }>(
+    `/workspaces/${workspaceId}/files/${fileId}/versions/${versionId}/make-current`,
+    { method: 'POST', authenticated: true },
+  ));
+  return result?.version ?? {};
+}
+
+export async function deleteFileVersion(
+  workspaceId: string,
+  fileId: string,
+  versionId: string,
+): Promise<void> {
+  await withAuthRetry(() => apiRequest<unknown>(
+    `/workspaces/${workspaceId}/files/${fileId}/versions/${versionId}`,
+    { method: 'DELETE', authenticated: true },
+  ));
+}
+
+// ─── Attachment version feedback ──────────────────────────────────────────────
+
+export async function listFileVersionFeedback(
+  workspaceId: string,
+  fileId: string,
+  versionId: string,
+  params: ListVersionFeedbackParams = {},
+): Promise<ListVersionFeedbackResult> {
+  const search = new URLSearchParams();
+  if (params.cursor) search.set('cursor', params.cursor);
+  if (params.limit) search.set('limit', String(params.limit));
+  const qs = search.toString();
+
+  const result = await withAuthRetry(() => apiRequest<ListVersionFeedbackResult>(
+    `/workspaces/${workspaceId}/files/${fileId}/versions/${versionId}/feedback${qs ? `?${qs}` : ''}`,
+    { authenticated: true },
+  ));
+  return { items: result?.items ?? [], nextCursor: result?.nextCursor ?? null };
+}
+
+export async function createFileVersionFeedback(
+  workspaceId: string,
+  fileId: string,
+  versionId: string,
+  body: string,
+): Promise<AttachmentVersionFeedbackSummary> {
+  const result = await withAuthRetry(() => apiRequest<{ feedback?: AttachmentVersionFeedbackSummary }>(
+    `/workspaces/${workspaceId}/files/${fileId}/versions/${versionId}/feedback`,
+    { method: 'POST', body: JSON.stringify({ body }), authenticated: true },
+  ));
+  return result?.feedback ?? {};
+}
+
+export async function updateFileVersionFeedback(
+  workspaceId: string,
+  fileId: string,
+  versionId: string,
+  feedbackId: string,
+  body: string,
+): Promise<AttachmentVersionFeedbackSummary> {
+  const result = await withAuthRetry(() => apiRequest<{ feedback?: AttachmentVersionFeedbackSummary }>(
+    `/workspaces/${workspaceId}/files/${fileId}/versions/${versionId}/feedback/${feedbackId}`,
+    { method: 'PATCH', body: JSON.stringify({ body }), authenticated: true },
+  ));
+  return result?.feedback ?? {};
+}
+
+export async function deleteFileVersionFeedback(
+  workspaceId: string,
+  fileId: string,
+  versionId: string,
+  feedbackId: string,
+): Promise<void> {
+  await withAuthRetry(() => apiRequest<unknown>(
+    `/workspaces/${workspaceId}/files/${fileId}/versions/${versionId}/feedback/${feedbackId}`,
     { method: 'DELETE', authenticated: true },
   ));
 }

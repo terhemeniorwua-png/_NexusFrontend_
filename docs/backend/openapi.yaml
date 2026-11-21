@@ -19582,6 +19582,7 @@ paths:
       - category
       - labels
       - status
+      - type
       - visibility
       - ownerId
       - memberCount
@@ -19630,6 +19631,17 @@ paths:
           - ON_HOLD
           - COMPLETED
           - ARCHIVED
+        type:
+          type: string
+          description: "Classification only; selects the project environment and grants no access."
+          enum:
+          - GENERAL
+          - ENGINEERING
+          - DESIGN
+          - OPERATIONS
+          - MARKETING
+          - HR
+          default: GENERAL
         visibility:
           type: string
           enum:
@@ -19711,6 +19723,17 @@ paths:
             type: string
             minLength: 1
             maxLength: 40
+        type:
+          type: string
+          description: "Optional classification; defaults to GENERAL. Grants no access."
+          enum:
+          - GENERAL
+          - ENGINEERING
+          - DESIGN
+          - OPERATIONS
+          - MARKETING
+          - HR
+          default: GENERAL
         visibility:
           type: string
           enum:
@@ -19769,6 +19792,16 @@ paths:
             type: string
             minLength: 1
             maxLength: 40
+        type:
+          type: string
+          description: "Optional classification; selects the project environment and grants no access."
+          enum:
+          - GENERAL
+          - ENGINEERING
+          - DESIGN
+          - OPERATIONS
+          - MARKETING
+          - HR
         visibility:
           type: string
           enum:

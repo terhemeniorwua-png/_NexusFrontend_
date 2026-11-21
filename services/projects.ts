@@ -1,21 +1,20 @@
 import { apiRequest, ApiRequestError } from '@/lib/api';
+import type { ProjectType } from '@/lib/project-type';
 import { refreshSession } from '@/services/auth';
 
 export type ProjectStatus = 'PLANNING' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'ARCHIVED';
 export type ProjectVisibility = 'PRIVATE' | 'DEPARTMENT_TEAM' | 'WORKSPACE';
 
-/** Project classification returned by the backend on every project response. */
-export const PROJECT_TYPES = ['GENERAL', 'ENGINEERING', 'DESIGN', 'OPERATIONS', 'MARKETING', 'HR'] as const;
-export type ProjectType = (typeof PROJECT_TYPES)[number];
-
-export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
-  GENERAL: 'General',
-  ENGINEERING: 'Engineering',
-  DESIGN: 'Design',
-  OPERATIONS: 'Operations',
-  MARKETING: 'Marketing',
-  HR: 'HR',
-};
+// Re-export the canonical project-type contract so existing service consumers
+// keep working; lib/project-type.ts is the single source of truth.
+export {
+  DEFAULT_PROJECT_TYPE,
+  normaliseProjectType,
+  projectTypeLabel,
+  PROJECT_TYPE_LABELS,
+  PROJECT_TYPES,
+} from '@/lib/project-type';
+export type { ProjectType } from '@/lib/project-type';
 
 /** Project-level roles returned by GET /project-roles and the permissions endpoint. */
 export const PROJECT_ROLES = ['PROJECT_MANAGER', 'MEMBER', 'COLLABORATOR', 'VIEWER'] as const;

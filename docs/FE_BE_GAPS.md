@@ -101,7 +101,7 @@ The frontend `auth.ts` service uses the following backend endpoints:
 
 ### Routes Used by Frontend
 
-The frontend `projects.ts` service uses the following backend endpoints (derived from `PROJECT_PERMISSIONS`, `ProjectSummary`, `ProjectDetail`, and mutation functions):
+The frontend `projects.ts` service uses the following backend endpoints (derived from `PROJECT_PERMISSIONS`, `ProjectSummary`, `ProjectDetail`, `ProjectType`, and mutation functions):
 
 | Frontend Method | Backend Path | Status |
 |---|---|---|
@@ -119,12 +119,15 @@ The frontend `projects.ts` service uses the following backend endpoints (derived
 
 | Mismatch Type | Detail |
 |---|---|
-| None detected | All project routes used by the frontend `projects.ts` service are documented in the backend `API.md` §Project section. The `ProjectSummary`, `ProjectDetail`, `ProjectStatus`, `ProjectVisibility`, `ProjectRole`, and `ProjectAccessSource` types all match the backend `project.ts` schemas. The `PROJECT_PERMISSIONS` list maps directly to the backend-provided permission strings. |
+| Resolved — project `type` contract (BE-1) | The frontend now consumes the backend `ProjectType` enum exactly: `GENERAL \| ENGINEERING \| DESIGN \| OPERATIONS \| MARKETING \| HR`. Project responses expose `type` (default `GENERAL`); create/update accept an optional `type`. Canonical values, labels and the `GENERAL` fallback live in `lib/project-type.ts` and are re-exported by `services/projects.ts`. |
+| None remaining | All project routes used by the frontend `projects.ts` service are documented in the backend `API.md` §Project section. The `ProjectSummary`, `ProjectDetail`, `ProjectStatus`, `ProjectVisibility`, `ProjectType`, `ProjectRole`, and `ProjectAccessSource` types all match the backend `project.ts` schemas. The `PROJECT_PERMISSIONS` list maps directly to the backend-provided permission strings. |
 
 ### Notes
 
 - The `PROJECT_PERMISSIONS` constants are derived from the backend's permission system and used by the frontend to hide/disable controls — this is the correct pattern per `CONVENTIONS.md` §11 and `AGENTS.md` §11.
 - The frontend correctly treats these as backend-authority-only checks, never as grantors of access.
+- Project `type` is a display classification only. It selects which environment renders a project and grants **no** access; it is never used in permission checks. The type select is gated by the existing workspace-/project-edit permissions.
+- Missing or unknown `type` values from older backends fall back to `GENERAL` so legacy responses do not crash the UI.
 - No path mismatches or payload shape mismatches found for the projects service.
 
 

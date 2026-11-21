@@ -17,9 +17,16 @@ import { Textarea } from '@/components/ui/Textarea';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AccessState } from '@/components/shared/AccessState';
 import { ApiRequestError } from '@/lib/api';
+import { workspaceCan } from '@/lib/permissions';
+import {
+  DEFAULT_PROJECT_TYPE,
+  projectTypeLabel,
+  PROJECT_TYPES,
+  PROJECT_TYPE_LABELS,
+  type ProjectType,
+} from '@/lib/project-type';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import {
-  PROJECT_TYPE_LABELS,
   archiveProject,
   createProject,
   listProjects,
@@ -36,6 +43,7 @@ const createSchema = z.object({
   key: z.string().trim().min(2, 'Key must be at least 2 characters').max(16, 'Key must be at most 16 characters').regex(/^[A-Za-z0-9_-]+$/, 'Key may only contain letters, numbers, hyphens, and underscores'),
   description: z.string().trim().max(5000).optional(),
   visibility: z.enum(['WORKSPACE', 'DEPARTMENT_TEAM', 'PRIVATE']),
+  type: z.enum(PROJECT_TYPES).default(DEFAULT_PROJECT_TYPE),
 });
 
 // --- Helpers ---
@@ -103,6 +111,7 @@ export default function ProjectsPage() {
   const [createKey, setCreateKey] = useState('');
   const [createDescription, setCreateDescription] = useState('');
   const [createVisibility, setCreateVisibility] = useState<ProjectVisibility>('WORKSPACE');
+  const [createType, setCreateType] = useState<ProjectType>(DEFAULT_PROJECT_TYPE);
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
 
   // Organizational access options for DEPARTMENT_TEAM visibility
@@ -180,6 +189,7 @@ export default function ProjectsPage() {
       name: createName, key: createKey,
       description: createDescription.trim() || undefined,
       visibility: createVisibility,
+      type: createType,
     });
     if (!parsed.success) {
       const errors: Record<string, string> = {};
@@ -193,11 +203,12 @@ export default function ProjectsPage() {
         name: parsed.data.name, key: parsed.data.key,
         description: parsed.data.description ?? null,
         visibility: parsed.data.visibility,
+        type: parsed.data.type,
         ...(parsed.data.visibility === 'DEPARTMENT_TEAM' && createTeamId ? { teamId: createTeamId } : {}),
         ...(parsed.data.visibility === 'DEPARTMENT_TEAM' && createDepartmentId ? { departmentId: createDepartmentId } : {}),
       });
       setShowCreate(false);
-      setCreateName(''); setCreateKey(''); setCreateDescription(''); setCreateVisibility('WORKSPACE'); setCreateTeamId(''); setCreateDepartmentId('');
+      setCreateName(''); setCreateKey(''); setCreateDescription(''); setCreateVisibility('WORKSPACE'); setCreateType(DEFAULT_PROJECT_TYPE); setCreateTeamId(''); setCreateDepartmentId('');
       setNotice('Project created.');
       await load();
     } catch (cause) {
@@ -375,7 +386,7 @@ export default function ProjectsPage() {
                           {statusLabel(project.status)}
                         </Badge>
                         <Badge variant="outline">
-                          {PROJECT_TYPE_LABELS[project.type ?? 'GENERAL']}
+                          {projectTypeLabel(project.type)}
                         </Badge>
                       </div>
                       {project.description && (
@@ -486,6 +497,16 @@ export default function ProjectsPage() {
               {VISIBILITY_CONSEQUENCES[createVisibility]}
             </p>
           </div>
+          {workspaceCan(activeWorkspace, 'workspace:update') && (
+            <Select
+              id="create-project-type"
+              label="Type"
+              value={createType}
+              onChange={(event) => setCreateType(event.target.value as ProjectType)}
+              options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
+              helperText="Classification only. It selects the project environment and does not grant access."
+            />
+          )}
           {createVisibility === 'DEPARTMENT_TEAM' && (
             <div className="space-y-4 rounded-lg border border-[var(--color-border)] p-4">
               <p className="text-sm font-medium">Department / team association</p>

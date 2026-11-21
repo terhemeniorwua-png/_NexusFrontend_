@@ -50,6 +50,30 @@ describe('ProjectsPage', () => {
     expect(screen.getByText('Engineering')).toBeInTheDocument();
   });
 
+  it('renders a type badge for every project type', async () => {
+    const types = ['GENERAL', 'ENGINEERING', 'DESIGN', 'OPERATIONS', 'MARKETING', 'HR'] as const;
+    const labels = ['General', 'Engineering', 'Design', 'Operations', 'Marketing', 'HR'] as const;
+    mocks.listProjects.mockResolvedValue({
+      items: types.map((type, index) => ({ ...projectA, id: `project-${index}`, name: `Project ${type}`, type })),
+      nextCursor: null,
+    });
+    render(<ProjectsPage />);
+    expect(await screen.findByText('Project GENERAL')).toBeInTheDocument();
+    for (const label of labels) {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('falls back to a General badge for an unknown type from an older backend', async () => {
+    mocks.listProjects.mockResolvedValue({
+      items: [{ ...projectA, name: 'Legacy project', type: 'LEGACY_TYPE' }],
+      nextCursor: null,
+    });
+    render(<ProjectsPage />);
+    expect(await screen.findByText('Legacy project')).toBeInTheDocument();
+    expect(screen.getAllByText('General').length).toBeGreaterThan(0);
+  });
+
   it('shows an empty state when there are no projects', async () => {
     mocks.listProjects.mockResolvedValue({ items: [], nextCursor: null });
     render(<ProjectsPage />);
@@ -100,6 +124,53 @@ describe('ProjectsPage', () => {
     await user.click(screen.getByRole('button', { name: 'New project' }));
     await user.click(screen.getByRole('button', { name: 'Create project' }));
     expect(mocks.createProject).not.toHaveBeenCalled();
+  });
+
+  it('sends the selected type when creating a project', async () => {
+    const user = userEvent.setup();
+    mocks.createProject.mockResolvedValue(projectA);
+    render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+
+    const typeSelect = await screen.findByLabelText('Type');
+    expect(typeSelect).toHaveValue('GENERAL');
+    await user.selectOptions(typeSelect, 'DESIGN');
+    await user.type(screen.getByLabelText(/Project name/), 'Design Project');
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    await waitFor(() =>
+      expect(mocks.createProject).toHaveBeenCalledWith(
+        'ws-1',
+        expect.objectContaining({ name: 'Design Project', type: 'DESIGN' }),
+      ),
+    );
+  });
+
+  it('hides the type select in the create modal for users who cannot edit the workspace', async () => {
+    const user = userEvent.setup();
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'VIEWER', organizationRole: null };
+    render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Type')).not.toBeInTheDocument();
+  });
+
+  it('gates the create type select on workspace:update exactly as the backend create-project permission', async () => {
+    const user = userEvent.setup();
+    // Backend: requireWorkspaceAccess(..., WorkspaceCapability.UpdateWorkspace)
+    // grants 'workspace:update' to OWNER and PROJECT_MANAGER only.
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'PROJECT_MANAGER', organizationRole: null };
+    const view = render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    expect(await screen.findByLabelText('Type')).toBeInTheDocument();
+
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'MEMBER', organizationRole: null };
+    view.rerender(<ProjectsPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Type')).not.toBeInTheDocument());
   });
 
   it('shows archive confirm dialog and calls archive on confirm', async () => {

@@ -26,6 +26,9 @@ import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import {
   getTask,
   updateTask,
+  acceptTask,
+  declineTask,
+  startTask,
   deleteTask,
   archiveTask,
   restoreTask,
@@ -49,6 +52,7 @@ import {
   deleteTaskRecurrence,
   generateTaskRecurrenceInstance,
   type ProjectCustomField,
+  type TaskAcceptanceStatus,
   type TaskRecurrenceFrequency,
   type TaskRecurrenceRule,
   type TaskReviewDecision,
@@ -129,6 +133,29 @@ function requestError(cause: unknown, fallback: string): string {
   }
   if (cause.status === 403) return 'Your current role does not allow this action.';
   return cause.message;
+}
+
+const ACCEPTANCE_LABELS: Record<TaskAcceptanceStatus, string> = {
+  PENDING: 'Pending',
+  ACCEPTED: 'Accepted',
+  DECLINED: 'Declined',
+};
+
+const ACCEPTANCE_BADGES: Record<TaskAcceptanceStatus, 'warning' | 'success' | 'error'> = {
+  PENDING: 'warning',
+  ACCEPTED: 'success',
+  DECLINED: 'error',
+};
+
+/**
+ * Acceptance actions surface the backend message for rejected/stale actions and
+ * refresh the task so assignee-scoped controls no longer render from stale data.
+ */
+function acceptanceActionError(cause: unknown, fallback: string): { message: string; refresh: boolean } {
+  if (cause instanceof ApiRequestError && [400, 403, 409].includes(cause.status)) {
+    return { message: cause.message || fallback, refresh: true };
+  }
+  return { message: requestError(cause, fallback), refresh: false };
 }
 
 function dependencyRequestError(cause: unknown, fallback: string): string {
@@ -264,6 +291,14 @@ export default function TaskDetailPage() {
 
   // Submission / review actions
   const [submissionBusy, setSubmissionBusy] = useState(false);
+
+  // Assignee acceptance actions
+  const [acceptanceBusy, setAcceptanceBusy] = useState(false);
+  const acceptanceInFlight = useRef(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+  const [declineReasonError, setDeclineReasonError] = useState<string | null>(null);
+
   const [reviewFeedbackSource, setReviewFeedbackSource] = useState<'reject' | 'request-revision' | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState('');
   const [reviewFeedbackError, setReviewFeedbackError] = useState<string | null>(null);
@@ -297,13 +332,15 @@ export default function TaskDetailPage() {
   // Data loading
   // ---------------------------------------------------------------------------
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { preserveError?: boolean }) => {
     if (!activeWorkspace || !canView) {
       setLoading(false);
       return;
     }
     const seq = ++latestLoad.current;
-    setLoading(true); setError(null); setAccessStatus(null);
+    setLoading(true);
+    if (!options?.preserveError) setError(null);
+    setAccessStatus(null);
     try {
       const data = await getTask(activeWorkspace.id, projectId, taskId);
       if (seq !== latestLoad.current) return;
@@ -312,6 +349,7 @@ export default function TaskDetailPage() {
       setTask(data);
     } catch (cause) {
       if (seq !== latestLoad.current) return;
+      if (options?.preserveError) return;
       if (cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) {
         setAccessStatus(cause.status);
       } else if (cause instanceof ApiRequestError && (cause.status === 404 || cause.status === 400)) {
@@ -757,27 +795,108 @@ export default function TaskDetailPage() {
   }
 
   // ---------------------------------------------------------------------------
+  // Assignee acceptance handlers
+  // ---------------------------------------------------------------------------
+
+  const declineReasonLength = declineReason.trim().length;
+  const declineReasonValid = declineReasonLength >= 3 && declineReasonLength <= 2000;
+
+  function applyAcceptanceResult(response: { task: TaskSummary; assignee: { userId: string; acceptanceStatus: TaskAcceptanceStatus } }) {
+    setTask((current) => {
+      const base = current ? { ...current, ...response.task } : response.task;
+      return {
+        ...base,
+        acceptanceStatus: response.assignee.acceptanceStatus,
+        assignees: base.assignees.map((assignee) =>
+          assignee.userId === response.assignee.userId
+            ? { ...assignee, acceptanceStatus: response.assignee.acceptanceStatus }
+            : assignee,
+        ),
+      };
+    });
+  }
+
+  /** Shared in-flight guard: a double click can never dispatch two requests. */
+  async function runAcceptanceAction(
+    action: () => Promise<{ task: TaskSummary; assignee: { userId: string; acceptanceStatus: TaskAcceptanceStatus } }>,
+    fallback: string,
+    successNotice: string,
+  ): Promise<boolean> {
+    if (!activeWorkspace || !task || acceptanceInFlight.current) return false;
+    acceptanceInFlight.current = true;
+    setAcceptanceBusy(true);
+    setError(null);
+    try {
+      applyAcceptanceResult(await action());
+      setNotice(successNotice);
+      return true;
+    } catch (cause) {
+      const { message, refresh } = acceptanceActionError(cause, fallback);
+      setError(message);
+      if (refresh) void load({ preserveError: true });
+      return false;
+    } finally {
+      acceptanceInFlight.current = false;
+      setAcceptanceBusy(false);
+    }
+  }
+
+  async function handleAccept() {
+    if (!activeWorkspace || !task) return;
+    await runAcceptanceAction(
+      () => acceptTask(activeWorkspace.id, projectId, task.id),
+      'The assignment could not be accepted.',
+      'Task assignment accepted.',
+    );
+  }
+
+  function openDecline() {
+    setDeclineReason('');
+    setDeclineReasonError(null);
+    setError(null);
+    setDeclineOpen(true);
+  }
+
+  function closeDecline() {
+    setDeclineOpen(false);
+    setDeclineReason('');
+    setDeclineReasonError(null);
+  }
+
+  async function confirmDecline() {
+    if (!activeWorkspace || !task) return;
+    const reason = declineReason.trim();
+    if (reason.length < 3) {
+      setDeclineReasonError('A reason of at least 3 characters is required.');
+      return;
+    }
+    if (reason.length > 2000) {
+      setDeclineReasonError('A reason must be at most 2000 characters.');
+      return;
+    }
+    const succeeded = await runAcceptanceAction(
+      () => declineTask(activeWorkspace.id, projectId, task.id, reason),
+      'The assignment could not be declined.',
+      'Task assignment declined.',
+    );
+    if (succeeded) closeDecline();
+  }
+
+  async function handleStart() {
+    if (!activeWorkspace || !task) return;
+    const taskId = task.id;
+    const succeeded = await runAcceptanceAction(
+      () => startTask(activeWorkspace.id, projectId, taskId),
+      'The task could not be started.',
+      'Task started.',
+    );
+    if (succeeded) router.push(`/app/projects/${projectId}/tasks/${taskId}/work`);
+  }
+
+  // ---------------------------------------------------------------------------
   // Submission / review handlers
   // ---------------------------------------------------------------------------
 
-  // TODO: switch to POST /start when available
-  async function handleStart() {
-    if (!activeWorkspace || !task) return;
-    setSubmissionBusy(true); setError(null);
-    try {
-      const updated = await updateTask(activeWorkspace.id, projectId, task.id, { status: 'IN_PROGRESS' });
-      setTask(updated);
-      router.push(`/app/projects/${projectId}/tasks/${task.id}/work`);
-    } catch (cause) {
-      setError(
-        cause instanceof ApiRequestError && cause.status === 403 && cause.message
-          ? cause.message
-          : requestError(cause, 'The task could not be started.'),
-      );
-    } finally {
-      setSubmissionBusy(false);
-    }
-  }
 
   function openSubmitSummary() {
     setSubmitSummary(task?.submissionSummary ?? '');
@@ -907,7 +1026,17 @@ export default function TaskDetailPage() {
 
   const isCompleted = task.status === 'APPROVED';
   const isArchived = Boolean(task.archivedAt);
-  const isAssignedToMe = Boolean(user && task.assignees.some((assignee) => assignee.userId === user.id));
+  const myAssignee = user ? task.assignees.find((assignee) => assignee.userId === user.id) : undefined;
+  const isAssignedToMe = Boolean(myAssignee);
+  const canWriteProject = canUpdate && !isArchived;
+  // Acceptance lives on the assignee record; task-level field is an optional
+  // fallback for newer responses. Missing values render no badge/actions.
+  const myAcceptanceStatus = myAssignee?.acceptanceStatus ?? task.acceptanceStatus;
+  // A stale PENDING acceptance record must not expose accept/decline once the
+  // task has already moved beyond ASSIGNED.
+  const canAcceptOrDecline = isAssignedToMe && canWriteProject
+    && task.status === 'ASSIGNED' && myAcceptanceStatus === 'PENDING';
+  const canStartTask = isAssignedToMe && canWriteProject && task.status === 'ASSIGNED';
   // A submission belongs to its assignees. Reviewers must never approve or
   // reject their own submitted work.
   const isOwnSubmission = isAssignedToMe;
@@ -979,6 +1108,11 @@ export default function TaskDetailPage() {
                   )}
                   <Badge variant={task.status}>{statusLabel(task.status)}</Badge>
                   <Badge variant={task.priority}>{priorityLabel(task.priority)}</Badge>
+                  {myAcceptanceStatus && (
+                    <Badge variant={ACCEPTANCE_BADGES[myAcceptanceStatus]}>
+                      {ACCEPTANCE_LABELS[myAcceptanceStatus]}
+                    </Badge>
+                  )}
                   {isArchived && <Badge variant="outline">Archived</Badge>}
                 </div>
                 {editing ? (
@@ -1093,9 +1227,23 @@ export default function TaskDetailPage() {
                   >
                     Edit
                   </PermissionButton>
-                  {isAssignedToMe && (task.status === 'ASSIGNED' || task.status === 'CHANGES_REQUESTED') && (
-                    <Button size="sm" onClick={() => void handleStart()} disabled={busy || submissionBusy}>
-                      {task.status === 'ASSIGNED' ? 'Start' : 'Resume'}
+                  {canAcceptOrDecline && (
+                    <>
+                      <Button size="sm" onClick={() => void handleAccept()} disabled={acceptanceBusy || busy}>
+                        Accept
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={openDecline} disabled={acceptanceBusy || busy}>
+                        Decline
+                      </Button>
+                    </>
+                  )}
+                  {canStartTask && (
+                    <Button size="sm" onClick={() => void handleStart()} disabled={acceptanceBusy || busy}>
+                      {myAcceptanceStatus === 'PENDING'
+                        ? 'Start (acceptance pending)'
+                        : myAcceptanceStatus === 'ACCEPTED'
+                          ? 'Start (accepted)'
+                          : 'Start'}
                     </Button>
                   )}
                   {!isArchived && isAssignedToMe && (
@@ -1697,6 +1845,50 @@ export default function TaskDetailPage() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={declineOpen}
+        onClose={closeDecline}
+        title="Decline task assignment"
+        description="Tell the task creator why you cannot take this task."
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeDecline} disabled={acceptanceBusy}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void confirmDecline()}
+              loading={acceptanceBusy}
+              disabled={acceptanceBusy || !declineReasonValid}
+            >
+              Decline assignment
+            </Button>
+          </>
+        }
+      >
+        <Textarea
+          id="decline-reason"
+          label="Reason"
+          required
+          value={declineReason}
+          onChange={(event) => {
+            setDeclineReason(event.target.value);
+            setDeclineReasonError(null);
+          }}
+          errorMessage={declineReasonError ?? undefined}
+          placeholder="Explain why you cannot accept this task"
+          rows={4}
+          disabled={acceptanceBusy}
+        />
+        <p
+          className={`mt-1 text-xs ${declineReasonLength > 2000 ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]'}`}
+          aria-live="polite"
+        >
+          {declineReasonLength}/2000
+        </p>
+      </Modal>
 
       <Modal
         open={submitSummaryOpen}

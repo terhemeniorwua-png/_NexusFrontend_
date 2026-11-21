@@ -2,12 +2,19 @@ import { listProjects } from '@/services/projects';
 import {
   listMineTasks,
   listTasks,
+  type TaskAcceptanceStatus,
   type TaskPriority,
   type TaskStatus,
 } from '@/services/tasks';
 
 type TaskItem = Awaited<ReturnType<typeof listTasks>>['items'][number];
-export type MyTask = TaskItem & { projectName: string; projectKeyLabel: string };
+export type MyTask = TaskItem & {
+  projectName: string;
+  projectKeyLabel: string;
+  /** Optional so older responses and existing fixtures stay valid. */
+  acceptanceStatus?: TaskAcceptanceStatus;
+  reviewerId?: string | null;
+};
 
 /**
  * Query fields honoured by GET /tasks/mine. Generic task-list filters such as

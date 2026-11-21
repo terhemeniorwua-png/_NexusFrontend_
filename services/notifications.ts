@@ -75,7 +75,10 @@ export type NotificationType =
   | 'TASK_BLOCKER_REPORTED'
   | 'TASK_BLOCKER_RESOLVED'
   | 'TASK_DUE_SOON'
-  | 'TASK_OVERDUE';
+  | 'TASK_OVERDUE'
+  | 'TASK_DECLINED'
+  | 'INTEGRATION_RECONNECT_REQUIRED'
+  | 'SECURITY_ALERT';
 
 export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   'MENTION',
@@ -100,6 +103,9 @@ export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   'TASK_BLOCKER_RESOLVED',
   'TASK_DUE_SOON',
   'TASK_OVERDUE',
+  'TASK_DECLINED',
+  'INTEGRATION_RECONNECT_REQUIRED',
+  'SECURITY_ALERT',
 ];
 
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
@@ -125,6 +131,9 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   TASK_BLOCKER_RESOLVED: 'Task blocker resolved',
   TASK_DUE_SOON: 'Task due soon',
   TASK_OVERDUE: 'Task overdue',
+  TASK_DECLINED: 'Task assignment declined',
+  INTEGRATION_RECONNECT_REQUIRED: 'Integration reconnection required',
+  SECURITY_ALERT: 'Security alert',
 };
 
 export const NOTIFICATION_TYPE_GROUPS: { label: string; types: NotificationType[] }[] = [
@@ -140,6 +149,7 @@ export const NOTIFICATION_TYPE_GROUPS: { label: string; types: NotificationType[
       'TASK_BLOCKER_RESOLVED',
       'TASK_DUE_SOON',
       'TASK_OVERDUE',
+      'TASK_DECLINED',
     ],
   },
   { label: 'Comments and mentions', types: ['MENTION', 'COMMENT_REPLY'] },
@@ -157,6 +167,8 @@ export const NOTIFICATION_TYPE_GROUPS: { label: string; types: NotificationType[
   },
   { label: 'Meetings', types: ['MEETING_INVITE', 'MEETING_RESCHEDULED', 'MEETING_CANCELLED'] },
   { label: 'Projects', types: ['PROJECT_UPDATE'] },
+  { label: 'Integrations', types: ['INTEGRATION_RECONNECT_REQUIRED'] },
+  { label: 'Security', types: ['SECURITY_ALERT'] },
 ];
 
 export interface NotificationSummary {

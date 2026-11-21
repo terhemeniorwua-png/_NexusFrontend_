@@ -15,6 +15,9 @@ export type TaskStatus =
 
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
+/** Per-assignee acceptance state (backend TaskAssigneeAcceptanceStatus). */
+export type TaskAcceptanceStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
+
 export type TaskSortBy = 'position' | 'dueDate' | 'priority' | 'createdAt';
 export type TaskSortOrder = 'asc' | 'desc';
 
@@ -23,6 +26,8 @@ export interface TaskAssignee {
   user: { id: string; name: string; email: string };
   assignedBy: string;
   createdAt: string;
+  /** Optional so older responses and existing fixtures stay valid. */
+  acceptanceStatus?: TaskAcceptanceStatus;
 }
 
 export interface TaskDependency {
@@ -120,6 +125,9 @@ export interface TaskSummary {
   reviewedAt?: string | null;
   reviewedById?: string | null;
   reviewedBy?: TaskPersonRef | null;
+  /** Optional so older responses and existing fixtures stay valid. */
+  acceptanceStatus?: TaskAcceptanceStatus;
+  reviewerId?: string | null;
 }
 
 export interface TaskProgress {
@@ -149,7 +157,11 @@ export interface TaskWorkspaceData {
     assignees: TaskAssignee[];
     assignedBy: string | null;
     reviewer: TaskPersonRef | null;
+    reviewerId?: string | null;
   };
+  /** Optional so older responses and existing fixtures stay valid. */
+  acceptanceStatus?: TaskAcceptanceStatus;
+  reviewerId?: string | null;
   schedule: {
     startDate: string | null;
     dueDate: string | null;
@@ -228,6 +240,7 @@ export interface CreateTaskInput {
   parentTaskId?: string | null;
   weight?: number;
   assigneeIds?: string[];
+  reviewerId?: string | null;
   requiresApproval?: boolean;
   expectedDeliverables?: TaskDeliverable[] | null;
 }
@@ -244,11 +257,31 @@ export interface UpdateTaskInput {
   position?: number;
   parentTaskId?: string | null;
   weight?: number;
+  reviewerId?: string | null;
   requiresApproval?: boolean;
   expectedDeliverables?: TaskDeliverable[] | null;
 }
 
 export type TaskReviewDecision = 'START_REVIEW' | 'APPROVE' | 'REQUEST_CHANGES';
+
+/** Assignee record returned by accept/decline/start (backend task.service.ts). */
+export interface TaskAssigneeActionResult {
+  taskId: string;
+  userId: string;
+  user: { id: string; name: string; email: string };
+  assignedBy: string | null;
+  assignedAt: string;
+  acceptanceStatus: TaskAcceptanceStatus;
+  acceptedAt: string | null;
+  declinedAt: string | null;
+  declineReason: string | null;
+}
+
+/** Response envelope returned by POST /:taskId/{accept,decline,start}. */
+export interface TaskAssigneeActionResponse {
+  task: TaskSummary;
+  assignee: TaskAssigneeActionResult;
+}
 
 export interface ListTasksQuery {
   cursor?: string;
@@ -548,6 +581,41 @@ export function reviewTask(
   return request<TaskSummary>(taskPath(workspaceId, projectId, taskId, '/review'), {
     method: 'POST',
     body: JSON.stringify({ decision, ...(feedback != null ? { feedback } : {}) }),
+  });
+}
+
+/** Assignee-only actions. The backend schema requires an empty JSON object for accept/start. */
+export function acceptTask(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<TaskAssigneeActionResponse> {
+  return request<TaskAssigneeActionResponse>(taskPath(workspaceId, projectId, taskId, '/accept'), {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function declineTask(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  reason: string,
+): Promise<TaskAssigneeActionResponse> {
+  return request<TaskAssigneeActionResponse>(taskPath(workspaceId, projectId, taskId, '/decline'), {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function startTask(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+): Promise<TaskAssigneeActionResponse> {
+  return request<TaskAssigneeActionResponse>(taskPath(workspaceId, projectId, taskId, '/start'), {
+    method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 

@@ -48,6 +48,7 @@ describe('ProjectsPage', () => {
     // Visibility badge is present (there may be the filter option as well)
     expect(screen.getAllByText('Organisation-wide').length).toBeGreaterThan(0);
     expect(screen.getByText('Engineering')).toBeInTheDocument();
+<<<<<<< HEAD
   });
 
   it('renders a type badge for every project type', async () => {
@@ -72,6 +73,8 @@ describe('ProjectsPage', () => {
     render(<ProjectsPage />);
     expect(await screen.findByText('Legacy project')).toBeInTheDocument();
     expect(screen.getAllByText('General').length).toBeGreaterThan(0);
+=======
+>>>>>>> origin/main
   });
 
   it('shows an empty state when there are no projects', async () => {
@@ -156,6 +159,21 @@ describe('ProjectsPage', () => {
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.queryByLabelText('Type')).not.toBeInTheDocument();
+  });
+
+  it('gates the create type select on workspace:update exactly as the backend create-project permission', async () => {
+    const user = userEvent.setup();
+    // Backend: requireWorkspaceAccess(..., WorkspaceCapability.UpdateWorkspace)
+    // grants 'workspace:update' to OWNER and PROJECT_MANAGER only.
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'PROJECT_MANAGER', organizationRole: null };
+    const view = render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    expect(await screen.findByLabelText('Type')).toBeInTheDocument();
+
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'MEMBER', organizationRole: null };
+    view.rerender(<ProjectsPage />);
+    await waitFor(() => expect(screen.queryByLabelText('Type')).not.toBeInTheDocument());
   });
 
   it('shows archive confirm dialog and calls archive on confirm', async () => {

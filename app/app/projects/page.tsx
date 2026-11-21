@@ -27,6 +27,7 @@ import {
 } from '@/lib/project-type';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import {
+  PROJECT_TYPE_LABELS,
   archiveProject,
   createProject,
   listProjects,
@@ -386,7 +387,11 @@ export default function ProjectsPage() {
                           {statusLabel(project.status)}
                         </Badge>
                         <Badge variant="outline">
+<<<<<<< HEAD
                           {projectTypeLabel(project.type)}
+=======
+                          {PROJECT_TYPE_LABELS[project.type ?? 'GENERAL']}
+>>>>>>> origin/main
                         </Badge>
                       </div>
                       {project.description && (

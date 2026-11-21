@@ -19,7 +19,6 @@ import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import {
-  PROJECT_TYPE_LABELS,
   archiveProject,
   deleteProject,
   getProject,
@@ -280,11 +279,7 @@ export default function ProjectOverviewPage() {
               <Badge variant={project.status === 'ACTIVE' ? 'success' : 'outline'}>
                 {project.status.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
               </Badge>
-<<<<<<< HEAD
               <Badge variant="outline">{projectTypeLabel(project.type)}</Badge>
-=======
-              <Badge variant="outline">{PROJECT_TYPE_LABELS[project.type ?? 'GENERAL']}</Badge>
->>>>>>> origin/main
               {project.myRole && (
                 <Badge variant="default">My role: {project.myRole.replaceAll('_', ' ').toLowerCase()}</Badge>
               )}

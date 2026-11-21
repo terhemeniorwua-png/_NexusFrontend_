@@ -152,7 +152,6 @@ describe('ProjectSettingsPage — organizational access', () => {
     );
     expect(await screen.findByText('Project settings saved.')).toBeInTheDocument();
   });
-<<<<<<< HEAD
 
   it('hides the type select from users without project.update permission', async () => {
     setPermissions(['project.view', 'project.settings.manage']);
@@ -176,8 +175,6 @@ describe('ProjectSettingsPage — organizational access', () => {
 
     expect(await screen.findByText('Your current role does not allow this action. Project manager permission is required.')).toBeInTheDocument();
   });
-=======
->>>>>>> origin/main
 });
 
 describe('ProjectSettingsPage — ownership transfer', () => {

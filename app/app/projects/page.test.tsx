@@ -48,7 +48,6 @@ describe('ProjectsPage', () => {
     // Visibility badge is present (there may be the filter option as well)
     expect(screen.getAllByText('Organisation-wide').length).toBeGreaterThan(0);
     expect(screen.getByText('Engineering')).toBeInTheDocument();
-<<<<<<< HEAD
   });
 
   it('renders a type badge for every project type', async () => {
@@ -73,8 +72,6 @@ describe('ProjectsPage', () => {
     render(<ProjectsPage />);
     expect(await screen.findByText('Legacy project')).toBeInTheDocument();
     expect(screen.getAllByText('General').length).toBeGreaterThan(0);
-=======
->>>>>>> origin/main
   });
 
   it('shows an empty state when there are no projects', async () => {

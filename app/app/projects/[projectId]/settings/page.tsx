@@ -34,12 +34,9 @@ import {
   transferProjectOwnership,
   updateProject,
   updateProjectOrganizationAccess,
-  PROJECT_TYPE_LABELS,
-  PROJECT_TYPES,
   type ProjectCommentPolicy,
   type ProjectStatus,
   type ProjectSummary,
-  type ProjectType,
   type ProjectVisibility,
 } from '@/services/projects';
 import {
@@ -179,11 +176,7 @@ export default function ProjectSettingsPage() {
       setKey(data.key);
       setDescription(data.description ?? '');
       setStatus(data.status === 'ARCHIVED' ? 'ACTIVE' : data.status);
-<<<<<<< HEAD
       setType(normaliseProjectType(data.type));
-=======
-      setType(data.type ?? 'GENERAL');
->>>>>>> origin/main
       setVisibility(data.visibility);
       setCommentPolicy(data.commentPolicy ?? 'ASSIGNEES_ONLY');
       setStartDate(data.startDate ? new Date(data.startDate).toISOString().slice(0, 10) : '');
@@ -462,16 +455,6 @@ export default function ProjectSettingsPage() {
               />
             </div>
           )}
-          <div>
-            <Select
-              id="settings-type"
-              label="Type"
-              value={type}
-              onChange={(event) => setType(event.target.value as ProjectType)}
-              options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
-              helperText="Changing the project type does not delete or hide existing project data."
-            />
-          </div>
           <div>
             <Select
               id="settings-visibility"

@@ -1563,10 +1563,10 @@ Validation:
 | `npx tsc --noEmit` | Exit 0 — 0 errors |
 | `npx eslint .` | Exit 1 — 16 errors / 52 warnings, identical to the pre-existing baseline; no checklist-file findings |
 | `npx vitest run services/__tests__/checklists.test.ts 'app/app/projects/[projectId]/checklists/page.test.tsx'` | Exit 0 — 2 files, 42 tests passed |
-| `npm test` | Exit 0 — 116 files, 1069 tests passed (baseline from `origin/main` in a separate worktree: 114 files, 1027 tests, exit 0) |
-| `npx next build` | Exit 0 on retry — `/app/projects/[projectId]/checklists` generated |
+| `npm test -- --maxWorkers=1` | Exit 0 — 116 files, 1069 tests passed |
+| `npx next build` | Exit 0 — `/app/projects/[projectId]/checklists` generated |
 
-The first `next build` invocation was interrupted by Next.js's security-advisory nudge (no source error). The same command was retried without running the suggested upgrade and completed successfully. An earlier build attempt in this worktree failed only because `node_modules` was a symlink outside the Turbopack root; replacing that gitignored symlink with a local hard-link copy resolved package resolution with no source change.
+Two default-worker full runs hit a transient `OwnershipLifecyclePanel` timeout; that suite passes in isolation (`4/4`) and the clean serial full run above passed. The first build attempt failed only because `node_modules` was a symlink outside the Turbopack root; replacing that gitignored symlink with a local hard-link copy resolved package resolution with no source change. The Next.js security-upgrade nudge printed during the failed build was not executed.
 
 ### Objectives
 

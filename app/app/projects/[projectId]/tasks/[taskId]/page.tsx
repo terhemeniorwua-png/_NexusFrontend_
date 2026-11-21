@@ -62,6 +62,7 @@ import {
   type TaskComment,
 } from '@/services/tasks';
 import { CustomFieldInput, formatCustomFieldValue } from '@/components/tasks/CustomFieldInputs';
+import { FileVersionsPanel } from '@/components/files/FileVersionsPanel';
 import { listProjectMembers, type ProjectMember } from '@/services/projects';
 import { MentionTextarea, extractMentionIds, type MentionMember } from '@/components/ui/MentionTextarea';
 import {
@@ -1716,17 +1717,26 @@ export default function TaskDetailPage() {
                         {formatBytes(file.sizeBytes)} · {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(file.createdAt))}
                       </p>
                     </div>
-                    {canDeleteFile(file) && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={uploadBusy}
-                        onClick={() => setDeleteFileTarget(file)}
-                        aria-label={`Delete ${file.fileName}`}
-                      >
-                        Delete
-                      </Button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <FileVersionsPanel
+                        workspaceId={activeWorkspace?.id ?? ''}
+                        file={{ id: file.id, fileName: file.fileName }}
+                        canManage={canUpload}
+                        canDeleteAny={canDeleteAnyFile}
+                        currentUserId={user?.id}
+                      />
+                      {canDeleteFile(file) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={uploadBusy}
+                          onClick={() => setDeleteFileTarget(file)}
+                          aria-label={`Delete ${file.fileName}`}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

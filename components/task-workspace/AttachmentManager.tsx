@@ -7,7 +7,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Alert } from '@/components/ui/Alert';
 import { PermissionButton } from '@/components/shared/PermissionButton';
 import { Can } from '@/components/shared/Can';
+import { FileVersionsPanel } from '@/components/files/FileVersionsPanel';
 import { ApiRequestError } from '@/lib/api';
+import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { deleteFile, downloadFile, uploadFile, formatBytes, type FileSummary } from '@/services/files';
 
 export function AttachmentManager({
@@ -18,6 +20,7 @@ export function AttachmentManager({
   loading,
   error,
   onReload,
+  currentUserId = null,
 }: {
   workspaceId: string;
   projectId: string;
@@ -26,11 +29,15 @@ export function AttachmentManager({
   loading: boolean;
   error: string | null;
   onReload: () => Promise<void> | void;
+  currentUserId?: string | null;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const { can } = usePermissions();
+  const canManageVersions = can('file.upload');
+  const canDeleteAnyFeedback = can('file.delete.any');
 
   async function onUpload(file: File) {
     setBusy(true); setLocalError(null); setProgress(0);
@@ -99,6 +106,13 @@ export function AttachmentManager({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="secondary" onClick={() => void downloadFile(workspaceId, file.id, file.fileName)}>Download</Button>
+                  <FileVersionsPanel
+                    workspaceId={workspaceId}
+                    file={{ id: file.id, fileName: file.fileName }}
+                    canManage={canManageVersions}
+                    canDeleteAny={canDeleteAnyFeedback}
+                    currentUserId={currentUserId}
+                  />
                   <PermissionButton permission={['file.delete.own', 'file.delete.any']} mode="any" size="sm" variant="secondary" onClick={() => void onDelete(file.id)} deniedReason="You do not have permission to delete this file.">
                     Delete
                   </PermissionButton>

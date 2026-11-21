@@ -414,6 +414,7 @@ export default function TaskWorkPage() {
         loading={filesLoading}
         error={filesError}
         onReload={loadFiles}
+        currentUserId={currentUserId}
       />
     );
   } else if (section === 'discussion') {

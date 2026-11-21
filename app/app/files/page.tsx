@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
+import { FileVersionsPanel } from '@/components/files/FileVersionsPanel';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -89,11 +90,23 @@ interface FileRowProps {
   onPreview: (file: FileSummary) => void;
   onDelete: (file: FileSummary) => void;
   downloading: boolean;
+  canManageVersions: boolean;
+  canDeleteAnyFeedback: boolean;
+  currentUserId?: string | null;
 }
 
-function FileRow({ file, onDownload, onPreview, onDelete, downloading }: FileRowProps) {
+function FileRow({
+  file,
+  onDownload,
+  onPreview,
+  onDelete,
+  downloading,
+  canManageVersions,
+  canDeleteAnyFeedback,
+  currentUserId,
+}: FileRowProps) {
   return (
-    <li className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+    <li className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 sm:flex-row sm:items-center">
       <span className="shrink-0 text-xl" aria-hidden="true">{fileIcon(file.mimeType)}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{file.fileName}</p>
@@ -101,7 +114,7 @@ function FileRow({ file, onDownload, onPreview, onDelete, downloading }: FileRow
           {fileCategory(file.mimeType)} · {formatBytes(file.sizeBytes)} · {relativeTime(file.createdAt)}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button
           variant="secondary"
           size="sm"
@@ -119,6 +132,13 @@ function FileRow({ file, onDownload, onPreview, onDelete, downloading }: FileRow
         >
           {downloading ? 'Downloading…' : 'Download'}
         </Button>
+        <FileVersionsPanel
+          workspaceId={file.workspaceId}
+          file={{ id: file.id, fileName: file.fileName }}
+          canManage={canManageVersions}
+          canDeleteAny={canDeleteAnyFeedback}
+          currentUserId={currentUserId}
+        />
         <Button
           variant="secondary"
           size="sm"
@@ -268,8 +288,11 @@ function UploadArea({ workspaceId, onUploaded }: UploadAreaProps) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FilesPage() {
-  const { activeWorkspace } = useWorkspaceContext();
+  const { activeWorkspace, user } = useWorkspaceContext();
   const workspaceId = activeWorkspace?.id ?? '';
+  const canManageVersions = Boolean(activeWorkspace && activeWorkspace.role !== 'VIEWER');
+  const canDeleteAnyFeedback = activeWorkspace?.role === 'OWNER'
+    || activeWorkspace?.role === 'PROJECT_MANAGER';
 
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -484,6 +507,9 @@ export default function FilesPage() {
               onPreview={(target) => { void handlePreview(target); }}
               onDelete={setPendingDelete}
               downloading={downloadingId === file.id}
+              canManageVersions={canManageVersions}
+              canDeleteAnyFeedback={canDeleteAnyFeedback}
+              currentUserId={user?.id}
             />
           ))}
         </ul>

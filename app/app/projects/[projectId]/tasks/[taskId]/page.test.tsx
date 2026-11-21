@@ -58,7 +58,12 @@ function setRole(role: 'PROJECT_MANAGER' | 'MEMBER' | 'COLLABORATOR' | 'VIEWER')
     workspaceRole: 'OWNER',
     accessSource: 'project_member',
     assignableRoles: [],
-    roleDefinitions: [],
+    roleDefinitions: [
+      { role: 'PROJECT_MANAGER', label: 'Project Manager', description: '', permissions: ['task.view', 'task.update', 'task.assign', 'submission.review', 'submission.approve'] },
+      { role: 'MEMBER', label: 'Member', description: '', permissions: ['task.view', 'task.update'] },
+      { role: 'COLLABORATOR', label: 'Collaborator', description: '', permissions: ['task.view', 'task.comment'] },
+      { role: 'VIEWER', label: 'Viewer', description: '', permissions: ['task.view'] },
+    ],
     isLoading: false,
     accessStatus: null,
     error: null,
@@ -830,5 +835,85 @@ describe('TaskDetailPage — four roles', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Remove dependency' }));
 
     expect(await screen.findByText('That dependency does not exist.')).toBeInTheDocument();
+  });
+
+  it('reviewer picker lists only eligible members and excludes assignees', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.listProjectMembers.mockResolvedValue([
+      { userId: 'user-1', role: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z', user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' } },
+      { userId: 'user-2', role: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z', user: { id: 'user-2', name: 'Bob', email: 'bob@example.com' } },
+      { userId: 'user-3', role: 'MEMBER', createdAt: '2026-01-01T00:00:00.000Z', user: { id: 'user-3', name: 'Carol', email: 'carol@example.com' } },
+      { userId: 'user-4', role: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z', user: { id: 'user-4', name: 'Dave', email: 'dave@example.com' } },
+    ]);
+    render(<TaskDetailPage />);
+
+    const picker = await screen.findByRole('combobox', { name: 'Reviewer' });
+    expect(within(picker).getByRole('option', { name: 'No reviewer' })).toBeInTheDocument();
+    expect(within(picker).getByRole('option', { name: 'Alice (alice@example.com)' })).toBeInTheDocument();
+    expect(within(picker).getByRole('option', { name: 'Dave (dave@example.com)' })).toBeInTheDocument();
+    expect(within(picker).queryByRole('option', { name: 'Bob (bob@example.com)' })).not.toBeInTheDocument();
+    expect(within(picker).queryByRole('option', { name: 'Carol (carol@example.com)' })).not.toBeInTheDocument();
+  });
+
+  it('changes the reviewer through updateTask with a reviewerId payload', async () => {
+    setRole('PROJECT_MANAGER');
+    const updated = { ...task1, reviewerId: 'user-1', reviewer: { id: 'user-1', name: 'Alice' } };
+    mocks.listProjectMembers.mockResolvedValue([
+      { userId: 'user-1', role: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z', user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' } },
+    ]);
+    mocks.updateTask.mockResolvedValue(updated);
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Reviewer' }), 'user-1');
+
+    await waitFor(() => expect(mocks.updateTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', { reviewerId: 'user-1' }));
+  });
+
+  it('clears the reviewer through updateTask with a null reviewerId payload', async () => {
+    setRole('PROJECT_MANAGER');
+    const reviewedTask = { ...task1, reviewerId: 'user-1', reviewer: { id: 'user-1', name: 'Alice' } };
+    mocks.getTask.mockResolvedValue(reviewedTask);
+    mocks.updateTask.mockResolvedValue({ ...task1, reviewerId: null, reviewer: null });
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Reviewer' }), '');
+
+    await waitFor(() => expect(mocks.updateTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', { reviewerId: null }));
+  });
+
+  it('hides the reviewer control from viewers and shows the reviewer read-only', async () => {
+    setRole('VIEWER');
+    mocks.getTask.mockResolvedValue({ ...task1, reviewerId: 'user-4', reviewer: { id: 'user-4', name: 'Dave' } });
+    render(<TaskDetailPage />);
+
+    expect(await screen.findByText('Fix authentication bug')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Reviewer' })).not.toBeInTheDocument();
+    expect(screen.getByText('Reviewer').parentElement).toHaveTextContent('Dave');
+  });
+
+  it('shows the backend reviewer error and refreshes the task on rejection', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.listProjectMembers.mockResolvedValue([
+      { userId: 'user-1', role: 'PROJECT_MANAGER', createdAt: '2026-01-01T00:00:00.000Z', user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' } },
+    ]);
+    mocks.updateTask.mockRejectedValue(new ApiRequestError('The selected reviewer is not eligible', 403, 'REVIEWER_NOT_ELIGIBLE'));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Reviewer' }), 'user-1');
+
+    expect(await screen.findByText(/not eligible/i)).toBeInTheDocument();
+    await waitFor(() => expect(mocks.getTask.mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it('does not crash when an older task response has no reviewerId', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.getTask.mockResolvedValue({ ...task1 });
+    render(<TaskDetailPage />);
+
+    const picker = await screen.findByRole('combobox', { name: 'Reviewer' });
+    expect(picker).toHaveValue('');
   });
 });

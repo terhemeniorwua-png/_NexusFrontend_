@@ -390,6 +390,65 @@ describe('TaskDetailPage — four roles', () => {
     await waitFor(() => expect(mocks.completeTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1'));
   });
 
+  // Original Start/Resume coverage retained. Assertions that the removed
+  // updateTask workaround was called are replaced by equivalent assertions on
+  // the real POST /start service; no behavioural assertion is dropped.
+  it('shows the backend 403 message when Start fails and keeps the task status unchanged', async () => {
+    setRole('MEMBER');
+    mocks.getTask.mockResolvedValue(withAcceptance('ACCEPTED'));
+    mocks.startTask.mockRejectedValueOnce(
+      new ApiRequestError('Only the assignee can start this task', 403, 'NOT_TASK_ASSIGNEE'),
+    );
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    const startButton = await screen.findByRole('button', { name: 'Start' });
+    await user.click(startButton);
+
+    expect(await screen.findByText('Only the assignee can start this task')).toBeInTheDocument();
+    expect(mocks.startTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1');
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Start' })).toBeInTheDocument();
+  });
+
+  it('starts an assigned task and opens its workspace', async () => {
+    setRole('MEMBER');
+    mocks.getTask.mockResolvedValue(withAcceptance('ACCEPTED'));
+    mocks.startTask.mockResolvedValueOnce(acceptanceResponse({ ...task1, status: 'IN_PROGRESS' }, 'ACCEPTED'));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Start' }));
+
+    await waitFor(() => {
+      expect(mocks.startTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1');
+      expect(mocks.push).toHaveBeenCalledWith('/app/projects/project-1/tasks/task-1/work');
+    });
+  });
+
+  it('does not offer Resume for CHANGES_REQUESTED but keeps workspace access', async () => {
+    setRole('MEMBER');
+    mocks.getTask.mockResolvedValue({ ...withAcceptance('ACCEPTED'), status: 'CHANGES_REQUESTED' });
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('Fix authentication bug')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue working' }));
+    expect(mocks.push).toHaveBeenCalledWith('/app/projects/project-1/tasks/task-1/work');
+  });
+
+  it('shows the backend error when Start fails with a stale state', async () => {
+    setRole('MEMBER');
+    mocks.getTask.mockResolvedValue(withAcceptance('ACCEPTED'));
+    mocks.startTask.mockRejectedValueOnce(new ApiRequestError('Resolve review feedback first', 409));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Start' }));
+
+    expect(await screen.findByText('Resolve review feedback first')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Start' })).toBeInTheDocument();
+  });
+
   // ---------------------------------------------------------------------------
   // Assignee acceptance actions (FE-2b) — replace the removed updateTask workaround
   // ---------------------------------------------------------------------------
@@ -401,7 +460,7 @@ describe('TaskDetailPage — four roles', () => {
 
     expect(await screen.findByRole('button', { name: 'Accept' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Start \(acceptance pending\)/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
     expect(screen.getByText('Pending')).toBeInTheDocument();
   });
 
@@ -410,7 +469,7 @@ describe('TaskDetailPage — four roles', () => {
     mocks.getTask.mockResolvedValue(withAcceptance('ACCEPTED'));
     render(<TaskDetailPage />);
 
-    expect(await screen.findByRole('button', { name: /Start \(accepted\)/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Start' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
     expect(screen.getByText('Accepted')).toBeInTheDocument();
@@ -418,7 +477,8 @@ describe('TaskDetailPage — four roles', () => {
 
   it('shows none of the three actions to an assignee whose task is IN_PROGRESS', async () => {
     setRole('MEMBER');
-    mocks.getTask.mockResolvedValue({ ...withAcceptance('PENDING'), status: 'IN_PROGRESS' });
+    // A started task has been implicitly accepted; no acceptance action remains.
+    mocks.getTask.mockResolvedValue({ ...withAcceptance('ACCEPTED'), status: 'IN_PROGRESS' });
     render(<TaskDetailPage />);
 
     expect(await screen.findByText('Fix authentication bug')).toBeInTheDocument();
@@ -475,7 +535,7 @@ describe('TaskDetailPage — four roles', () => {
     render(<TaskDetailPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /Start \(acceptance pending\)/ }));
+    await user.click(await screen.findByRole('button', { name: 'Start' }));
 
     await waitFor(() => {
       expect(mocks.startTask).toHaveBeenCalledTimes(1);
@@ -490,7 +550,7 @@ describe('TaskDetailPage — four roles', () => {
     mocks.getTask.mockResolvedValue(withAcceptance('ACCEPTED'));
     render(<TaskDetailPage />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /Start \(accepted\)/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Start' }));
 
     await waitFor(() => expect(mocks.startTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1'));
     expect(mocks.updateTask).not.toHaveBeenCalled();
@@ -525,6 +585,9 @@ describe('TaskDetailPage — four roles', () => {
       expect(mocks.declineTask).toHaveBeenCalledTimes(1);
       expect(mocks.declineTask).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1', 'Cannot take this task');
     });
+    expect(await screen.findByText('Declined')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
   });
 
   it('closes the decline dialog on cancel without sending a request', async () => {
@@ -547,7 +610,7 @@ describe('TaskDetailPage — four roles', () => {
     mocks.getTask.mockResolvedValue(withAcceptance('PENDING'));
     render(<TaskDetailPage />);
 
-    const startButton = await screen.findByRole('button', { name: /Start \(acceptance pending\)/ });
+    const startButton = await screen.findByRole('button', { name: 'Start' });
     fireEvent.click(startButton);
     fireEvent.click(startButton);
 
@@ -564,7 +627,7 @@ describe('TaskDetailPage — four roles', () => {
     render(<TaskDetailPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /Start \(acceptance pending\)/ }));
+    await user.click(await screen.findByRole('button', { name: 'Start' }));
 
     expect(await screen.findByText('Only the assignee can start this task')).toBeInTheDocument();
     await waitFor(() => expect(mocks.getTask).toHaveBeenCalledTimes(2));

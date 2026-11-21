@@ -1028,15 +1028,16 @@ export default function TaskDetailPage() {
   const isArchived = Boolean(task.archivedAt);
   const myAssignee = user ? task.assignees.find((assignee) => assignee.userId === user.id) : undefined;
   const isAssignedToMe = Boolean(myAssignee);
-  const canWriteProject = canUpdate && !isArchived;
+  // "Project-writable" maps to the task.update permission used across this page.
+  const canWriteProject = canUpdate;
   // Acceptance lives on the assignee record; task-level field is an optional
   // fallback for newer responses. Missing values render no badge/actions.
   const myAcceptanceStatus = myAssignee?.acceptanceStatus ?? task.acceptanceStatus;
-  // A stale PENDING acceptance record must not expose accept/decline once the
-  // task has already moved beyond ASSIGNED.
-  const canAcceptOrDecline = isAssignedToMe && canWriteProject
-    && task.status === 'ASSIGNED' && myAcceptanceStatus === 'PENDING';
-  const canStartTask = isAssignedToMe && canWriteProject && task.status === 'ASSIGNED';
+  // Accept/Decline follow the backend contract exactly: assignee + PENDING +
+  // project write access. Start is deliberately NOT gated on ACCEPTED because
+  // POST /start implicitly accepts a PENDING assignment.
+  const canAcceptOrDecline = isAssignedToMe && myAcceptanceStatus === 'PENDING' && canWriteProject;
+  const canStartTask = isAssignedToMe && task.status === 'ASSIGNED' && canWriteProject;
   // A submission belongs to its assignees. Reviewers must never approve or
   // reject their own submitted work.
   const isOwnSubmission = isAssignedToMe;
@@ -1239,11 +1240,7 @@ export default function TaskDetailPage() {
                   )}
                   {canStartTask && (
                     <Button size="sm" onClick={() => void handleStart()} disabled={acceptanceBusy || busy}>
-                      {myAcceptanceStatus === 'PENDING'
-                        ? 'Start (acceptance pending)'
-                        : myAcceptanceStatus === 'ACCEPTED'
-                          ? 'Start (accepted)'
-                          : 'Start'}
+                      Start
                     </Button>
                   )}
                   {!isArchived && isAssignedToMe && (

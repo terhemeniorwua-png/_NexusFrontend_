@@ -1534,10 +1534,39 @@ Phase 10 remains **In Progress** due to:
 
 - **Attachments**: Task attachment upload, listing, and download are not implemented. The backend exposes no general file/attachment upload contract for tasks (only org logo routes exist). Blocked by the same missing backend storage contract as Phase 13.
 - **@mentions**: `@mention` interface in comments and task descriptions is not implemented. No backend @mention resolution or notification contract exists for task comments beyond the existing TASK_ASSIGNED notification.
-- **Subtasks / checklists**: Sub-task creation is not wired in the UI (though the backend supports `parentTaskId`). A dedicated subtask list panel was not built. No checklist model is registered in the backend.
+- **Subtasks / checklists**: One-level subtask creation and deletion are wired in the task work UI; deeper nesting is not supported. Dedicated project checklists are implemented separately at `app/app/projects/[projectId]/checklists/page.tsx` against the BE-4 checklist API; a task-embedded subtask panel remains out of scope.
 - **Activity history per task**: The backend records audit events for task mutations but does not expose a per-task activity timeline endpoint. Only the project-level activity feed exists.
 - **Live backend verification**: All tests use mocked API responses. No live authenticated backend session was used.
 - **Manual responsive review**: Not performed by this agent; awaiting user confirmation.
+
+#### Project checklists — 2026-11-21
+
+Branch: `feature/frontend-fe4-checklists`. Base SHA: `f8882e8d43129bb190ba2104e4c3611d93f4f70b`.
+
+Implemented `services/checklists.ts` with typed functions for all 18 BE-4 checklist routes and normalisation for responses that omit newer optional fields. Added `app/app/projects/[projectId]/checklists/page.tsx` with checklist list/detail, derived progress, cursor load-more, create/edit/delete, item add/edit/delete, full ordered-list reorder, complete/uncomplete, sign-off/removal, item feedback, the 200-live-item cap, and role-aware read-only behaviour. Added a `Checklists` tab to `app/app/projects/[projectId]/layout.tsx` behind `project.view`.
+
+Contracts consumed:
+
+- `GET/POST /workspaces/{workspaceId}/projects/{projectId}/checklists`
+- `GET/PATCH/DELETE /workspaces/{workspaceId}/projects/{projectId}/checklists/{checklistId}`
+- `GET/POST /checklists/{checklistId}/items`, `POST /items/reorder`
+- `PATCH/DELETE /items/{itemId}`, `POST /items/{itemId}/complete`, `POST /items/{itemId}/uncomplete`
+- `POST/DELETE /items/{itemId}/sign-off`
+- `GET/POST /items/{itemId}/feedback`, `PATCH/DELETE /items/{itemId}/feedback/{feedbackId}`
+
+Backend error messages are surfaced directly for `CHECKLIST_ITEMS_MISMATCH`, `CHECKLIST_ITEM_LIMIT`, `ITEM_SIGNED_OFF`, `ITEM_NOT_COMPLETED`, `SELF_REVIEW_FORBIDDEN`, and other 403/409 responses; those responses also trigger a refetch. Idempotent 200 no-ops are treated as successes. Live backend verification and manual responsive review were not performed.
+
+Validation:
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Exit 0 — 0 errors |
+| `npx eslint .` | Exit 1 — 16 errors / 52 warnings, identical to the pre-existing baseline; no checklist-file findings |
+| `npx vitest run services/__tests__/checklists.test.ts 'app/app/projects/[projectId]/checklists/page.test.tsx'` | Exit 0 — 2 files, 42 tests passed |
+| `npm test -- --maxWorkers=1` | Exit 0 — 116 files, 1069 tests passed |
+| `npx next build` | Exit 0 — `/app/projects/[projectId]/checklists` generated |
+
+Two default-worker full runs hit a transient `OwnershipLifecyclePanel` timeout; that suite passes in isolation (`4/4`) and the clean serial full run above passed. The first build attempt failed only because `node_modules` was a symlink outside the Turbopack root; replacing that gitignored symlink with a local hard-link copy resolved package resolution with no source change. The Next.js security-upgrade nudge printed during the failed build was not executed.
 
 ### Objectives
 
@@ -3417,7 +3446,7 @@ Status reflects contract inspection against `../__NexusBackend__/docs/API.md` an
 | FE-7 | Roles, access control and lifecycle UI | BE-4 — Ownership lifecycle; BE-3 — Privacy/account APIs; BE-5 — Membership authorization | Workspace member role/state routes; owner transfer incoming/accept/reject/billing acceptance; `POST /privacy-requests`, `/privacy-requests/mine*` |
 | FE-8 | Departments, teams and institution groups UI | BE-7 — Teams and organizational structure | Workspace departments, teams, and institution-group routes; department roster and team activity are real gaps |
 | FE-9 | Projects and project visibility UI | BE-8 — Projects and project visibility; BE-1 — Project type | Project routes in OpenAPI; visibility and resource contracts verified. Project type consumed on list/detail/create/settings: `type` is classification only (no access), defaults to `GENERAL`, and unknown/missing values fall back to `GENERAL`. Type selects gated by existing edit permissions. |
-| FE-10 | Tasks and work management UI | BE-8 — Projects / task module | Task API fully registered: `GET/POST /workspaces/{workspaceId}/projects/{projectId}/tasks`, `GET/PATCH/DELETE /{taskId}`, `POST /{taskId}/archive`, `/{taskId}/restore`, `/{taskId}/complete`, `/{taskId}/reopen`, `/{taskId}/assignees`, `/{taskId}/dependencies`, `/{taskId}/comments`. All routes verified in backend source. |
+| FE-10 | Tasks and work management UI | BE-8 — Projects / task module; BE-4 — Project checklists | Task API fully registered: `GET/POST /workspaces/{workspaceId}/projects/{projectId}/tasks`, `GET/PATCH/DELETE /{taskId}`, `POST /{taskId}/archive`, `/{taskId}/restore`, `/{taskId}/complete`, `/{taskId}/reopen`, `/{taskId}/assignees`, `/{taskId}/dependencies`, `/{taskId}/comments`. Project checklists registered at `/workspaces/{workspaceId}/projects/{projectId}/checklists*` and wired into the project Checklists tab on 2026-11-21. All routes verified in backend source. |
 | FE-11 | Real-time messaging and conversations UI | Backend messaging contract phase not yet documented in the active backend roadmap | OpenAPI/API.md message and channel contracts; verify persistence and event support before implementation |
 | FE-12 | Notification centre and activity feed UI | Backend contract phase not yet mapped | Use only registered notification/activity contracts; verify before implementation |
 | FE-13 | File management and PITERON Drive UI | Backend contract phase not yet mapped | Use only registered file/storage contracts; verify authorization and upload shape first |

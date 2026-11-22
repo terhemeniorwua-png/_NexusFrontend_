@@ -34,6 +34,37 @@ export interface DevRepositorySummary {
   htmlUrl?: string | null;
 }
 
+export type RepositoryAccessLevel =
+  | 'NONE'
+  | 'METADATA_ONLY'
+  | 'METADATA'
+  | 'ACCESS'
+  | 'READ'
+  | 'FULL'
+  | 'LINK';
+
+export type NormalizedRepositoryAccessLevel = 'NONE' | 'METADATA_ONLY' | 'ACCESS' | 'FULL';
+
+export function normalizeRepositoryAccessLevel(
+  level: RepositoryAccessLevel | null | undefined,
+): NormalizedRepositoryAccessLevel {
+  switch (level) {
+    case 'NONE':
+      return 'NONE';
+    case 'METADATA':
+    case 'METADATA_ONLY':
+      return 'METADATA_ONLY';
+    case 'READ':
+    case 'ACCESS':
+      return 'ACCESS';
+    case 'LINK':
+    case 'FULL':
+      return 'FULL';
+    default:
+      return 'FULL';
+  }
+}
+
 export interface LinkedProjectRepository {
   id: string;
   projectId: string;
@@ -44,6 +75,8 @@ export interface LinkedProjectRepository {
   defaultBranch: string | null;
   createdAt: string;
   updatedAt: string;
+  accessLevel?: RepositoryAccessLevel | null;
+  effectiveAccessLevel?: RepositoryAccessLevel | null;
 }
 
 export interface DevBranchSummary {
@@ -90,6 +123,8 @@ export interface TaskDevLink {
   linkedById: string;
   createdAt: string;
   updatedAt: string;
+  accessLevel?: RepositoryAccessLevel | null;
+  restricted?: boolean;
 }
 
 function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -284,4 +319,59 @@ export interface DevCommitDetail extends DevCommitSummary {
 
 export function getRepositoryCommit(w: string, p: string, r: string, sha: string) {
   return authed<DevCommitDetail>(`${repoBase(w, p, r)}/commits/${sha}`);
+}
+
+export interface ProjectRepositoryAccessMember {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  role?: string | null;
+  level: RepositoryAccessLevel;
+  effectiveLevel?: RepositoryAccessLevel | null;
+  isOverride?: boolean;
+}
+
+export async function listRepositoryAccessMembers(
+  workspaceId: string,
+  projectId: string,
+  repositoryId: string,
+): Promise<ProjectRepositoryAccessMember[]> {
+  return authed<ProjectRepositoryAccessMember[]>(
+    `/workspaces/${workspaceId}/projects/${projectId}/repositories/${repositoryId}/access`,
+  );
+}
+
+export async function updateRepositoryAccessMember(
+  workspaceId: string,
+  projectId: string,
+  repositoryId: string,
+  userId: string,
+  level: RepositoryAccessLevel,
+): Promise<ProjectRepositoryAccessMember | { ok: true }> {
+  return authed<ProjectRepositoryAccessMember | { ok: true }>(
+    `/workspaces/${workspaceId}/projects/${projectId}/repositories/${repositoryId}/access/${userId}`,
+    { method: 'PUT', body: JSON.stringify({ level }) },
+  );
+}
+
+export function repositoryAccessLabel(level: RepositoryAccessLevel | null | undefined): string {
+  switch (normalizeRepositoryAccessLevel(level)) {
+    case 'NONE':
+      return 'No access';
+    case 'METADATA_ONLY':
+      return 'Metadata only';
+    case 'ACCESS':
+      return 'Code access';
+    case 'FULL':
+      return 'Full access';
+  }
+}
+
+export function canBrowseRepositoryCode(level: RepositoryAccessLevel | null | undefined): boolean {
+  const normalized = normalizeRepositoryAccessLevel(level);
+  return normalized === 'ACCESS' || normalized === 'FULL';
+}
+
+export function canLinkRepositoryDevWork(level: RepositoryAccessLevel | null | undefined): boolean {
+  return normalizeRepositoryAccessLevel(level) === 'FULL';
 }

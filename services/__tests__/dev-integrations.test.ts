@@ -163,3 +163,63 @@ describe('dev-integrations service (Feature A)', () => {
     await expect(listDevConnections(WS)).rejects.toMatchObject({ status: 403, message: 'Forbidden' });
   });
 });
+
+describe('dev-integrations repository access (FE-8)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.refreshSession.mockResolvedValue(undefined);
+  });
+
+  it('normalizes repository access levels', async () => {
+    const { normalizeRepositoryAccessLevel, canBrowseRepositoryCode, canLinkRepositoryDevWork } = await import('../dev-integrations');
+    expect(normalizeRepositoryAccessLevel('NONE')).toBe('NONE');
+    expect(normalizeRepositoryAccessLevel('METADATA')).toBe('METADATA_ONLY');
+    expect(normalizeRepositoryAccessLevel('METADATA_ONLY')).toBe('METADATA_ONLY');
+    expect(normalizeRepositoryAccessLevel('READ')).toBe('ACCESS');
+    expect(normalizeRepositoryAccessLevel('ACCESS')).toBe('ACCESS');
+    expect(normalizeRepositoryAccessLevel('LINK')).toBe('FULL');
+    expect(normalizeRepositoryAccessLevel('FULL')).toBe('FULL');
+
+    expect(canBrowseRepositoryCode('NONE')).toBe(false);
+    expect(canBrowseRepositoryCode('METADATA_ONLY')).toBe(false);
+    expect(canBrowseRepositoryCode('ACCESS')).toBe(true);
+    expect(canBrowseRepositoryCode('FULL')).toBe(true);
+
+    expect(canLinkRepositoryDevWork('ACCESS')).toBe(false);
+    expect(canLinkRepositoryDevWork('FULL')).toBe(true);
+  });
+
+  it('lists repository access members', async () => {
+    mocks.apiRequest.mockResolvedValue([{ userId: 'u1', level: 'READ' }]);
+    const { listRepositoryAccessMembers } = await import('../dev-integrations');
+    const res = await listRepositoryAccessMembers(WS, PID, 'repo-1');
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/repositories/repo-1/access`,
+      expect.objectContaining({ authenticated: true }),
+    );
+    expect(res[0].userId).toBe('u1');
+  });
+
+  it('updates repository access member level', async () => {
+    mocks.apiRequest.mockResolvedValue({ ok: true });
+    const { updateRepositoryAccessMember } = await import('../dev-integrations');
+    await updateRepositoryAccessMember(WS, PID, 'repo-1', 'u1', 'FULL');
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/repositories/repo-1/access/u1`,
+      expect.objectContaining({ method: 'PUT', authenticated: true }),
+    );
+    const body = JSON.parse((mocks.apiRequest.mock.calls[0][1] as any).body);
+    expect(body).toEqual({ level: 'FULL' });
+  });
+
+  it('surfaces 403/404 backend messages for repository access operations', async () => {
+    const { ApiRequestError } = await import('@/lib/api');
+    mocks.apiRequest.mockRejectedValueOnce(new ApiRequestError('No repository access', 403, 'REPOSITORY_ACCESS_DENIED'));
+    const { listRepositoryAccessMembers } = await import('../dev-integrations');
+    await expect(listRepositoryAccessMembers(WS, PID, 'repo-1')).rejects.toMatchObject({ status: 403, message: 'No repository access' });
+
+    mocks.apiRequest.mockRejectedValueOnce(new ApiRequestError('Repository not found', 404, 'NOT_FOUND'));
+    const { updateRepositoryAccessMember } = await import('../dev-integrations');
+    await expect(updateRepositoryAccessMember(WS, PID, 'repo-1', 'u1', 'NONE')).rejects.toMatchObject({ status: 404, message: 'Repository not found' });
+  });
+});

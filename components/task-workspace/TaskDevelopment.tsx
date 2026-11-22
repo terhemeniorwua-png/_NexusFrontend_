@@ -10,11 +10,14 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import type {
-  DevBranchSummary,
-  DevPullRequestSummary,
-  LinkedProjectRepository,
-  TaskDevLink,
+import {
+  canBrowseRepositoryCode,
+  canLinkRepositoryDevWork,
+  normalizeRepositoryAccessLevel,
+  type DevBranchSummary,
+  type DevPullRequestSummary,
+  type LinkedProjectRepository,
+  type TaskDevLink,
 } from '@/services/dev-integrations';
 
 function stateVariant(state?: string | null): 'default' | 'success' | 'warning' | 'error' | 'info' | 'outline' {
@@ -103,11 +106,18 @@ export function TaskDevelopment({
   const [unlinkTarget, setUnlinkTarget] = useState<TaskDevLink | null>(null);
   const [localNotice, setLocalNotice] = useState<string | null>(null);
 
-  const selectedRepo = useMemo(() => linkedRepos.find((r) => r.id === selectedRepoId) ?? null, [linkedRepos, selectedRepoId]);
+  const visibleRepos = useMemo(
+    () => linkedRepos.filter((r) => normalizeRepositoryAccessLevel(r.effectiveAccessLevel ?? r.accessLevel) !== 'NONE'),
+    [linkedRepos],
+  );
+  const selectedRepo = useMemo(() => visibleRepos.find((r) => r.id === selectedRepoId) ?? null, [visibleRepos, selectedRepoId]);
+  const selectedRepoAccess = normalizeRepositoryAccessLevel(selectedRepo?.effectiveAccessLevel ?? selectedRepo?.accessLevel);
+  const canBrowseSelected = canBrowseRepositoryCode(selectedRepoAccess);
+  const canLinkSelected = canLink && canLinkRepositoryDevWork(selectedRepoAccess);
   const providerName = selectedRepo?.provider === 'GITLAB' ? 'GitLab' : selectedRepo?.provider === 'GITHUB' ? 'GitHub' : 'provider';
 
   async function browse() {
-    if (!selectedRepoId) return;
+    if (!selectedRepoId || !canBrowseSelected) return;
     setBrowseLoading(true); setBrowseError(null); setLocalNotice(null);
     try {
       if (mode === 'BRANCH') {
@@ -206,30 +216,33 @@ export function TaskDevelopment({
           ) : (
             <ul className="mt-2 space-y-2" role="list">
               {devLinks.map((link) => {
-                const isRestricted = !link.url && !link.repositoryFullName;
-                const label = isRestricted
+                const accessLevel = link.effectiveAccessLevel ?? null;
+                const restricted = accessLevel === 'NONE' || accessLevel === 'METADATA';
+                const label = restricted
                   ? 'Restricted repository'
                   : link.externalType === 'PULL_REQUEST'
                     ? `PR #${link.externalNumber ?? ''}${link.title ? ` — ${link.title}` : ''}`
                     : link.externalType === 'BRANCH'
                       ? `Branch: ${link.ref ?? link.title ?? link.externalId}`
                       : `${link.externalType}: ${link.title ?? link.externalId}`;
-                const reviewLabel = link.externalType === 'PULL_REQUEST' ? reviewBadgeLabel(link.reviewState) : null;
-                const reviewedAtLabel = link.externalType === 'PULL_REQUEST' ? relativeTime(link.reviewedAt) : null;
-                const merged = (link.state ?? '').toLowerCase() === 'merged' || !!link.mergedAt;
+                const reviewLabel = !restricted && link.externalType === 'PULL_REQUEST' ? reviewBadgeLabel(link.reviewState) : null;
+                const reviewedAtLabel = !restricted && link.externalType === 'PULL_REQUEST' ? relativeTime(link.reviewedAt) : null;
+                const merged = !restricted && ((link.state ?? '').toLowerCase() === 'merged' || !!link.mergedAt);
 
                 return (
                   <li key={link.id} className="flex flex-col gap-2 rounded border border-[var(--color-border)] p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline">{link.externalType === 'PULL_REQUEST' ? 'Pull request' : link.externalType === 'BRANCH' ? 'Branch' : 'Commit'}</Badge>
-                        {merged ? <Badge variant="info">Merged</Badge> : link.state ? <Badge variant={stateVariant(link.state)}>{link.state}</Badge> : null}
+                        {restricted ? <Badge variant="warning">Restricted</Badge> : null}
+                        {!restricted && (merged ? <Badge variant="info">Merged</Badge> : link.state ? <Badge variant={stateVariant(link.state)}>{link.state}</Badge> : null)}
                         {reviewLabel ? <Badge variant={reviewBadgeVariant(link.reviewState)}>{reviewLabel}</Badge> : null}
-                        {link.repositoryFullName ? <span className="text-xs text-[var(--color-text-muted)]">{link.repositoryFullName}</span> : null}
+                        {!restricted && link.repositoryFullName ? <span className="text-xs text-[var(--color-text-muted)]">{link.repositoryFullName}</span> : null}
                       </div>
                       <p className="mt-1 truncate font-medium text-[var(--color-text-primary)]">
-                        {(() => {
-                          if (isRestricted) return label;
+                        {restricted ? (
+                          <span className="text-[var(--color-text-muted)]">{label}</span>
+                        ) : (() => {
                           const base = link.projectRepositoryId ? `/app/projects/${link.projectId}/code/${link.projectRepositoryId}` : null;
                           const inApp = !base ? null
                             : link.externalType === 'COMMIT' ? `${base}/commit/${link.externalId}`
@@ -239,15 +252,21 @@ export function TaskDevelopment({
                           return link.url ? <a className="underline underline-offset-2" href={link.url} target="_blank" rel="noreferrer">{label}</a> : label;
                         })()}
                       </p>
-                      {!isRestricted && (link.headRef || link.baseRef) && <p className="text-xs text-[var(--color-text-muted)]">{link.headRef ?? '—'} → {link.baseRef ?? '—'}</p>}
-                      {!isRestricted && link.externalType === 'PULL_REQUEST' && (link.reviewerLogin || reviewedAtLabel) ? (
-                        <p className="text-xs text-[var(--color-text-muted)]">
-                          {link.reviewerLogin ? `Reviewed by ${link.reviewerLogin}` : 'Reviewed'}
-                          {reviewedAtLabel ? ` · ${reviewedAtLabel}` : ''}
-                        </p>
-                      ) : null}
+                      {restricted ? (
+                        <p className="text-xs text-[var(--color-text-muted)]">Restricted repository. You do not have access to this repository content.</p>
+                      ) : (
+                        <>
+                          {(link.headRef || link.baseRef) && <p className="text-xs text-[var(--color-text-muted)]">{link.headRef ?? '—'} → {link.baseRef ?? '—'}</p>}
+                          {link.externalType === 'PULL_REQUEST' && (link.reviewerLogin || reviewedAtLabel) ? (
+                            <p className="text-xs text-[var(--color-text-muted)]">
+                              {link.reviewerLogin ? `Reviewed by ${link.reviewerLogin}` : 'Reviewed'}
+                              {reviewedAtLabel ? ` · ${reviewedAtLabel}` : ''}
+                            </p>
+                          ) : null}
+                        </>
+                      )}
                     </div>
-                    {canLink && (
+                    {canLink && !restricted && (
                       <Button size="sm" variant="secondary" onClick={() => setUnlinkTarget(link)} disabled={busy}>Unlink</Button>
                     )}
                   </li>
@@ -262,9 +281,9 @@ export function TaskDevelopment({
         <h3 className="text-sm font-semibold">Link development work</h3>
         {!canLink ? (
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">Your task/project role cannot link or unlink development items.</p>
-        ) : linkedRepos.length === 0 ? (
+        ) : visibleRepos.length === 0 ? (
           <Alert className="mt-3" variant="info">
-            No repositories are linked to this project. Link a GitHub or GitLab repository in Project Settings → Source control first.
+            {linkedRepos.length > 0 ? 'You do not have access to repositories linked to this project.' : 'No repositories are linked to this project. Link a GitHub or GitLab repository in Project Settings → Source control first.'}
           </Alert>
         ) : (
           <div className="mt-3 space-y-3">
@@ -277,7 +296,7 @@ export function TaskDevelopment({
                 onChange={(e) => { setSelectedRepoId(e.target.value); setBranches([]); setPrs([]); }}
                 options={[
                   { value: '', label: 'Select a linked repository…' },
-                  ...linkedRepos.map((r) => ({ value: r.id, label: r.fullName })),
+                  ...visibleRepos.map((r) => ({ value: r.id, label: r.fullName })),
                 ]}
               />
               <Select
@@ -295,8 +314,11 @@ export function TaskDevelopment({
               <div className="min-w-[220px] flex-1">
                 <Input id="dev-search" label="Search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={mode === 'PULL_REQUEST' ? 'Title, number, or branch' : 'Branch name'} />
               </div>
-              <Button variant="secondary" onClick={() => void browse()} loading={browseLoading} disabled={!selectedRepoId || busy}>Load from {selectedRepo ? providerName : 'provider'}</Button>
+              <Button variant="secondary" onClick={() => void browse()} loading={browseLoading} disabled={!selectedRepoId || busy || !canBrowseSelected}>Load from {selectedRepo ? providerName : 'provider'}</Button>
             </div>
+            {selectedRepo && !canBrowseSelected && (
+              <Alert variant="info">This repository is metadata-only. You can see its name, but code activity cannot be browsed.</Alert>
+            )}
 
             {browseLoading ? (
               <div className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
@@ -311,7 +333,7 @@ export function TaskDevelopment({
                           <p className="font-medium">#{pr.number} {pr.title}</p>
                           <p className="text-xs text-[var(--color-text-muted)]">{pr.headRef ?? '—'} → {pr.baseRef ?? '—'} · {pr.state}{pr.authorLogin ? ` · ${pr.authorLogin}` : ''}</p>
                         </div>
-                        <Button size="sm" onClick={() => void handleLinkPr(pr)} disabled={already || busy}>{already ? 'Linked' : 'Link'}</Button>
+                        <Button size="sm" onClick={() => void handleLinkPr(pr)} disabled={already || busy || !canLinkSelected}>{already ? 'Linked' : !canLinkSelected ? 'No access' : 'Link'}</Button>
                       </li>
                     );
                   })}
@@ -328,7 +350,7 @@ export function TaskDevelopment({
                           <p className="font-medium">{b.name}</p>
                           {b.commitSha ? <p className="text-xs text-[var(--color-text-muted)]">{b.commitSha.slice(0, 12)}</p> : null}
                         </div>
-                        <Button size="sm" onClick={() => void handleLinkBranch(b)} disabled={already || busy}>{already ? 'Linked' : 'Link'}</Button>
+                        <Button size="sm" onClick={() => void handleLinkBranch(b)} disabled={already || busy || !canLinkSelected}>{already ? 'Linked' : !canLinkSelected ? 'No access' : 'Link'}</Button>
                       </li>
                     );
                   })}

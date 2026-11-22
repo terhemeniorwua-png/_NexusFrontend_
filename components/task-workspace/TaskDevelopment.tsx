@@ -26,6 +26,48 @@ function stateVariant(state?: string | null): 'default' | 'success' | 'warning' 
   return 'default';
 }
 
+function reviewBadgeLabel(reviewState?: string | null): string | null {
+  switch ((reviewState ?? '').toUpperCase()) {
+    case 'APPROVED':
+      return 'Approved';
+    case 'CHANGES_REQUESTED':
+      return 'Changes requested';
+    case 'COMMENTED':
+      return 'Commented';
+    default:
+      return null;
+  }
+}
+
+function reviewBadgeVariant(reviewState?: string | null): 'default' | 'success' | 'warning' | 'error' | 'info' | 'outline' {
+  switch ((reviewState ?? '').toUpperCase()) {
+    case 'APPROVED':
+      return 'success';
+    case 'CHANGES_REQUESTED':
+      return 'warning';
+    case 'COMMENTED':
+      return 'info';
+    default:
+      return 'default';
+  }
+}
+
+function relativeTime(isoString?: string | null): string | null {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return null;
+  const diff = Date.now() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 export function TaskDevelopment({
   linkedRepos,
   devLinks,
@@ -164,21 +206,30 @@ export function TaskDevelopment({
           ) : (
             <ul className="mt-2 space-y-2" role="list">
               {devLinks.map((link) => {
-                const label = link.externalType === 'PULL_REQUEST'
-                  ? `PR #${link.externalNumber ?? ''}${link.title ? ` — ${link.title}` : ''}`
-                  : link.externalType === 'BRANCH'
-                    ? `Branch: ${link.ref ?? link.title ?? link.externalId}`
-                    : `${link.externalType}: ${link.title ?? link.externalId}`;
+                const isRestricted = !link.url && !link.repositoryFullName;
+                const label = isRestricted
+                  ? 'Restricted repository'
+                  : link.externalType === 'PULL_REQUEST'
+                    ? `PR #${link.externalNumber ?? ''}${link.title ? ` — ${link.title}` : ''}`
+                    : link.externalType === 'BRANCH'
+                      ? `Branch: ${link.ref ?? link.title ?? link.externalId}`
+                      : `${link.externalType}: ${link.title ?? link.externalId}`;
+                const reviewLabel = link.externalType === 'PULL_REQUEST' ? reviewBadgeLabel(link.reviewState) : null;
+                const reviewedAtLabel = link.externalType === 'PULL_REQUEST' ? relativeTime(link.reviewedAt) : null;
+                const merged = (link.state ?? '').toLowerCase() === 'merged' || !!link.mergedAt;
+
                 return (
                   <li key={link.id} className="flex flex-col gap-2 rounded border border-[var(--color-border)] p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline">{link.externalType === 'PULL_REQUEST' ? 'Pull request' : link.externalType === 'BRANCH' ? 'Branch' : 'Commit'}</Badge>
-                        {link.state ? <Badge variant={stateVariant(link.state)}>{link.state}</Badge> : null}
+                        {merged ? <Badge variant="info">Merged</Badge> : link.state ? <Badge variant={stateVariant(link.state)}>{link.state}</Badge> : null}
+                        {reviewLabel ? <Badge variant={reviewBadgeVariant(link.reviewState)}>{reviewLabel}</Badge> : null}
                         {link.repositoryFullName ? <span className="text-xs text-[var(--color-text-muted)]">{link.repositoryFullName}</span> : null}
                       </div>
                       <p className="mt-1 truncate font-medium text-[var(--color-text-primary)]">
                         {(() => {
+                          if (isRestricted) return label;
                           const base = link.projectRepositoryId ? `/app/projects/${link.projectId}/code/${link.projectRepositoryId}` : null;
                           const inApp = !base ? null
                             : link.externalType === 'COMMIT' ? `${base}/commit/${link.externalId}`
@@ -188,7 +239,13 @@ export function TaskDevelopment({
                           return link.url ? <a className="underline underline-offset-2" href={link.url} target="_blank" rel="noreferrer">{label}</a> : label;
                         })()}
                       </p>
-                      {(link.headRef || link.baseRef) && <p className="text-xs text-[var(--color-text-muted)]">{link.headRef ?? '—'} → {link.baseRef ?? '—'}</p>}
+                      {!isRestricted && (link.headRef || link.baseRef) && <p className="text-xs text-[var(--color-text-muted)]">{link.headRef ?? '—'} → {link.baseRef ?? '—'}</p>}
+                      {!isRestricted && link.externalType === 'PULL_REQUEST' && (link.reviewerLogin || reviewedAtLabel) ? (
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          {link.reviewerLogin ? `Reviewed by ${link.reviewerLogin}` : 'Reviewed'}
+                          {reviewedAtLabel ? ` · ${reviewedAtLabel}` : ''}
+                        </p>
+                      ) : null}
                     </div>
                     {canLink && (
                       <Button size="sm" variant="secondary" onClick={() => setUnlinkTarget(link)} disabled={busy}>Unlink</Button>

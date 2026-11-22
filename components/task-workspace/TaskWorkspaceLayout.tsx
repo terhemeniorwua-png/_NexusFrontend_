@@ -73,6 +73,7 @@ export function TaskWorkspaceLayout({
             { value: 'attachments', label: 'Attachments' },
             { value: 'development', label: 'Development' },
             { value: 'discussion', label: 'Discussion' },
+            { value: 'progress', label: 'Progress updates' },
             { value: 'activity', label: 'Activity' },
             { value: 'time', label: 'Time tracking' },
           ]}

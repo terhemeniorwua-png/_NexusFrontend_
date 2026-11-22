@@ -151,6 +151,22 @@ export interface TaskActivityPage {
   nextCursor: string | null;
 }
 
+export interface TaskProgressUpdate {
+  id: string;
+  taskId: string;
+  authorId: string;
+  note: string;
+  percent: number | null;
+  /** Returned by backend; echoed for idempotent submits. */
+  clientRequestId?: string | null;
+  createdAt: string;
+}
+
+export interface TaskProgressUpdatePage {
+  items: TaskProgressUpdate[];
+  nextCursor: string | null;
+}
+
 export interface TaskWorkspaceData {
   task: TaskSummary;
   subtasks: TaskSummary[];
@@ -558,6 +574,46 @@ export function listTaskActivity(
   if (opts.limit !== undefined) params.set('limit', String(opts.limit));
   return request<TaskActivityPage>(
     taskPath(workspaceId, projectId, taskId, '/activity') + (params.size ? `?${params}` : ''),
+  );
+}
+
+export interface AddTaskProgressUpdateInput {
+  note: string;
+  percent?: number | null;
+  clientRequestId?: string;
+}
+
+export function addTaskProgressUpdate(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  input: AddTaskProgressUpdateInput,
+): Promise<{ update: TaskProgressUpdate }> {
+  const body: Record<string, unknown> = {
+    note: input.note,
+    clientRequestId: input.clientRequestId,
+  };
+  if (input.percent !== undefined) body.percent = input.percent;
+  return request<{ update: TaskProgressUpdate }>(
+    taskPath(workspaceId, projectId, taskId, '/progress-updates'),
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export function listTaskProgressUpdates(
+  workspaceId: string,
+  projectId: string,
+  taskId: string,
+  opts: { cursor?: string; limit?: number } = {},
+): Promise<TaskProgressUpdatePage> {
+  const params = new URLSearchParams();
+  if (opts.cursor) params.set('cursor', opts.cursor);
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+  return request<TaskProgressUpdatePage>(
+    taskPath(workspaceId, projectId, taskId, '/progress-updates') + (params.size ? `?${params}` : ''),
   );
 }
 

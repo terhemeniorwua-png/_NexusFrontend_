@@ -458,6 +458,65 @@ describe('tasks service', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Progress updates
+  // ---------------------------------------------------------------------------
+
+  it('addTaskProgressUpdate posts note, percent and clientRequestId', async () => {
+    mocks.apiRequest.mockResolvedValue({ update: { id: 'pu-1' } });
+    const { addTaskProgressUpdate } = await import('../tasks');
+    await addTaskProgressUpdate(WS, PID, TID, {
+      note: 'Worked on auth flow',
+      percent: 40,
+      clientRequestId: 'req-123',
+    });
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/${TID}/progress-updates`,
+      expect.objectContaining({
+        method: 'POST',
+        authenticated: true,
+        body: JSON.stringify({
+          note: 'Worked on auth flow',
+          clientRequestId: 'req-123',
+          percent: 40,
+        }),
+      }),
+    );
+  });
+
+  it('addTaskProgressUpdate omits percent when undefined', async () => {
+    mocks.apiRequest.mockResolvedValue({ update: { id: 'pu-2' } });
+    const { addTaskProgressUpdate } = await import('../tasks');
+    await addTaskProgressUpdate(WS, PID, TID, {
+      note: 'Status note only',
+      clientRequestId: 'req-456',
+    });
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/tasks/${TID}/progress-updates`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          note: 'Status note only',
+          clientRequestId: 'req-456',
+        }),
+      }),
+    );
+  });
+
+  it('listTaskProgressUpdates requests cursor-paginated progress updates', async () => {
+    mocks.apiRequest.mockResolvedValue({ items: [], nextCursor: null });
+    const { listTaskProgressUpdates } = await import('../tasks');
+    await listTaskProgressUpdates(WS, PID, TID, { cursor: 'cursor-1', limit: 25 });
+
+    const url: string = mocks.apiRequest.mock.calls[0][0] as string;
+    expect(url).toContain(`/workspaces/${WS}/projects/${PID}/tasks/${TID}/progress-updates?`);
+    expect(url).toContain('cursor=cursor-1');
+    expect(url).toContain('limit=25');
+    expect(mocks.apiRequest).toHaveBeenCalledWith(url, expect.objectContaining({ authenticated: true }));
+  });
+
+  // ---------------------------------------------------------------------------
   // Session refresh retry
   // ---------------------------------------------------------------------------
 

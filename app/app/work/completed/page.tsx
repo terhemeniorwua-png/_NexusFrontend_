@@ -12,7 +12,7 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { listTasks } from '@/services/tasks';
 
-type TaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED' | 'COMPLETED';
+type TaskStatus = 'ASSIGNED' | 'AWAITING_CLARIFICATION' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED' | 'COMPLETED';
 
 function statusLabel(s: TaskStatus): string {
   return s.replaceAll('_', ' ').toLowerCase().replace(/^\\w/, (c) => c.toUpperCase());

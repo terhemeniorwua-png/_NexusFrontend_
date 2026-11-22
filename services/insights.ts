@@ -153,6 +153,7 @@ export const PROJECT_VISIBILITIES: ProjectVisibility[] = [
 
 export const TASK_STATUSES: TaskStatus[] = [
   'ASSIGNED',
+  'AWAITING_CLARIFICATION',
   'IN_PROGRESS',
   'SUBMITTED',
   'UNDER_REVIEW',

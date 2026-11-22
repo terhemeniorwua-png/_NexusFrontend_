@@ -12,6 +12,8 @@ function nextAction(task: TaskSummary): string {
   switch (task.status) {
     case 'ASSIGNED':
       return 'Review the requirements and start working when ready.';
+    case 'AWAITING_CLARIFICATION':
+      return 'A clarification request is open. Wait for an answer before continuing.';
     case 'IN_PROGRESS':
       return task.requiresApproval ? 'Complete your work and submit it for review.' : 'Complete subtasks and mark work done when ready.';
     case 'SUBMITTED':

@@ -61,6 +61,12 @@ import {
   type TaskPriority,
   type TaskComment,
 } from '@/services/tasks';
+import {
+  listClarifications,
+  askClarification,
+  answerClarification,
+  type TaskClarification,
+} from '@/services/clarifications';
 import { CustomFieldInput, formatCustomFieldValue } from '@/components/tasks/CustomFieldInputs';
 import { FileVersionsPanel } from '@/components/files/FileVersionsPanel';
 import { listProjectMembers, type ProjectMember } from '@/services/projects';
@@ -313,6 +319,21 @@ export default function TaskDetailPage() {
   const [declineReason, setDeclineReason] = useState('');
   const [declineReasonError, setDeclineReasonError] = useState<string | null>(null);
 
+  // Clarifications (BE-7)
+  const [clarifications, setClarifications] = useState<TaskClarification[]>([]);
+  const [clarificationsNextCursor, setClarificationsNextCursor] = useState<string | null>(null);
+  const [clarificationsLoading, setClarificationsLoading] = useState(false);
+  const [clarificationsLoadingMore, setClarificationsLoadingMore] = useState(false);
+  const [clarificationsError, setClarificationsError] = useState<string | null>(null);
+  const [askOpen, setAskOpen] = useState(false);
+  const [askQuestion, setAskQuestion] = useState('');
+  const [askBusy, setAskBusy] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
+  const [answeringId, setAnsweringId] = useState<string | null>(null);
+  const [answerText, setAnswerText] = useState('');
+  const [answerBusy, setAnswerBusy] = useState(false);
+  const [answerError, setAnswerError] = useState<string | null>(null);
+
   const [reviewFeedbackSource, setReviewFeedbackSource] = useState<'reject' | 'request-revision' | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState('');
   const [reviewFeedbackError, setReviewFeedbackError] = useState<string | null>(null);
@@ -390,11 +411,44 @@ export default function TaskDetailPage() {
     }
   }, [activeWorkspace, projectId, taskId]);
 
+  const loadClarifications = useCallback(async () => {
+    if (!activeWorkspace || !canView) return;
+    setClarificationsLoading(true);
+    setClarificationsError(null);
+    try {
+      const data = await listClarifications(activeWorkspace.id, projectId, taskId, { limit: 25 });
+      setClarifications(data.items);
+      setClarificationsNextCursor(data.nextCursor ?? null);
+    } catch (cause) {
+      setClarificationsError(requestError(cause, 'Clarifications could not be loaded.'));
+    } finally {
+      setClarificationsLoading(false);
+    }
+  }, [activeWorkspace, projectId, taskId, canView]);
+
+  const loadMoreClarifications = useCallback(async () => {
+    if (!activeWorkspace || !canView || !clarificationsNextCursor || clarificationsLoadingMore) return;
+    setClarificationsLoadingMore(true);
+    setClarificationsError(null);
+    try {
+      const data = await listClarifications(activeWorkspace.id, projectId, taskId, {
+        limit: 25,
+        cursor: clarificationsNextCursor,
+      });
+      setClarifications((prev) => [...prev, ...data.items]);
+      setClarificationsNextCursor(data.nextCursor ?? null);
+    } catch (cause) {
+      setClarificationsError(requestError(cause, 'Clarifications could not be loaded.'));
+    } finally {
+      setClarificationsLoadingMore(false);
+    }
+  }, [activeWorkspace, projectId, taskId, canView, clarificationsNextCursor, clarificationsLoadingMore]);
+
   useEffect(() => {
     let active = true;
-    void Promise.resolve().then(() => { if (active) { void load(); void loadComments(); } });
+    void Promise.resolve().then(() => { if (active) { void load(); void loadComments(); void loadClarifications(); } });
     return () => { active = false; };
-  }, [load, loadComments]);
+  }, [load, loadComments, loadClarifications]);
 
   // Load project members only when the caller can change assignees.
   useEffect(() => {
@@ -880,6 +934,42 @@ export default function TaskDetailPage() {
     );
   }
 
+  async function handleAskClarification() {
+    if (!activeWorkspace || !task || askBusy) return;
+    const q = askQuestion.trim();
+    if (!q) {
+      setAskError('Question is required.');
+      return;
+    }
+    if (q.length > 2000) {
+      setAskError('Question must be at most 2000 characters.');
+      return;
+    }
+    setAskBusy(true);
+    setAskError(null);
+    try {
+      const res = await askClarification<TaskSummary>(activeWorkspace.id, projectId, task.id, q);
+      setTask(res.task);
+      setAskQuestion('');
+      setAskOpen(false);
+      setNotice('Clarification requested.');
+      await loadClarifications();
+    } catch (cause) {
+      if (cause instanceof ApiRequestError) {
+        if ([403, 404, 409].includes(cause.status)) {
+          setAskError(cause.message || 'Could not request clarification.');
+          await Promise.all([load({ preserveError: true }), loadClarifications()]);
+        } else {
+          setAskError(requestError(cause, 'Could not request clarification.'));
+        }
+      } else {
+        setAskError(requestError(cause, 'Could not request clarification.'));
+      }
+    } finally {
+      setAskBusy(false);
+    }
+  }
+
   function openDecline() {
     setDeclineReason('');
     setDeclineReasonError(null);
@@ -910,6 +1000,43 @@ export default function TaskDetailPage() {
       'Task assignment declined.',
     );
     if (succeeded) closeDecline();
+  }
+
+  async function handleAnswerClarification(clarificationId: string) {
+    if (!activeWorkspace || !task || answerBusy) return;
+    const a = answerText.trim();
+    if (!a) {
+      setAnswerError('Answer is required.');
+      return;
+    }
+    if (a.length > 2000) {
+      setAnswerError('Answer must be at most 2000 characters.');
+      return;
+    }
+    setAnswerBusy(true);
+    setAnswerError(null);
+    try {
+      const res = await answerClarification<TaskSummary>(activeWorkspace.id, projectId, task.id, clarificationId, a);
+      setTask(res.task);
+      setAnswerText('');
+      setAnsweringId(null);
+      setNotice('Clarification answered.');
+      await loadClarifications();
+    } catch (cause) {
+      if (cause instanceof ApiRequestError) {
+        if ([403, 404, 409].includes(cause.status)) {
+          // Decision 1: show backend message and refetch on real clarification conflict/permission/not-found codes.
+          setAnswerError(cause.message || 'Could not answer clarification.');
+          await Promise.all([load({ preserveError: true }), loadClarifications()]);
+        } else {
+          setAnswerError(requestError(cause, 'Could not answer clarification.'));
+        }
+      } else {
+        setAnswerError(requestError(cause, 'Could not answer clarification.'));
+      }
+    } finally {
+      setAnswerBusy(false);
+    }
   }
 
   async function handleStart() {
@@ -1262,7 +1389,7 @@ export default function TaskDetailPage() {
 
               {/* Header actions */}
               {!editing && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   <PermissionButton
                     size="sm"
                     variant="secondary"
@@ -1273,22 +1400,38 @@ export default function TaskDetailPage() {
                   >
                     Edit
                   </PermissionButton>
-                  {canAcceptOrDecline && (
+                  {task.status === 'AWAITING_CLARIFICATION' && isAssignedToMe && myAcceptanceStatus === 'PENDING' && !isArchived && (
+                    <>
+                      <span className="text-sm text-[var(--color-warning)] font-medium">Awaiting answer</span>
+                      <Button size="sm" variant="secondary" onClick={openDecline} disabled={acceptanceBusy || busy}>
+                        Decline
+                      </Button>
+                    </>
+                  )}
+                  {canAcceptOrDecline && task.status === 'ASSIGNED' && !isArchived && (
                     <>
                       <Button size="sm" onClick={() => void handleAccept()} disabled={acceptanceBusy || busy}>
                         Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => { setAskError(null); setAskOpen(true); }}
+                        disabled={acceptanceBusy || busy}
+                      >
+                        Request clarification
                       </Button>
                       <Button size="sm" variant="secondary" onClick={openDecline} disabled={acceptanceBusy || busy}>
                         Decline
                       </Button>
                     </>
                   )}
-                  {canStartTask && (
+                  {canStartTask && task.status !== 'AWAITING_CLARIFICATION' && (
                     <Button size="sm" onClick={() => void handleStart()} disabled={acceptanceBusy || busy}>
                       Start
                     </Button>
                   )}
-                  {!isArchived && isAssignedToMe && (
+                  {!isArchived && isAssignedToMe && task.status !== 'AWAITING_CLARIFICATION' && (
                     <Button
                       size="sm"
                       variant={task.status === 'ASSIGNED' ? 'secondary' : 'primary'}
@@ -1297,7 +1440,7 @@ export default function TaskDetailPage() {
                       {task.status === 'ASSIGNED' ? 'Open workspace' : 'Continue working'}
                     </Button>
                   )}
-                  {!isArchived && !isAssignedToMe && (
+                  {!isArchived && !isAssignedToMe && task.status !== 'AWAITING_CLARIFICATION' && (
                     <Button
                       size="sm"
                       variant="secondary"
@@ -1306,7 +1449,7 @@ export default function TaskDetailPage() {
                       View task
                     </Button>
                   )}
-                  {can('task.complete') && isAssignedToMe && (
+                  {can('task.complete') && isAssignedToMe && task.status !== 'AWAITING_CLARIFICATION' && (
                     isCompleted
                       ? <Button size="sm" variant="secondary" onClick={() => setConfirmAction('reopen')} disabled={busy}>Reopen</Button>
                       : <Button size="sm" onClick={() => setConfirmAction('complete')} disabled={busy}>Mark complete</Button>
@@ -1558,6 +1701,112 @@ export default function TaskDetailPage() {
             )}
           </Card>
 
+          {/* Clarifications */}
+          <div id="task-clarifications">
+          <Card className="p-5">
+            <h2 className="font-semibold mb-3">Clarifications</h2>
+            {clarificationsError && (
+              <Alert variant="error" className="mb-3" title="Clarifications unavailable">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{clarificationsError}</span>
+                  <Button size="sm" variant="secondary" disabled={clarificationsLoading} onClick={() => void loadClarifications()}>
+                    Retry clarifications
+                  </Button>
+                </div>
+              </Alert>
+            )}
+            {askError && <Alert variant="error" className="mb-3">{askError}</Alert>}
+            {clarificationsLoading && clarifications.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">Loading clarifications…</p>
+            ) : clarifications.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-secondary)] mb-3">No clarifications yet.</p>
+            ) : (
+              <ul className="space-y-4 mb-4" aria-label="Clarification history">
+                {clarifications.map((c) => {
+                  const isAsker = Boolean(user && (c.askedById === user.id || c.askedBy?.id === user.id));
+                  // Decision 6: hide for asker and for users not creator/reviewer/manager.
+                  // Inherited workspace authority relies on backend 403.
+                  const isManager = canReview || canApprove || canRequestRevisionAction || canUpdate;
+                  const canAnswerThis = !isAsker && (task.creatorId === user?.id || task.reviewerId === user?.id || isManager);
+                  const isOpen = !c.answeredAt && !c.cancelledAt;
+                  return (
+                    <li key={c.id} className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3 text-sm space-y-2">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-muted)]">
+                        <span className="font-medium text-[var(--color-text-secondary)]">Round {c.round}</span>
+                        <span>Asked by {c.askedBy?.name ?? 'Unknown'} on {new Date(c.askedAt).toLocaleString()}</span>
+                        {c.cancelledAt && <Badge variant="outline">Cancelled</Badge>}
+                        {c.answeredAt && <Badge variant="success">Answered</Badge>}
+                        {isOpen && !c.cancelledAt && <Badge variant="warning">Open</Badge>}
+                      </div>
+                      <p className="whitespace-pre-wrap text-[var(--color-text-primary)]"><span className="font-medium">Q:</span> {c.question}</p>
+                      {c.answer ? (
+                        <div className="whitespace-pre-wrap text-[var(--color-text-secondary)]">
+                          <span className="font-medium text-[var(--color-text-primary)]">A:</span> {c.answer}
+                          <div className="mt-1 text-xs text-[var(--color-text-muted)]">Answered by {c.answeredBy?.name ?? 'Unknown'} on {c.answeredAt ? new Date(c.answeredAt).toLocaleString() : '—'}</div>
+                        </div>
+                      ) : null}
+                      {isOpen && canAnswerThis && (
+                        <div className="pt-2 space-y-2">
+                          {answeringId === c.id ? (
+                            <>
+                              <Textarea
+                                id={`answer-${c.id}`}
+                                label="Your answer"
+                                value={answerText}
+                                onChange={(e) => setAnswerText(e.target.value)}
+                                maxLength={2000}
+                                rows={3}
+                              />
+                              <p className="text-xs text-[var(--color-text-muted)]">{answerText.trim().length}/2000</p>
+                              {answerError && <Alert variant="error">{answerError}</Alert>}
+                              <div className="flex gap-2">
+                                <Button size="sm" loading={answerBusy} onClick={() => void handleAnswerClarification(c.id)}>Submit answer</Button>
+                                <Button size="sm" variant="secondary" disabled={answerBusy} onClick={() => { setAnsweringId(null); setAnswerText(''); setAnswerError(null); }}>Cancel</Button>
+                              </div>
+                            </>
+                          ) : (
+                            <Button size="sm" variant="secondary" onClick={() => { setAnswerError(null); setAnswerText(''); setAnsweringId(c.id); }}>Answer</Button>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {clarificationsNextCursor && (
+              <div className="mb-4">
+                <Button size="sm" variant="secondary" loading={clarificationsLoadingMore} onClick={() => void loadMoreClarifications()}>
+                  Load more
+                </Button>
+              </div>
+            )}
+
+            {/* Ask clarification (pending assignee in ASSIGNED) */}
+            {task.status === 'ASSIGNED' && isAssignedToMe && myAcceptanceStatus === 'PENDING' && !isArchived && (
+              <div className="pt-2 border-t border-[var(--color-border)] mt-2">
+                {askOpen ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      id="ask-question"
+                      label="Question for the requester"
+                      value={askQuestion}
+                      onChange={(e) => setAskQuestion(e.target.value)}
+                      maxLength={2000}
+                      rows={3}
+                      placeholder="Ask a clarification question (1–2000 characters)"
+                    />
+                    <p className="text-xs text-[var(--color-text-muted)]">{askQuestion.trim().length}/2000</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" loading={askBusy} onClick={() => void handleAskClarification()}>Send question</Button>
+                      <Button size="sm" variant="secondary" disabled={askBusy} onClick={() => { setAskOpen(false); setAskQuestion(''); setAskError(null); }}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </Card>
+
           {/* Comments */}
           <Card className="p-5">
             <h2 className="font-semibold mb-3">Comments <span className="text-[var(--color-text-muted)] font-normal">({task.commentCount})</span></h2>
@@ -1656,6 +1905,7 @@ export default function TaskDetailPage() {
               </p>
             )}
           </Card>
+          </div>
 
           {/* Attachments */}
           <Card className="p-5">

@@ -29,6 +29,8 @@ const variantClasses: Record<string, string> = {
   // Task status variants — always include text, never rely on color alone
   ASSIGNED:
     'bg-[var(--color-status-assigned-bg)] text-[var(--color-status-assigned)] border border-[var(--color-status-assigned)]',
+  AWAITING_CLARIFICATION:
+    'bg-[var(--color-warning-bg)] text-[var(--color-warning)] border border-[var(--color-warning)]',
   IN_PROGRESS:
     'bg-[var(--color-status-in-progress-bg)] text-[var(--color-status-in-progress)] border border-[var(--color-status-in-progress)]',
   SUBMITTED:

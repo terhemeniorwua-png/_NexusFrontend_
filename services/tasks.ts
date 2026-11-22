@@ -7,6 +7,7 @@ import { refreshSession } from '@/services/auth';
 
 export type TaskStatus =
   | 'ASSIGNED'
+  | 'AWAITING_CLARIFICATION'
   | 'IN_PROGRESS'
   | 'SUBMITTED'
   | 'UNDER_REVIEW'

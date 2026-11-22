@@ -39,6 +39,7 @@ export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg';
 /**
  * PITERON task workflow statuses.
  * ASSIGNED → IN_PROGRESS → SUBMITTED → UNDER_REVIEW → APPROVED
+ * ASSIGNED ⇄ AWAITING_CLARIFICATION (clarification flow)
  * CHANGES_REQUESTED → IN_PROGRESS
  *
  * Note: valid status transitions are enforced by the backend.
@@ -46,6 +47,7 @@ export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg';
  */
 export type TaskStatus =
   | 'ASSIGNED'
+  | 'AWAITING_CLARIFICATION'
   | 'IN_PROGRESS'
   | 'SUBMITTED'
   | 'UNDER_REVIEW'

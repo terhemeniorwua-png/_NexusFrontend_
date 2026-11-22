@@ -34,7 +34,7 @@ export default function WorkOverviewPage() {
           limit: 100,
         });
         const allTasks = result.items.map((t) => t.status);
-        const countAssigned = allTasks.filter((s: string) => s === 'ASSIGNED').length;
+        const countAssigned = allTasks.filter((s: string) => s === 'ASSIGNED' || s === 'AWAITING_CLARIFICATION').length;
         const countInProgress = allTasks.filter((s: string) => s === 'IN_PROGRESS' || s === 'SUBMITTED' || s === 'UNDER_REVIEW').length;
         const countSubmitted = allTasks.filter((s: string) => s === 'SUBMITTED').length;
         const countCompleted = allTasks.filter((s: string) => s === 'APPROVED' || s === 'COMPLETED').length;

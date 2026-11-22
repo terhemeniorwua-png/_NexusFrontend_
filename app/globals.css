@@ -33,6 +33,8 @@
   /* Task status colours */
   --color-status-assigned:          #5146D8;
   --color-status-assigned-bg:       #EEF0FF;
+  --color-status-awaiting-clarification: #D97706;
+  --color-status-awaiting-clarification-bg: #FFFBEB;
   --color-status-in-progress:       #D97706;
   --color-status-in-progress-bg:    #FFFBEB;
   --color-status-submitted:         #7C3AED;
@@ -116,6 +118,8 @@
 
   --color-status-assigned:          #A5A0F0;
   --color-status-assigned-bg:       #23214A;
+  --color-status-awaiting-clarification: #FCD34D;
+  --color-status-awaiting-clarification-bg: #3A2A06;
   --color-status-in-progress:       #FBBF24;
   --color-status-in-progress-bg:    #3A2A06;
   --color-status-submitted:         #C4B5FD;
@@ -160,6 +164,8 @@
 
     --color-status-assigned:          #A5A0F0;
     --color-status-assigned-bg:       #23214A;
+    --color-status-awaiting-clarification: #FCD34D;
+    --color-status-awaiting-clarification-bg: #3A2A06;
     --color-status-in-progress:       #FBBF24;
     --color-status-in-progress-bg:    #3A2A06;
     --color-status-submitted:         #C4B5FD;

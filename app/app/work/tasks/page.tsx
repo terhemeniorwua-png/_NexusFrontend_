@@ -14,7 +14,7 @@ import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { listProjects, type ProjectSummary } from '@/services/projects';
 import { type TaskPriority } from '@/services/tasks';
 
-type TaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED';
+type TaskStatus = 'ASSIGNED' | 'AWAITING_CLARIFICATION' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED';
 
 function statusLabel(s: TaskStatus): string {
   return s.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
@@ -124,6 +124,7 @@ export default function WorkMyTasksPage() {
   // Build status filter options from enum
   const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
     { value: 'ASSIGNED', label: 'Assigned' },
+    { value: 'AWAITING_CLARIFICATION', label: 'Awaiting Clarification' },
     { value: 'IN_PROGRESS', label: 'In Progress' },
     { value: 'SUBMITTED', label: 'Submitted' },
     { value: 'UNDER_REVIEW', label: 'Under Review' },

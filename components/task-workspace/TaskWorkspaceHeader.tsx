@@ -6,6 +6,7 @@ import type { TaskStatus } from '@/services/tasks';
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
   ASSIGNED: 'Assigned',
+  AWAITING_CLARIFICATION: 'Awaiting clarification',
   IN_PROGRESS: 'In progress',
   SUBMITTED: 'Submitted',
   UNDER_REVIEW: 'Under review',

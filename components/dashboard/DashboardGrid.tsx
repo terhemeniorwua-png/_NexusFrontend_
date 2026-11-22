@@ -263,6 +263,7 @@ export function DashboardGrid({
             options={[
               { value: '', label: 'All statuses' },
               { value: 'ASSIGNED', label: 'Assigned' },
+              { value: 'AWAITING_CLARIFICATION', label: 'Awaiting clarification' },
               { value: 'IN_PROGRESS', label: 'In Progress' },
               { value: 'SUBMITTED', label: 'Submitted' },
             ]}

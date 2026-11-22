@@ -18,6 +18,7 @@ interface WorkloadCardProps {
 
 const STATUS_COLORS: Record<string, string> = {
   ASSIGNED: 'bg-[var(--color-info-bg)] text-[var(--color-info)]',
+  AWAITING_CLARIFICATION: 'bg-[var(--color-warning-bg)] text-[var(--color-warning)]',
   IN_PROGRESS: 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]',
   SUBMITTED: 'bg-[var(--color-warning-bg)] text-[var(--color-warning)]',
   UNDER_REVIEW: 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]',

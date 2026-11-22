@@ -28,6 +28,9 @@ const mocks = vi.hoisted(() => ({
   deleteComment: vi.fn(),
   reviewTask: vi.fn(),
   submitTask: vi.fn(),
+  listClarifications: vi.fn(),
+  askClarification: vi.fn(),
+  answerClarification: vi.fn(),
   listFiles: vi.fn(),
   uploadFile: vi.fn(),
   deleteFile: vi.fn(),
@@ -131,6 +134,12 @@ vi.mock('@/services/files', () => ({
   uploadFile: mocks.uploadFile,
 }));
 
+vi.mock('@/services/clarifications', () => ({
+  listClarifications: mocks.listClarifications,
+  askClarification: mocks.askClarification,
+  answerClarification: mocks.answerClarification,
+}));
+
 const task1 = {
   id: 'task-1', projectId: 'project-1', key: 'NX-1', title: 'Fix authentication bug',
   description: null, status: 'ASSIGNED', priority: 'HIGH', category: null, labels: [],
@@ -176,6 +185,7 @@ describe('TaskDetailPage — four roles', () => {
     mocks.user = { id: 'user-2', name: 'Bob', email: 'bob@example.com' };
     mocks.getTask.mockResolvedValue(task1);
     mocks.listComments.mockResolvedValue([]);
+    mocks.listClarifications.mockResolvedValue({ items: [], nextCursor: null });
     mocks.listFiles.mockResolvedValue({ items: [], nextCursor: null, totalBytes: 0 });
     mocks.listProjectMembers.mockResolvedValue([]);
     mocks.reviewTask.mockResolvedValue({ ...task1, status: 'APPROVED' });
@@ -915,5 +925,118 @@ describe('TaskDetailPage — four roles', () => {
 
     const picker = await screen.findByRole('combobox', { name: 'Reviewer' });
     expect(picker).toHaveValue('');
+  });
+
+  it('shows Request clarification for a PENDING assignee on ASSIGNED task', async () => {
+    setRole('MEMBER');
+    mocks.user = { id: 'user-2', name: 'Bob', email: 'bob@example.com' };
+    mocks.getTask.mockResolvedValue(withAcceptance('PENDING'));
+    render(<TaskDetailPage />);
+
+    expect(await screen.findByRole('button', { name: 'Request clarification' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
+  });
+
+  it('while awaiting clarification shows Awaiting answer, hides Accept/Start, keeps Decline', async () => {
+    setRole('MEMBER');
+    mocks.user = { id: 'user-2', name: 'Bob', email: 'bob@example.com' };
+    mocks.getTask.mockResolvedValue({ ...withAcceptance('PENDING'), status: 'AWAITING_CLARIFICATION' });
+    mocks.listClarifications.mockResolvedValue({
+      items: [{
+        id: 'c1', taskId: 'task-1', askedById: 'user-2',
+        askedBy: { id: 'user-2', name: 'Bob' },
+        question: 'What is expected?', answer: null, answeredById: null, answeredBy: null,
+        askedAt: '2026-01-01T00:00:00.000Z', answeredAt: null, cancelledAt: null, round: 1,
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      }],
+      nextCursor: null,
+    });
+    render(<TaskDetailPage />);
+
+    expect(await screen.findByText('Awaiting answer')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
+  });
+
+  it('validates clarification question and shows live counter', async () => {
+    setRole('MEMBER');
+    mocks.user = { id: 'user-2', name: 'Bob', email: 'bob@example.com' };
+    mocks.getTask.mockResolvedValue(withAcceptance('PENDING'));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Request clarification' }));
+    const textarea = await screen.findByLabelText('Question for the requester');
+    expect(screen.getByText('0/2000')).toBeInTheDocument();
+    await user.type(textarea, 'Hello');
+    expect(screen.getByText('5/2000')).toBeInTheDocument();
+    await user.clear(textarea);
+    await user.click(screen.getByRole('button', { name: 'Send question' }));
+    expect(await screen.findByText('Question is required.')).toBeInTheDocument();
+    expect(mocks.askClarification).not.toHaveBeenCalled();
+  });
+
+  it('shows answer form to creator/reviewer/manager and not to asker', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.user = { id: 'user-1', name: 'Alice', email: 'alice@example.com' };
+    mocks.getTask.mockResolvedValue({ ...task1, status: 'AWAITING_CLARIFICATION', assignees: [{ ...task1.assignees[0], acceptanceStatus: 'PENDING' }] });
+    mocks.listClarifications.mockResolvedValue({
+      items: [{
+        id: 'c1', taskId: 'task-1', askedById: 'user-2',
+        askedBy: { id: 'user-2', name: 'Bob' },
+        question: 'What is expected?', answer: null, answeredById: null, answeredBy: null,
+        askedAt: '2026-01-01T00:00:00.000Z', answeredAt: null, cancelledAt: null, round: 1,
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      }],
+      nextCursor: null,
+    });
+    render(<TaskDetailPage />);
+    expect(await screen.findByRole('button', { name: 'Answer' })).toBeInTheDocument();
+  });
+
+  it('hides answer form from asker', async () => {
+    setRole('MEMBER');
+    mocks.user = { id: 'user-2', name: 'Bob', email: 'bob@example.com' };
+    mocks.getTask.mockResolvedValue({ ...withAcceptance('PENDING'), status: 'AWAITING_CLARIFICATION' });
+    mocks.listClarifications.mockResolvedValue({
+      items: [{
+        id: 'c1', taskId: 'task-1', askedById: 'user-2',
+        askedBy: { id: 'user-2', name: 'Bob' },
+        question: 'What is expected?', answer: null, answeredById: null, answeredBy: null,
+        askedAt: '2026-01-01T00:00:00.000Z', answeredAt: null, cancelledAt: null, round: 1,
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      }],
+      nextCursor: null,
+    });
+    render(<TaskDetailPage />);
+    await screen.findByText('What is expected?');
+    expect(screen.queryByRole('button', { name: 'Answer' })).not.toBeInTheDocument();
+  });
+
+  it('shows backend error and refetches on clarification 409/403', async () => {
+    setRole('PROJECT_MANAGER');
+    mocks.user = { id: 'user-1', name: 'Alice', email: 'alice@example.com' };
+    mocks.getTask.mockResolvedValue({ ...task1, status: 'AWAITING_CLARIFICATION', assignees: [{ ...task1.assignees[0], acceptanceStatus: 'PENDING' }] });
+    mocks.listClarifications.mockResolvedValue({
+      items: [{
+        id: 'c1', taskId: 'task-1', askedById: 'user-2',
+        askedBy: { id: 'user-2', name: 'Bob' },
+        question: 'What is expected?', answer: null, answeredById: null, answeredBy: null,
+        askedAt: '2026-01-01T00:00:00.000Z', answeredAt: null, cancelledAt: null, round: 1,
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      }],
+      nextCursor: null,
+    });
+    mocks.answerClarification.mockRejectedValue(new ApiRequestError('This clarification is already resolved', 409, 'INVALID_CLARIFICATION_STATE'));
+    render(<TaskDetailPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Answer' }));
+    await user.type(screen.getByLabelText('Your answer'), 'Done');
+    await user.click(screen.getByRole('button', { name: 'Submit answer' }));
+    expect(await screen.findByText('This clarification is already resolved')).toBeInTheDocument();
+    await waitFor(() => expect(mocks.getTask.mock.calls.length).toBeGreaterThan(1));
+    expect(mocks.listClarifications.mock.calls.length).toBeGreaterThan(1);
   });
 });

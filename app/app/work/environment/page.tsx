@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 
-type TaskStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED' | 'COMPLETED';
+type TaskStatus = 'ASSIGNED' | 'AWAITING_CLARIFICATION' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED' | 'COMPLETED';
 
 function statusLabel(s: TaskStatus): string {
   return s.replaceAll('_', ' ').toLowerCase().replace(/^\\w/, (c) => c.toUpperCase());
@@ -23,6 +23,7 @@ function badgeVariantForStatus(s: TaskStatus): 'primary' | 'secondary' | 'ghost'
       return 'secondary';
     case 'CHANGES_REQUESTED':
       return 'destructive';
+    case 'AWAITING_CLARIFICATION':
     case 'IN_PROGRESS':
     case 'SUBMITTED':
     case 'ASSIGNED':

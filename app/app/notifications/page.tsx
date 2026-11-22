@@ -28,6 +28,9 @@ import {
   ALL_NOTIFICATION_TYPES,
   NOTIFICATION_TYPE_GROUPS,
   NOTIFICATION_TYPE_LABELS,
+  getNotificationTypeLabel,
+  getNotificationTypeIcon,
+  getNotificationTargetLink,
   type NotificationSummary,
   type NotificationPreference,
   type ActivityEntry,
@@ -241,7 +244,11 @@ function InboxTab() {
 
       {notifications.length > 0 && (
         <ul className="space-y-1" role="list" aria-label="Notifications">
-          {notifications.map((n) => (
+          {notifications.map((n) => {
+            const targetLink = getNotificationTargetLink(n);
+            const typeLabel = getNotificationTypeLabel(n.type);
+            const typeIcon = getNotificationTypeIcon(n.type);
+            return (
             <li
               key={n.id}
               className={[
@@ -257,9 +264,9 @@ function InboxTab() {
               />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                  {n.link ? (
+                  {targetLink ? (
                     <Link
-                      href={n.link}
+                      href={targetLink}
                       className="hover:underline"
                       onClick={() => { if (!n.readAt) void handleMarkRead(n.id); }}
                     >
@@ -271,7 +278,10 @@ function InboxTab() {
                   <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">{n.body}</p>
                 )}
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <Badge variant="default">{n.type.replace(/_/g, ' ')}</Badge>
+                  <Badge variant="default">
+                    <span aria-hidden="true" className="mr-1 inline-block font-mono text-[10px]">{typeIcon}</span>
+                    {typeLabel}
+                  </Badge>
                   <span className="text-xs text-[var(--color-text-muted)]">{relativeTime(n.createdAt)}</span>
                 </div>
               </div>
@@ -287,7 +297,8 @@ function InboxTab() {
                 </Button>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 

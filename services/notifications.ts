@@ -78,7 +78,20 @@ export type NotificationType =
   | 'TASK_OVERDUE'
   | 'TASK_DECLINED'
   | 'INTEGRATION_RECONNECT_REQUIRED'
-  | 'SECURITY_ALERT';
+  | 'SECURITY_ALERT'
+  | 'REVIEW_SUBMITTED'
+  | 'REVIEW_ASSIGNED'
+  | 'REVIEW_STARTED'
+  | 'REVIEW_APPROVED'
+  | 'REVIEW_REJECTED'
+  | 'REVIEW_CHANGES_REQUESTED'
+  | 'REVIEW_RESUBMITTED'
+  | 'CHECKLIST_SIGNED_OFF'
+  | 'ATTACHMENT_VERSION_ADDED'
+  | 'GITHUB_PR_MERGED'
+  | 'GITHUB_PR_REVIEW_RECEIVED'
+  | 'TASK_CLARIFICATION_REQUESTED'
+  | 'TASK_CLARIFICATION_ANSWERED';
 
 export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   'MENTION',
@@ -106,6 +119,19 @@ export const ALL_NOTIFICATION_TYPES: NotificationType[] = [
   'TASK_DECLINED',
   'INTEGRATION_RECONNECT_REQUIRED',
   'SECURITY_ALERT',
+  'REVIEW_SUBMITTED',
+  'REVIEW_ASSIGNED',
+  'REVIEW_STARTED',
+  'REVIEW_APPROVED',
+  'REVIEW_REJECTED',
+  'REVIEW_CHANGES_REQUESTED',
+  'REVIEW_RESUBMITTED',
+  'CHECKLIST_SIGNED_OFF',
+  'ATTACHMENT_VERSION_ADDED',
+  'GITHUB_PR_MERGED',
+  'GITHUB_PR_REVIEW_RECEIVED',
+  'TASK_CLARIFICATION_REQUESTED',
+  'TASK_CLARIFICATION_ANSWERED',
 ];
 
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
@@ -134,6 +160,60 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   TASK_DECLINED: 'Task assignment declined',
   INTEGRATION_RECONNECT_REQUIRED: 'Integration reconnection required',
   SECURITY_ALERT: 'Security alert',
+  REVIEW_SUBMITTED: 'Review submitted',
+  REVIEW_ASSIGNED: 'Review assigned',
+  REVIEW_STARTED: 'Review started',
+  REVIEW_APPROVED: 'Review approved',
+  REVIEW_REJECTED: 'Review rejected',
+  REVIEW_CHANGES_REQUESTED: 'Review changes requested',
+  REVIEW_RESUBMITTED: 'Review resubmitted',
+  CHECKLIST_SIGNED_OFF: 'Checklist signed off',
+  ATTACHMENT_VERSION_ADDED: 'Attachment version added',
+  GITHUB_PR_MERGED: 'GitHub PR merged',
+  GITHUB_PR_REVIEW_RECEIVED: 'GitHub PR review received',
+  TASK_CLARIFICATION_REQUESTED: 'Task clarification requested',
+  TASK_CLARIFICATION_ANSWERED: 'Task clarification answered',
+};
+
+export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
+  MENTION: '@',
+  TASK_ASSIGNED: 'TA',
+  TASK_REASSIGNED: 'TR',
+  TASK_SUBMITTED: 'TS',
+  TASK_APPROVED: 'OK',
+  CHANGES_REQUESTED: 'CR',
+  COMMENT_REPLY: 'CR',
+  MEMBERSHIP_CHANGED: 'MC',
+  MEMBERSHIP_SUSPENDED: 'MS',
+  MEMBERSHIP_RESTORED: 'MR',
+  INVITATION_ACCEPTED: 'IA',
+  JOIN_REQUEST_RECEIVED: 'JR',
+  JOIN_REQUEST_APPROVED: 'JA',
+  JOIN_REQUEST_REJECTED: 'JR',
+  MEETING_INVITE: 'MI',
+  MEETING_RESCHEDULED: 'MR',
+  MEETING_CANCELLED: 'MX',
+  PROJECT_UPDATE: 'PU',
+  TASK_BLOCKER_REPORTED: 'BR',
+  TASK_BLOCKER_RESOLVED: 'BR',
+  TASK_DUE_SOON: 'TD',
+  TASK_OVERDUE: 'TO',
+  TASK_DECLINED: 'TD',
+  INTEGRATION_RECONNECT_REQUIRED: 'IR',
+  SECURITY_ALERT: 'SA',
+  REVIEW_SUBMITTED: 'RS',
+  REVIEW_ASSIGNED: 'RA',
+  REVIEW_STARTED: 'RV',
+  REVIEW_APPROVED: 'RA',
+  REVIEW_REJECTED: 'RR',
+  REVIEW_CHANGES_REQUESTED: 'RC',
+  REVIEW_RESUBMITTED: 'RS',
+  CHECKLIST_SIGNED_OFF: 'CS',
+  ATTACHMENT_VERSION_ADDED: 'AV',
+  GITHUB_PR_MERGED: 'GM',
+  GITHUB_PR_REVIEW_RECEIVED: 'GR',
+  TASK_CLARIFICATION_REQUESTED: 'CQ',
+  TASK_CLARIFICATION_ANSWERED: 'CA',
 };
 
 export const NOTIFICATION_TYPE_GROUPS: { label: string; types: NotificationType[] }[] = [
@@ -150,6 +230,22 @@ export const NOTIFICATION_TYPE_GROUPS: { label: string; types: NotificationType[
       'TASK_DUE_SOON',
       'TASK_OVERDUE',
       'TASK_DECLINED',
+      'TASK_CLARIFICATION_REQUESTED',
+      'TASK_CLARIFICATION_ANSWERED',
+    ],
+  },
+  {
+    label: 'Reviews and submissions',
+    types: [
+      'REVIEW_SUBMITTED',
+      'REVIEW_ASSIGNED',
+      'REVIEW_STARTED',
+      'REVIEW_APPROVED',
+      'REVIEW_REJECTED',
+      'REVIEW_CHANGES_REQUESTED',
+      'REVIEW_RESUBMITTED',
+      'CHECKLIST_SIGNED_OFF',
+      'ATTACHMENT_VERSION_ADDED',
     ],
   },
   { label: 'Comments and mentions', types: ['MENTION', 'COMMENT_REPLY'] },
@@ -167,9 +263,50 @@ export const NOTIFICATION_TYPE_GROUPS: { label: string; types: NotificationType[
   },
   { label: 'Meetings', types: ['MEETING_INVITE', 'MEETING_RESCHEDULED', 'MEETING_CANCELLED'] },
   { label: 'Projects', types: ['PROJECT_UPDATE'] },
-  { label: 'Integrations', types: ['INTEGRATION_RECONNECT_REQUIRED'] },
+  { label: 'Integrations', types: ['INTEGRATION_RECONNECT_REQUIRED', 'GITHUB_PR_MERGED', 'GITHUB_PR_REVIEW_RECEIVED'] },
   { label: 'Security', types: ['SECURITY_ALERT'] },
 ];
+
+const DEFAULT_NOTIFICATION_TYPE_LABEL = 'Notification';
+const DEFAULT_NOTIFICATION_TYPE_ICON = 'N';
+
+export function isNotificationType(type: string): type is NotificationType {
+  return (ALL_NOTIFICATION_TYPES as readonly string[]).includes(type);
+}
+
+export function getNotificationTypeLabel(type: string): string {
+  if (isNotificationType(type)) return NOTIFICATION_TYPE_LABELS[type];
+  if (typeof type !== 'string' || type.trim().length === 0) return DEFAULT_NOTIFICATION_TYPE_LABEL;
+  return type
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+export function getNotificationTypeIcon(type: string): string {
+  if (isNotificationType(type)) return NOTIFICATION_TYPE_ICONS[type];
+  return DEFAULT_NOTIFICATION_TYPE_ICON;
+}
+
+export function getNotificationTargetLink(
+  notification: { type: string; link: string | null; data: Record<string, unknown> | null },
+): string | null {
+  if (typeof notification.link === 'string' && notification.link.trim().length > 0) {
+    return notification.link;
+  }
+
+  const data = notification.data ?? {};
+  const workspaceId = typeof data.workspaceId === 'string' ? data.workspaceId : null;
+  const projectId = typeof data.projectId === 'string' ? data.projectId : null;
+  const taskId = typeof data.taskId === 'string' ? data.taskId : null;
+
+  if (projectId && taskId) return `/app/projects/${projectId}/tasks/${taskId}`;
+  if (projectId) return `/app/projects/${projectId}`;
+  if (workspaceId) return `/app/workspaces/${workspaceId}`;
+  return null;
+}
 
 export interface NotificationSummary {
   id: string;

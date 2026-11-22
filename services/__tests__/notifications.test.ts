@@ -10,6 +10,10 @@ import {
   ALL_NOTIFICATION_TYPES,
   NOTIFICATION_TYPE_LABELS,
   NOTIFICATION_TYPE_GROUPS,
+  NOTIFICATION_TYPE_ICONS,
+  getNotificationTypeLabel,
+  getNotificationTypeIcon,
+  getNotificationTargetLink,
 } from '../notifications';
 
 const WS_ID = 'ws-abc123';
@@ -44,10 +48,14 @@ describe('notifications service', () => {
 
   // ── Metadata ───────────────────────────────────────────────────────────────
 
-  it('exports all 25 notification types', () => {
-    expect(ALL_NOTIFICATION_TYPES).toHaveLength(25);
+  it('exports all 38 notification types', () => {
+    expect(ALL_NOTIFICATION_TYPES).toHaveLength(38);
     expect(ALL_NOTIFICATION_TYPES).toContain('MENTION');
     expect(ALL_NOTIFICATION_TYPES).toContain('PROJECT_UPDATE');
+    expect(ALL_NOTIFICATION_TYPES).toContain('TASK_CLARIFICATION_REQUESTED');
+    expect(ALL_NOTIFICATION_TYPES).toContain('TASK_CLARIFICATION_ANSWERED');
+    expect(ALL_NOTIFICATION_TYPES).toContain('GITHUB_PR_MERGED');
+    expect(ALL_NOTIFICATION_TYPES).toContain('GITHUB_PR_REVIEW_RECEIVED');
   });
 
   it('has a label for every notification type', () => {
@@ -56,10 +64,10 @@ describe('notifications service', () => {
     }
   });
 
-  it('groups cover all 25 types without duplication', () => {
+  it('groups cover all 38 types without duplication', () => {
     const flat = NOTIFICATION_TYPE_GROUPS.flatMap((g) => g.types);
-    expect(flat).toHaveLength(25);
-    expect(new Set(flat).size).toBe(25);
+    expect(flat).toHaveLength(38);
+    expect(new Set(flat).size).toBe(38);
   });
 
   it('matches the backend NotificationType enum exactly', () => {
@@ -71,11 +79,63 @@ describe('notifications service', () => {
       'MEETING_RESCHEDULED', 'MEETING_CANCELLED', 'PROJECT_UPDATE', 'TASK_BLOCKER_REPORTED',
       'TASK_BLOCKER_RESOLVED', 'TASK_DUE_SOON', 'TASK_OVERDUE', 'TASK_DECLINED',
       'INTEGRATION_RECONNECT_REQUIRED', 'SECURITY_ALERT',
+      'REVIEW_SUBMITTED', 'REVIEW_ASSIGNED', 'REVIEW_STARTED', 'REVIEW_APPROVED',
+      'REVIEW_REJECTED', 'REVIEW_CHANGES_REQUESTED', 'REVIEW_RESUBMITTED',
+      'CHECKLIST_SIGNED_OFF', 'ATTACHMENT_VERSION_ADDED',
+      'GITHUB_PR_MERGED', 'GITHUB_PR_REVIEW_RECEIVED',
+      'TASK_CLARIFICATION_REQUESTED', 'TASK_CLARIFICATION_ANSWERED',
     ]);
-    for (const type of ['TASK_DECLINED', 'INTEGRATION_RECONNECT_REQUIRED', 'SECURITY_ALERT'] as const) {
+    for (const type of [
+      'TASK_DECLINED', 'INTEGRATION_RECONNECT_REQUIRED', 'SECURITY_ALERT',
+      'REVIEW_SUBMITTED', 'REVIEW_ASSIGNED', 'REVIEW_STARTED', 'REVIEW_APPROVED',
+      'REVIEW_REJECTED', 'REVIEW_CHANGES_REQUESTED', 'REVIEW_RESUBMITTED',
+      'CHECKLIST_SIGNED_OFF', 'ATTACHMENT_VERSION_ADDED',
+      'GITHUB_PR_MERGED', 'GITHUB_PR_REVIEW_RECEIVED',
+      'TASK_CLARIFICATION_REQUESTED', 'TASK_CLARIFICATION_ANSWERED',
+    ] as const) {
       expect(NOTIFICATION_TYPE_LABELS[type]).toBeTruthy();
       expect(NOTIFICATION_TYPE_GROUPS.flatMap((g) => g.types)).toContain(type);
     }
+  });
+
+  const NEW_NOTIFICATION_TYPES = [
+    'REVIEW_SUBMITTED',
+    'REVIEW_ASSIGNED',
+    'REVIEW_STARTED',
+    'REVIEW_APPROVED',
+    'REVIEW_REJECTED',
+    'REVIEW_CHANGES_REQUESTED',
+    'REVIEW_RESUBMITTED',
+    'CHECKLIST_SIGNED_OFF',
+    'ATTACHMENT_VERSION_ADDED',
+    'GITHUB_PR_MERGED',
+    'GITHUB_PR_REVIEW_RECEIVED',
+    'TASK_CLARIFICATION_REQUESTED',
+    'TASK_CLARIFICATION_ANSWERED',
+  ] as const;
+
+  it('has label, icon and target link for each new notification type', () => {
+    for (const type of NEW_NOTIFICATION_TYPES) {
+      expect(getNotificationTypeLabel(type)).toBeTruthy();
+      expect(getNotificationTypeLabel(type)).not.toBe('Notification');
+      expect(getNotificationTypeIcon(type)).toBeTruthy();
+      expect(getNotificationTypeIcon(type)).not.toBe('N');
+      expect(NOTIFICATION_TYPE_ICONS[type]).toBeTruthy();
+
+      const taskLink = getNotificationTargetLink({
+        type,
+        link: null,
+        data: { projectId: 'p1', taskId: 't1' },
+      });
+      expect(taskLink).toBe('/app/projects/p1/tasks/t1');
+    }
+  });
+
+  it('falls back safely for unknown notification types', () => {
+    expect(getNotificationTypeLabel('SOMETHING_NEW_FROM_BACKEND')).toBe('Something New From Backend');
+    expect(getNotificationTypeIcon('SOMETHING_NEW_FROM_BACKEND')).toBe('N');
+    expect(getNotificationTargetLink({ type: 'SOMETHING_NEW_FROM_BACKEND', link: null, data: null })).toBeNull();
+    expect(getNotificationTargetLink({ type: 'SOMETHING_NEW_FROM_BACKEND', link: '/custom', data: null })).toBe('/custom');
   });
 
   // ── listNotifications ──────────────────────────────────────────────────────

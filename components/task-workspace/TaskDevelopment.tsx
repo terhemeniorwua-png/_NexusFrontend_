@@ -11,9 +11,8 @@ import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
-  canBrowseRepositoryCode,
-  canLinkRepositoryDevWork,
-  normalizeRepositoryAccessLevel,
+  canBrowseRepository,
+  canLinkRepository,
   type DevBranchSummary,
   type DevPullRequestSummary,
   type LinkedProjectRepository,
@@ -107,13 +106,13 @@ export function TaskDevelopment({
   const [localNotice, setLocalNotice] = useState<string | null>(null);
 
   const visibleRepos = useMemo(
-    () => linkedRepos.filter((r) => normalizeRepositoryAccessLevel(r.effectiveAccessLevel ?? r.accessLevel) !== 'NONE'),
+    () => linkedRepos.filter((r) => r.effectiveAccessLevel !== 'NONE'),
     [linkedRepos],
   );
   const selectedRepo = useMemo(() => visibleRepos.find((r) => r.id === selectedRepoId) ?? null, [visibleRepos, selectedRepoId]);
-  const selectedRepoAccess = normalizeRepositoryAccessLevel(selectedRepo?.effectiveAccessLevel ?? selectedRepo?.accessLevel);
-  const canBrowseSelected = canBrowseRepositoryCode(selectedRepoAccess);
-  const canLinkSelected = canLink && canLinkRepositoryDevWork(selectedRepoAccess);
+  const selectedRepoAccess = selectedRepo?.effectiveAccessLevel ?? null;
+  const canBrowseSelected = canBrowseRepository(selectedRepoAccess);
+  const canLinkSelected = canLink && canLinkRepository(selectedRepoAccess);
   const providerName = selectedRepo?.provider === 'GITLAB' ? 'GitLab' : selectedRepo?.provider === 'GITHUB' ? 'GitHub' : 'provider';
 
   async function browse() {
@@ -216,8 +215,13 @@ export function TaskDevelopment({
           ) : (
             <ul className="mt-2 space-y-2" role="list">
               {devLinks.map((link) => {
-                const accessLevel = link.effectiveAccessLevel ?? null;
-                const restricted = accessLevel === 'NONE' || accessLevel === 'METADATA';
+                const accessLevel = link.effectiveAccessLevel;
+                const hasKnownLevel = accessLevel !== undefined;
+                // Contract: restricted only from METADATA. null (no linked repo) renders as before, never restricted.
+                // Legacy fallback: when effectiveAccessLevel is undefined (older shape), keep previous restricted heuristic.
+                const restricted = hasKnownLevel ? accessLevel === 'METADATA' : (!link.url && !link.repositoryFullName);
+                const canMutateByLevel = hasKnownLevel ? accessLevel === 'LINK' : accessLevel === undefined;
+                const canUnlink = canLink && canMutateByLevel;
                 const label = restricted
                   ? 'Restricted repository'
                   : link.externalType === 'PULL_REQUEST'
@@ -266,7 +270,7 @@ export function TaskDevelopment({
                         </>
                       )}
                     </div>
-                    {canLink && !restricted && (
+                    {canUnlink && (
                       <Button size="sm" variant="secondary" onClick={() => setUnlinkTarget(link)} disabled={busy}>Unlink</Button>
                     )}
                   </li>
@@ -316,8 +320,11 @@ export function TaskDevelopment({
               </div>
               <Button variant="secondary" onClick={() => void browse()} loading={browseLoading} disabled={!selectedRepoId || busy || !canBrowseSelected}>Load from {selectedRepo ? providerName : 'provider'}</Button>
             </div>
-            {selectedRepo && !canBrowseSelected && (
-              <Alert variant="info">This repository is metadata-only. You can see its name, but code activity cannot be browsed.</Alert>
+            {selectedRepo && selectedRepoAccess === 'METADATA' && (
+              <Alert variant="info">Restricted repository. You can see its name, but code activity cannot be browsed.</Alert>
+            )}
+            {selectedRepo && selectedRepoAccess !== null && selectedRepoAccess !== 'METADATA' && !canLinkSelected && (
+              <Alert variant="info">You have read access to this repository. Linking and unlinking development work requires link access.</Alert>
             )}
 
             {browseLoading ? (
@@ -333,7 +340,9 @@ export function TaskDevelopment({
                           <p className="font-medium">#{pr.number} {pr.title}</p>
                           <p className="text-xs text-[var(--color-text-muted)]">{pr.headRef ?? '—'} → {pr.baseRef ?? '—'} · {pr.state}{pr.authorLogin ? ` · ${pr.authorLogin}` : ''}</p>
                         </div>
-                        <Button size="sm" onClick={() => void handleLinkPr(pr)} disabled={already || busy || !canLinkSelected}>{already ? 'Linked' : !canLinkSelected ? 'No access' : 'Link'}</Button>
+                        {canLinkSelected ? (
+                          <Button size="sm" onClick={() => void handleLinkPr(pr)} disabled={already || busy}>{already ? 'Linked' : 'Link'}</Button>
+                        ) : null}
                       </li>
                     );
                   })}
@@ -350,7 +359,9 @@ export function TaskDevelopment({
                           <p className="font-medium">{b.name}</p>
                           {b.commitSha ? <p className="text-xs text-[var(--color-text-muted)]">{b.commitSha.slice(0, 12)}</p> : null}
                         </div>
-                        <Button size="sm" onClick={() => void handleLinkBranch(b)} disabled={already || busy || !canLinkSelected}>{already ? 'Linked' : !canLinkSelected ? 'No access' : 'Link'}</Button>
+                        {canLinkSelected ? (
+                          <Button size="sm" onClick={() => void handleLinkBranch(b)} disabled={already || busy}>{already ? 'Linked' : 'Link'}</Button>
+                        ) : null}
                       </li>
                     );
                   })}

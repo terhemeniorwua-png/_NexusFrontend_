@@ -10,12 +10,11 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import {
-  canBrowseRepositoryCode,
+  canBrowseRepository,
   listProjectRepositories,
   listRepositoryBranches,
   listRepositoryCommits,
   listRepositoryPullRequests,
-  normalizeRepositoryAccessLevel,
   type DevBranchSummary,
   type DevCommitSummary,
   type DevPullRequestSummary,
@@ -59,12 +58,11 @@ export default function ProjectCodePage() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const visibleRepos = repos.filter(
-    (r) => normalizeRepositoryAccessLevel(r.effectiveAccessLevel ?? r.accessLevel) !== 'NONE',
-  );
+  const visibleRepos = repos.filter((r) => r.effectiveAccessLevel !== 'NONE');
   const selectedRepo = visibleRepos.find((r) => r.id === repoId) ?? null;
-  const selectedAccess = normalizeRepositoryAccessLevel(selectedRepo?.effectiveAccessLevel ?? selectedRepo?.accessLevel);
-  const canBrowse = canBrowseRepositoryCode(selectedAccess);
+  const selectedAccess = selectedRepo?.effectiveAccessLevel ?? null;
+  const isRestricted = selectedAccess === 'METADATA';
+  const canBrowse = canBrowseRepository(selectedAccess);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -74,11 +72,9 @@ export default function ProjectCodePage() {
         const list = await listProjectRepositories(workspaceId, projectId);
         if (!active) return;
         setRepos(list);
-        const firstVisible = list.find(
-          (r) => normalizeRepositoryAccessLevel(r.effectiveAccessLevel ?? r.accessLevel) !== 'NONE',
-        );
+        const firstVisible = list.find((r) => r.effectiveAccessLevel !== 'NONE');
         setRepoId((current) => {
-          if (current && list.some((r) => r.id === current && normalizeRepositoryAccessLevel(r.effectiveAccessLevel ?? r.accessLevel) !== 'NONE')) return current;
+          if (current && list.some((r) => r.id === current && r.effectiveAccessLevel !== 'NONE')) return current;
           return firstVisible?.id || '';
         });
       } catch (cause) {
@@ -185,10 +181,11 @@ export default function ProjectCodePage() {
 
       {error && <Alert variant="error" title="Could not load">{error}</Alert>}
 
-      {!canBrowse ? (
-        <Alert variant="info" title="Metadata-only access">
-          You can see this repository name, but code activity is not available with metadata-only access.
-        </Alert>
+      {isRestricted ? (
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-sm">
+          <p className="font-medium text-[var(--color-text-primary)]">Restricted repository</p>
+          <p className="mt-1 text-[var(--color-text-secondary)]">You can see this repository exists, but code activity is not available with metadata-only access.</p>
+        </div>
       ) : itemsLoading ? (
         <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
       ) : mode === 'pulls' ? (

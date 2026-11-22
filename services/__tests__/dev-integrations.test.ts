@@ -91,7 +91,7 @@ describe('dev-integrations service (Feature A)', () => {
       `/workspaces/${WS}/projects/${PID}/repositories`,
       expect.objectContaining({ method: 'POST', authenticated: true }),
     );
-    const body = JSON.parse((mocks.apiRequest.mock.calls[0][1] as any).body);
+    const body = JSON.parse(String((mocks.apiRequest.mock.calls[0][1] as { body: string }).body));
     expect(body).toEqual({ connectionId: 'conn-1', externalRepoId: '1', fullName: 'acme/app', defaultBranch: 'main' });
   });
 
@@ -170,56 +170,63 @@ describe('dev-integrations repository access (FE-8)', () => {
     mocks.refreshSession.mockResolvedValue(undefined);
   });
 
-  it('normalizes repository access levels', async () => {
-    const { normalizeRepositoryAccessLevel, canBrowseRepositoryCode, canLinkRepositoryDevWork } = await import('../dev-integrations');
-    expect(normalizeRepositoryAccessLevel('NONE')).toBe('NONE');
-    expect(normalizeRepositoryAccessLevel('METADATA')).toBe('METADATA_ONLY');
-    expect(normalizeRepositoryAccessLevel('METADATA_ONLY')).toBe('METADATA_ONLY');
-    expect(normalizeRepositoryAccessLevel('READ')).toBe('ACCESS');
-    expect(normalizeRepositoryAccessLevel('ACCESS')).toBe('ACCESS');
-    expect(normalizeRepositoryAccessLevel('LINK')).toBe('FULL');
-    expect(normalizeRepositoryAccessLevel('FULL')).toBe('FULL');
-
-    expect(canBrowseRepositoryCode('NONE')).toBe(false);
-    expect(canBrowseRepositoryCode('METADATA_ONLY')).toBe(false);
-    expect(canBrowseRepositoryCode('ACCESS')).toBe(true);
-    expect(canBrowseRepositoryCode('FULL')).toBe(true);
-
-    expect(canLinkRepositoryDevWork('ACCESS')).toBe(false);
-    expect(canLinkRepositoryDevWork('FULL')).toBe(true);
-  });
-
-  it('lists repository access members', async () => {
-    mocks.apiRequest.mockResolvedValue([{ userId: 'u1', level: 'READ' }]);
-    const { listRepositoryAccessMembers } = await import('../dev-integrations');
-    const res = await listRepositoryAccessMembers(WS, PID, 'repo-1');
+  it('lists repository access members from contract endpoint', async () => {
+    mocks.apiRequest.mockResolvedValue([
+      {
+        userId: 'u1',
+        effectiveAccessLevel: 'READ',
+        defaultLevel: 'LINK',
+        isOverride: true,
+        overrideLevel: 'READ',
+        inheritedWorkspaceAccess: false,
+        user: { id: 'u1', name: 'User', email: 'u1@example.com' },
+      },
+    ]);
+    const { listRepositoryMembers } = await import('../dev-integrations');
+    const res = await listRepositoryMembers(WS, PID, 'repo-1');
     expect(mocks.apiRequest).toHaveBeenCalledWith(
-      `/workspaces/${WS}/projects/${PID}/repositories/repo-1/access`,
+      `/workspaces/${WS}/projects/${PID}/repositories/repo-1/members`,
       expect.objectContaining({ authenticated: true }),
     );
-    expect(res[0].userId).toBe('u1');
+    expect(res[0]).toMatchObject({ userId: 'u1', effectiveAccessLevel: 'READ', isOverride: true, overrideLevel: 'READ' });
   });
 
-  it('updates repository access member level', async () => {
-    mocks.apiRequest.mockResolvedValue({ ok: true });
-    const { updateRepositoryAccessMember } = await import('../dev-integrations');
-    await updateRepositoryAccessMember(WS, PID, 'repo-1', 'u1', 'FULL');
+  it('sets repository member override with contract body', async () => {
+    mocks.apiRequest.mockResolvedValue({
+      userId: 'u1', effectiveAccessLevel: 'LINK', defaultLevel: 'READ', isOverride: true, overrideLevel: 'LINK', inheritedWorkspaceAccess: false, user: { id: 'u1', name: 'User', email: 'u1@example.com' },
+    });
+    const { setRepositoryMemberOverride } = await import('../dev-integrations');
+    await setRepositoryMemberOverride(WS, PID, 'repo-1', 'u1', 'LINK');
     expect(mocks.apiRequest).toHaveBeenCalledWith(
-      `/workspaces/${WS}/projects/${PID}/repositories/repo-1/access/u1`,
+      `/workspaces/${WS}/projects/${PID}/repositories/repo-1/members/u1`,
       expect.objectContaining({ method: 'PUT', authenticated: true }),
     );
-    const body = JSON.parse((mocks.apiRequest.mock.calls[0][1] as any).body);
-    expect(body).toEqual({ level: 'FULL' });
+    const body = JSON.parse(String((mocks.apiRequest.mock.calls[0][1] as { body: string }).body));
+    expect(body).toEqual({ level: 'LINK' });
+  });
+
+  it('removes repository member override (idempotent DELETE)', async () => {
+    mocks.apiRequest.mockResolvedValue({
+      userId: 'u1', effectiveAccessLevel: 'READ', defaultLevel: 'READ', isOverride: false, overrideLevel: null, inheritedWorkspaceAccess: true, user: { id: 'u1', name: 'User', email: 'u1@example.com' },
+    });
+    const { removeRepositoryMemberOverride } = await import('../dev-integrations');
+    const res = await removeRepositoryMemberOverride(WS, PID, 'repo-1', 'u1');
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `/workspaces/${WS}/projects/${PID}/repositories/repo-1/members/u1`,
+      expect.objectContaining({ method: 'DELETE', authenticated: true }),
+    );
+    expect(res.isOverride).toBe(false);
+    expect(res.effectiveAccessLevel).toBe('READ');
   });
 
   it('surfaces 403/404 backend messages for repository access operations', async () => {
     const { ApiRequestError } = await import('@/lib/api');
-    mocks.apiRequest.mockRejectedValueOnce(new ApiRequestError('No repository access', 403, 'REPOSITORY_ACCESS_DENIED'));
-    const { listRepositoryAccessMembers } = await import('../dev-integrations');
-    await expect(listRepositoryAccessMembers(WS, PID, 'repo-1')).rejects.toMatchObject({ status: 403, message: 'No repository access' });
+    mocks.apiRequest.mockRejectedValueOnce(new ApiRequestError('No repository access', 403, 'PERMISSION_DENIED'));
+    const { listRepositoryMembers } = await import('../dev-integrations');
+    await expect(listRepositoryMembers(WS, PID, 'repo-1')).rejects.toMatchObject({ status: 403, message: 'No repository access' });
 
-    mocks.apiRequest.mockRejectedValueOnce(new ApiRequestError('Repository not found', 404, 'NOT_FOUND'));
-    const { updateRepositoryAccessMember } = await import('../dev-integrations');
-    await expect(updateRepositoryAccessMember(WS, PID, 'repo-1', 'u1', 'NONE')).rejects.toMatchObject({ status: 404, message: 'Repository not found' });
+    mocks.apiRequest.mockRejectedValueOnce(new ApiRequestError('That project member does not exist', 404, 'PROJECT_MEMBER_NOT_FOUND'));
+    const { setRepositoryMemberOverride } = await import('../dev-integrations');
+    await expect(setRepositoryMemberOverride(WS, PID, 'repo-1', 'u1', 'NONE')).rejects.toMatchObject({ status: 404, code: 'PROJECT_MEMBER_NOT_FOUND' });
   });
 });

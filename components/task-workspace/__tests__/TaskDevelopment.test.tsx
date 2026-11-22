@@ -101,4 +101,51 @@ describe('TaskDevelopment', () => {
     expect(screen.getByText('Restricted repository')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Unlink' })).toBeInTheDocument();
   });
+
+  it('renders review and merge state for READ and LINK repository access', () => {
+    const { rerender } = renderDev([
+      makeLink({
+        id: 'read-link',
+        effectiveAccessLevel: 'READ',
+        state: 'merged',
+        mergedAt: '2026-01-02T00:00:00.000Z',
+        reviewState: 'APPROVED',
+        reviewerLogin: 'alice',
+        reviewedAt: '2026-01-01T00:00:00.000Z',
+      }),
+    ], true);
+    expect(screen.getAllByText('Merged').length).toBeGreaterThan(0);
+    expect(screen.getByText('Approved')).toBeInTheDocument();
+    expect(screen.getByText(/Reviewed by alice/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Unlink' })).not.toBeInTheDocument();
+
+    rerender(
+      <TaskDevelopment
+        devLinks={[
+          makeLink({
+            id: 'link-link',
+            effectiveAccessLevel: 'LINK',
+            state: 'merged',
+            mergedAt: '2026-01-02T00:00:00.000Z',
+            reviewState: 'APPROVED',
+            reviewerLogin: 'alice',
+            reviewedAt: '2026-01-01T00:00:00.000Z',
+          }),
+        ]}
+        linkedRepos={[repo]}
+        loading={false}
+        error={null}
+        canLink
+        busy={false}
+        onReload={vi.fn()}
+        onLoadBranches={vi.fn().mockResolvedValue([])}
+        onLoadPullRequests={vi.fn().mockResolvedValue([])}
+        onLink={vi.fn().mockResolvedValue(undefined)}
+        onUnlink={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    expect(screen.getAllByText('Merged').length).toBeGreaterThan(0);
+    expect(screen.getByText('Approved')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unlink' })).toBeInTheDocument();
+  });
 });

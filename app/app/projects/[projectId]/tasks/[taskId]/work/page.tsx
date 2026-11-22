@@ -14,6 +14,7 @@ import { ApiRequestError } from '@/lib/api';
 import { getProject, type ProjectSummary } from '@/services/projects';
 import {
   addComment,
+  addTaskProgressUpdate,
   completeSubtask,
   createTask,
   createTaskTimeEntry,
@@ -23,6 +24,7 @@ import {
   getTaskWorkspace,
   listComments,
   listTaskActivity,
+  listTaskProgressUpdates,
   listTaskTimeEntries,
   reportTaskBlocker,
   resolveTaskBlocker,
@@ -33,6 +35,7 @@ import {
   type TaskActivityItem,
   type TaskComment,
   type TaskProgress,
+  type TaskProgressUpdate,
   type TaskReportedBlocker,
   type TaskSummary,
   type TaskTimeEntry,
@@ -46,6 +49,7 @@ import { SubtaskManager } from '@/components/task-workspace/SubtaskManager';
 import { AttachmentManager } from '@/components/task-workspace/AttachmentManager';
 import { TaskDiscussion } from '@/components/task-workspace/TaskDiscussion';
 import { TaskActivityTimeline } from '@/components/task-workspace/TaskActivityTimeline';
+import { TaskProgressUpdates } from '@/components/task-workspace/TaskProgressUpdates';
 import { TaskSubmissionPanel } from '@/components/task-workspace/TaskSubmissionPanel';
 import { TaskProgressTracker } from '@/components/task-workspace/TaskProgressTracker';
 import { WorkDocuments } from '@/components/task-workspace/WorkDocuments';
@@ -63,7 +67,7 @@ import {
   type TaskDevLink,
 } from '@/services/dev-integrations';
 
-const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'documents', 'attachments', 'development', 'discussion', 'activity', 'time'];
+const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'documents', 'attachments', 'development', 'discussion', 'progress', 'activity', 'time'];
 
 function parseSection(hash: string, search: string): WorkspaceSection {
   const h = hash.replace(/^#/, '').toLowerCase();
@@ -107,6 +111,14 @@ export default function TaskWorkPage() {
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const [activityError, setActivityError] = useState<string | null>(null);
+
+  const [progressUpdates, setProgressUpdates] = useState<TaskProgressUpdate[]>([]);
+  const [progressCursor, setProgressCursor] = useState<string | null>(null);
+  const [progressLoading, setProgressLoading] = useState(false);
+  const [progressLoadingMore, setProgressLoadingMore] = useState(false);
+  const [progressError, setProgressError] = useState<string | null>(null);
+  const [progressSubmitBusy, setProgressSubmitBusy] = useState(false);
+  const [progressSubmitError, setProgressSubmitError] = useState<string | null>(null);
   const [submissionBusy, setSubmissionBusy] = useState(false);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [subtaskBusyId, setSubtaskBusyId] = useState<string | null>(null);
@@ -202,6 +214,25 @@ export default function TaskWorkPage() {
     finally { setActivityLoading(false); setActivityLoadingMore(false); }
   }, [activeWorkspaceId, projectId, taskId, activityCursor]);
 
+  const loadProgressUpdates = useCallback(async (reset = true) => {
+    if (!activeWorkspaceId) return;
+    if (reset) { setProgressLoading(true); setProgressError(null); }
+    else setProgressLoadingMore(true);
+    try {
+      const page = await listTaskProgressUpdates(activeWorkspaceId, projectId, taskId, {
+        cursor: reset ? undefined : progressCursor ?? undefined,
+        limit: 25,
+      });
+      setProgressUpdates((prev) => (reset ? page.items : [...prev, ...page.items]));
+      setProgressCursor(page.nextCursor);
+    } catch (e) {
+      setProgressError(e instanceof ApiRequestError ? e.message : 'Failed to load progress updates.');
+    } finally {
+      setProgressLoading(false);
+      setProgressLoadingMore(false);
+    }
+  }, [activeWorkspaceId, projectId, taskId, progressCursor]);
+
   const timeTrackingEnabled = Boolean(activeWorkspace?.timeTrackingEnabled);
 
   const loadTimeEntries = useCallback(async () => {
@@ -240,9 +271,10 @@ export default function TaskWorkPage() {
     if (section === 'discussion') void loadComments();
     if (section === 'attachments') void loadFiles();
     if (section === 'activity') void loadActivity(true);
+    if (section === 'progress') void loadProgressUpdates(true);
     if (section === 'time') void loadTimeEntries();
     if (section === 'development') void loadDevelopment();
-  }, [section, workspaceData, activeWorkspaceId, loadComments, loadFiles, loadActivity, loadTimeEntries, loadDevelopment]);
+  }, [section, workspaceData, activeWorkspaceId, loadComments, loadFiles, loadActivity, loadProgressUpdates, loadTimeEntries, loadDevelopment]);
 
   useEffect(() => {
     if (!workspaceData || !activeWorkspaceId || !timeTrackingEnabled) return;
@@ -294,6 +326,39 @@ export default function TaskWorkPage() {
       task.creatorId === currentUserId ||
       can('task.update') ||
       can('project.settings.manage'));
+
+  const canPostProgressUpdate =
+    isAssignee && (task.status === 'IN_PROGRESS' || task.status === 'CHANGES_REQUESTED');
+
+  const resolveProgressUpdateAuthor = (authorId: string) => {
+    if (authorId === currentUserId && user?.name) return user.name;
+    const assignee = task.assignees.find((a) => a.userId === authorId);
+    if (assignee?.user.name) return assignee.user.name;
+    if (task.creatorId === authorId) return task.creator.name;
+    if (task.reviewer?.id === authorId) return task.reviewer.name;
+    if (task.submittedBy?.id === authorId) return task.submittedBy.name;
+    if (task.reviewedBy?.id === authorId) return task.reviewedBy.name;
+    if (workspaceData.people.reviewer?.id === authorId) return workspaceData.people.reviewer.name;
+    return authorId;
+  };
+
+  const handleProgressUpdateSubmit = async (draft: { note: string; percent?: number | null; clientRequestId: string }) => {
+    setProgressSubmitBusy(true);
+    setProgressSubmitError(null);
+    try {
+      await addTaskProgressUpdate(activeWorkspaceId, projectId, taskId, draft);
+      await loadProgressUpdates(true);
+    } catch (e) {
+      const message = e instanceof ApiRequestError ? e.message : 'Failed to post progress update.';
+      setProgressSubmitError(message);
+      if (e instanceof ApiRequestError && (e.status === 409 || e.status === 403)) {
+        await Promise.allSettled([loadProgressUpdates(true), loadWorkspace()]);
+      }
+      throw e;
+    } finally {
+      setProgressSubmitBusy(false);
+    }
+  };
 
   const header = (
     <TaskWorkspaceHeader
@@ -444,6 +509,22 @@ export default function TaskWorkPage() {
           try { await updateComment(activeWorkspaceId, projectId, taskId, commentId, body); await loadComments(); }
           finally { setCommentsBusy(false); }
         }}
+      />
+    );
+  } else if (section === 'progress') {
+    sectionContent = (
+      <TaskProgressUpdates
+        updates={progressUpdates}
+        loading={progressLoading}
+        error={progressError}
+        hasMore={Boolean(progressCursor)}
+        loadingMore={progressLoadingMore}
+        onLoadMore={() => void loadProgressUpdates(false)}
+        canPost={canPostProgressUpdate}
+        onSubmit={handleProgressUpdateSubmit}
+        submitBusy={progressSubmitBusy}
+        submitError={progressSubmitError}
+        resolveAuthorName={resolveProgressUpdateAuthor}
       />
     );
   } else if (section === 'activity') {

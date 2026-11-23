@@ -34,6 +34,31 @@ export interface DevRepositorySummary {
   htmlUrl?: string | null;
 }
 
+export type RepositoryAccessLevel = 'NONE' | 'METADATA' | 'READ' | 'LINK';
+
+export function repositoryAccessLabel(level: RepositoryAccessLevel | null | undefined): string {
+  switch (level) {
+    case 'NONE':
+      return 'No access';
+    case 'METADATA':
+      return 'Metadata only';
+    case 'READ':
+      return 'Read access';
+    case 'LINK':
+      return 'Link access';
+    default:
+      return 'Unknown';
+  }
+}
+
+export function canBrowseRepository(level: RepositoryAccessLevel | null | undefined): boolean {
+  return level === 'READ' || level === 'LINK';
+}
+
+export function canLinkRepository(level: RepositoryAccessLevel | null | undefined): boolean {
+  return level === 'LINK';
+}
+
 export interface LinkedProjectRepository {
   id: string;
   projectId: string;
@@ -42,6 +67,8 @@ export interface LinkedProjectRepository {
   externalRepoId: string;
   fullName: string;
   defaultBranch: string | null;
+  /** Caller's effective repository access level. Present on authorized backend responses. */
+  effectiveAccessLevel?: RepositoryAccessLevel;
   createdAt: string;
   updatedAt: string;
 }
@@ -87,6 +114,8 @@ export interface TaskDevLink {
   reviewerLogin?: string | null;
   reviewedAt?: string | null;
   mergedAt?: string | null;
+  /** Caller's effective repository access level; null when no project repository is attached. Undefined for legacy payloads. */
+  effectiveAccessLevel?: RepositoryAccessLevel | null;
   linkedById: string;
   createdAt: string;
   updatedAt: string;
@@ -284,4 +313,53 @@ export interface DevCommitDetail extends DevCommitSummary {
 
 export function getRepositoryCommit(w: string, p: string, r: string, sha: string) {
   return authed<DevCommitDetail>(`${repoBase(w, p, r)}/commits/${sha}`);
+}
+
+export interface RepositoryAccessMember {
+  userId: string;
+  effectiveAccessLevel: RepositoryAccessLevel;
+  defaultLevel: RepositoryAccessLevel;
+  isOverride: boolean;
+  overrideLevel: RepositoryAccessLevel | null;
+  inheritedWorkspaceAccess: boolean;
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+}
+
+export async function listRepositoryMembers(
+  workspaceId: string,
+  projectId: string,
+  repositoryId: string,
+): Promise<RepositoryAccessMember[]> {
+  return authed<RepositoryAccessMember[]>(
+    `/workspaces/${workspaceId}/projects/${projectId}/repositories/${repositoryId}/members`,
+  );
+}
+
+export async function setRepositoryMemberOverride(
+  workspaceId: string,
+  projectId: string,
+  repositoryId: string,
+  userId: string,
+  level: RepositoryAccessLevel,
+): Promise<RepositoryAccessMember> {
+  return authed<RepositoryAccessMember>(
+    `/workspaces/${workspaceId}/projects/${projectId}/repositories/${repositoryId}/members/${userId}`,
+    { method: 'PUT', body: JSON.stringify({ level }) },
+  );
+}
+
+export async function removeRepositoryMemberOverride(
+  workspaceId: string,
+  projectId: string,
+  repositoryId: string,
+  userId: string,
+): Promise<RepositoryAccessMember> {
+  return authed<RepositoryAccessMember>(
+    `/workspaces/${workspaceId}/projects/${projectId}/repositories/${repositoryId}/members/${userId}`,
+    { method: 'DELETE' },
+  );
 }

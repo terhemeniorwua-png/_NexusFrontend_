@@ -50,11 +50,17 @@ import {
   listDevConnections,
   listAvailableRepositories,
   listProjectRepositories,
+  listRepositoryMembers,
   linkProjectRepository,
+  repositoryAccessLabel,
+  removeRepositoryMemberOverride,
+  setRepositoryMemberOverride,
   unlinkProjectRepository,
   type DevConnectionSummary,
   type DevRepositorySummary,
   type LinkedProjectRepository,
+  type RepositoryAccessMember,
+  type RepositoryAccessLevel,
 } from '@/services/dev-integrations';
 
 const editSchema = z.object({
@@ -159,6 +165,14 @@ export default function ProjectSettingsPage() {
   const [selectedRepoId, setSelectedRepoId] = useState('');
   const [unlinkTarget, setUnlinkTarget] = useState<LinkedProjectRepository | null>(null);
 
+  // Repository access management (FE-8)
+  const [accessRepoId, setAccessRepoId] = useState('');
+  const [accessMembers, setAccessMembers] = useState<RepositoryAccessMember[]>([]);
+  const [accessLoading, setAccessLoading] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [accessNotice, setAccessNotice] = useState<string | null>(null);
+  const [accessBusyUserId, setAccessBusyUserId] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
     setLoading(true); setError(null); setAccessStatus(null);
@@ -253,6 +267,75 @@ export default function ProjectSettingsPage() {
       setRepoError(requestError(cause, 'Could not unlink repository.'));
     } finally {
       setRepoBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!accessRepoId && linkedRepos[0]) setAccessRepoId(linkedRepos[0].id);
+    if (accessRepoId && !linkedRepos.some((r) => r.id === accessRepoId)) {
+      setAccessRepoId(linkedRepos[0]?.id ?? '');
+    }
+  }, [accessRepoId, linkedRepos]);
+
+  const repositoryAccessError = (cause: unknown, fallback: string): string => {
+    if (cause instanceof ApiRequestError && cause.code === 'PROJECT_MEMBER_NOT_FOUND') {
+      return 'That project member does not exist or no longer has project access.';
+    }
+    return requestError(cause, fallback);
+  };
+
+  const loadRepositoryAccess = useCallback(async (repoId: string) => {
+    if (!activeWorkspace || !repoId) return;
+    setAccessLoading(true);
+    setAccessError(null);
+    try {
+      const members = await listRepositoryMembers(activeWorkspace.id, projectId, repoId);
+      setAccessMembers(members);
+    } catch (cause) {
+      setAccessMembers([]);
+      setAccessError(repositoryAccessError(cause, 'Could not load repository access.'));
+    } finally {
+      setAccessLoading(false);
+    }
+  }, [activeWorkspace, projectId]);
+
+  useEffect(() => {
+    if (!accessRepoId) {
+      setAccessMembers([]);
+      return;
+    }
+    void loadRepositoryAccess(accessRepoId);
+  }, [accessRepoId, loadRepositoryAccess]);
+
+  async function handleAccessLevelChange(userId: string, level: RepositoryAccessLevel) {
+    if (!activeWorkspace || !accessRepoId) return;
+    setAccessBusyUserId(userId);
+    setAccessError(null);
+    setAccessNotice(null);
+    try {
+      await setRepositoryMemberOverride(activeWorkspace.id, projectId, accessRepoId, userId, level);
+      await loadRepositoryAccess(accessRepoId);
+      setAccessNotice('Repository access updated.');
+    } catch (cause) {
+      setAccessError(repositoryAccessError(cause, 'Could not update repository access.'));
+    } finally {
+      setAccessBusyUserId(null);
+    }
+  }
+
+  async function handleAccessReset(userId: string) {
+    if (!activeWorkspace || !accessRepoId) return;
+    setAccessBusyUserId(userId);
+    setAccessError(null);
+    setAccessNotice(null);
+    try {
+      await removeRepositoryMemberOverride(activeWorkspace.id, projectId, accessRepoId, userId);
+      await loadRepositoryAccess(accessRepoId);
+      setAccessNotice('Repository access reset to default.');
+    } catch (cause) {
+      setAccessError(repositoryAccessError(cause, 'Could not reset repository access.'));
+    } finally {
+      setAccessBusyUserId(null);
     }
   }
 
@@ -668,6 +751,83 @@ export default function ProjectSettingsPage() {
         destructive
         loading={repoBusy}
       />
+
+      {/* Repository access (FE-8) */}
+      {can('project.update') && (
+        <Card className="p-5">
+          <h3 className="font-semibold">Repository access</h3>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            Control who can see repository metadata, browse code activity, or link development work for each linked repository.
+          </p>
+          {accessError && <Alert className="mt-3" variant="error">{accessError}</Alert>}
+          {accessNotice && <Alert className="mt-3" variant="success">{accessNotice}</Alert>}
+
+          {linkedRepos.length === 0 ? (
+            <p className="mt-4 text-sm text-[var(--color-text-muted)]">Link a repository first to manage repository access.</p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <Select
+                id="access-repo"
+                label="Repository"
+                value={accessRepoId}
+                onChange={(e) => setAccessRepoId(e.target.value)}
+                options={linkedRepos.map((repo) => ({ value: repo.id, label: repo.fullName }))}
+              />
+
+              {accessLoading ? (
+                <p role="status" className="text-sm text-[var(--color-text-secondary)]">Loading repository access…</p>
+              ) : accessError ? null : accessMembers.length === 0 ? (
+                <p className="text-sm text-[var(--color-text-muted)]">No project members found for this repository.</p>
+              ) : (
+                <ul className="space-y-2" role="list">
+                  {accessMembers.map((member) => {
+                    const level = member.effectiveAccessLevel;
+                    const busy = accessBusyUserId === member.userId;
+                    return (
+                      <li key={member.userId} className="flex flex-col gap-3 rounded border border-[var(--color-border)] p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-[var(--color-text-primary)]">{member.user.name ?? member.user.email ?? member.userId}</p>
+                          <p className="truncate text-xs text-[var(--color-text-muted)]">{member.user.email || 'Project member'}</p>
+                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                            Default: {repositoryAccessLabel(member.defaultLevel)} · {member.isOverride ? `Override: ${repositoryAccessLabel(member.overrideLevel)}` : 'Using default'}
+                          </p>
+                          {member.inheritedWorkspaceAccess && (
+                            <p className="text-xs text-[var(--color-text-muted)]">Has inherited workspace access.</p>
+                          )}
+                        </div>
+                        <div className="w-full sm:w-64">
+                          <Select
+                            id={`repo-access-${member.userId}`}
+                            label="Access level"
+                            value={level}
+                            disabled={busy}
+                            onChange={(e) => void handleAccessLevelChange(member.userId, e.target.value as RepositoryAccessLevel)}
+                            options={[
+                              { value: 'NONE', label: 'No access - cannot see repository' },
+                              { value: 'METADATA', label: 'Metadata only - name only, no code' },
+                              { value: 'READ', label: 'Read access - can browse code/PRs' },
+                              { value: 'LINK', label: 'Link access - can link/unlink dev work' },
+                            ]}
+                          />
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <p className="text-xs text-[var(--color-text-muted)]">{repositoryAccessLabel(level)}</p>
+                            <Button size="sm" variant="secondary" onClick={() => void handleAccessReset(member.userId)} disabled={busy || !member.isOverride}>
+                              Reset to default
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Metadata only shows repository name. Read allows browsing. Link allows linking/unlinking development work.
+              </p>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Ownership transfer */}
       {workspaceMembers.length > 0 && (

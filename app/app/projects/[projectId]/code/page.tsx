@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import {
+  canBrowseRepository,
   listProjectRepositories,
   listRepositoryBranches,
   listRepositoryCommits,
@@ -57,6 +58,12 @@ export default function ProjectCodePage() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const visibleRepos = repos.filter((r) => r.effectiveAccessLevel !== 'NONE');
+  const selectedRepo = visibleRepos.find((r) => r.id === repoId) ?? null;
+  const selectedAccess = selectedRepo?.effectiveAccessLevel ?? null;
+  const isRestricted = selectedAccess === 'METADATA';
+  const canBrowse = canBrowseRepository(selectedAccess);
+
   useEffect(() => {
     if (!workspaceId) return;
     let active = true;
@@ -65,7 +72,11 @@ export default function ProjectCodePage() {
         const list = await listProjectRepositories(workspaceId, projectId);
         if (!active) return;
         setRepos(list);
-        setRepoId((current) => current || list[0]?.id || '');
+        const firstVisible = list.find((r) => r.effectiveAccessLevel !== 'NONE');
+        setRepoId((current) => {
+          if (current && list.some((r) => r.id === current && r.effectiveAccessLevel !== 'NONE')) return current;
+          return firstVisible?.id || '';
+        });
       } catch (cause) {
         if (active) setError(errMsg(cause, 'Linked repositories could not be loaded.'));
       } finally {
@@ -76,16 +87,24 @@ export default function ProjectCodePage() {
   }, [workspaceId, projectId]);
 
   useEffect(() => {
-    if (!workspaceId || !repoId) return;
+    if (!workspaceId || !repoId || !canBrowse) {
+      setBranches([]);
+      return;
+    }
     let active = true;
     listRepositoryBranches(workspaceId, projectId, repoId, { perPage: 100 })
       .then((r) => { if (active) setBranches(r.items); })
-      .catch(() => { if (active) setBranches([]); });
+      .catch((cause) => { if (active) setError(errMsg(cause, 'Repository branches could not be loaded.')); });
     return () => { active = false; };
-  }, [workspaceId, projectId, repoId]);
+  }, [workspaceId, projectId, repoId, canBrowse]);
 
   useEffect(() => {
-    if (!workspaceId || !repoId) return;
+    if (!workspaceId || !repoId || !canBrowse) {
+      setPrs([]);
+      setCommits([]);
+      setItemsLoading(false);
+      return;
+    }
     let active = true;
     (async () => {
       setItemsLoading(true);
@@ -99,24 +118,24 @@ export default function ProjectCodePage() {
           if (active) setCommits(r.items);
         }
       } catch (cause) {
-        if (active) setError(errMsg(cause, 'GitHub data could not be loaded.'));
+        if (active) setError(errMsg(cause, 'Repository activity could not be loaded.'));
       } finally {
         if (active) setItemsLoading(false);
       }
     })();
     return () => { active = false; };
-  }, [workspaceId, projectId, repoId, mode, prState, branch]);
+  }, [workspaceId, projectId, repoId, mode, prState, branch, canBrowse]);
 
   if (workspaceLoading || reposLoading) {
     return <p role="status" className="text-sm text-[var(--color-text-secondary)]">Loading code…</p>;
   }
 
-  if (!repos.length) {
+  if (!visibleRepos.length) {
     return (
       <EmptyState
-        title="No repository linked"
-        description="Link a GitHub repository to this project from Integrations to browse its code here."
-        action={<Link href="/app/integrations" className="text-[var(--color-primary)] underline">Open Integrations</Link>}
+        title="No repositories available"
+        description={repos.length ? 'You do not have access to repositories linked to this project.' : 'Link a GitHub repository to this project from Integrations to browse its code here.'}
+        action={!repos.length ? <Link href="/app/integrations" className="text-[var(--color-primary)] underline">Open Integrations</Link> : undefined}
       />
     );
   }
@@ -125,40 +144,49 @@ export default function ProjectCodePage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <select aria-label="Repository" className={selectClass} value={repoId} onChange={(e) => setRepoId(e.target.value)}>
-          {repos.map((r) => <option key={r.id} value={r.id}>{r.fullName}</option>)}
+          {visibleRepos.map((r) => <option key={r.id} value={r.id}>{r.fullName}</option>)}
         </select>
-        <div className="flex gap-1" role="tablist" aria-label="Code view">
-          {(['pulls', 'commits'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="tab"
-              aria-selected={mode === m}
-              onClick={() => setMode(m)}
-              className={['h-9 rounded-[var(--radius-md)] px-3 text-sm font-medium',
-                mode === m ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-secondary)]'].join(' ')}
-            >
-              {m === 'pulls' ? 'Pull requests' : 'Commits'}
-            </button>
-          ))}
-        </div>
-        {mode === 'pulls' ? (
-          <select aria-label="Pull request state" className={selectClass} value={prState} onChange={(e) => setPrState(e.target.value as 'open' | 'closed' | 'all')}>
-            <option value="open">Open</option>
-            <option value="closed">Closed</option>
-            <option value="all">All</option>
-          </select>
-        ) : (
-          <select aria-label="Branch" className={selectClass} value={branch} onChange={(e) => setBranch(e.target.value)}>
-            <option value="">Default branch</option>
-            {branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
-          </select>
+        {canBrowse && (
+          <>
+            <div className="flex gap-1" role="tablist" aria-label="Code view">
+              {(['pulls', 'commits'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === m}
+                  onClick={() => setMode(m)}
+                  className={['h-9 rounded-[var(--radius-md)] px-3 text-sm font-medium',
+                    mode === m ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-secondary)]'].join(' ')}
+                >
+                  {m === 'pulls' ? 'Pull requests' : 'Commits'}
+                </button>
+              ))}
+            </div>
+            {mode === 'pulls' ? (
+              <select aria-label="Pull request state" className={selectClass} value={prState} onChange={(e) => setPrState(e.target.value as 'open' | 'closed' | 'all')}>
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+                <option value="all">All</option>
+              </select>
+            ) : (
+              <select aria-label="Branch" className={selectClass} value={branch} onChange={(e) => setBranch(e.target.value)}>
+                <option value="">Default branch</option>
+                {branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
+              </select>
+            )}
+          </>
         )}
       </div>
 
       {error && <Alert variant="error" title="Could not load">{error}</Alert>}
 
-      {itemsLoading ? (
+      {isRestricted ? (
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-sm">
+          <p className="font-medium text-[var(--color-text-primary)]">Restricted repository</p>
+          <p className="mt-1 text-[var(--color-text-secondary)]">You can see this repository exists, but code activity is not available with metadata-only access.</p>
+        </div>
+      ) : itemsLoading ? (
         <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
       ) : mode === 'pulls' ? (
         prs.length === 0 ? (

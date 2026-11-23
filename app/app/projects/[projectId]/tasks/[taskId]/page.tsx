@@ -61,6 +61,7 @@ import {
   type TaskPriority,
   type TaskComment,
 } from '@/services/tasks';
+import { listTaskDevLinks, type TaskDevLink } from '@/services/dev-integrations';
 import {
   listClarifications,
   askClarification,
@@ -68,6 +69,7 @@ import {
   type TaskClarification,
 } from '@/services/clarifications';
 import { CustomFieldInput, formatCustomFieldValue } from '@/components/tasks/CustomFieldInputs';
+import { LinkedDevelopmentItems } from '@/components/tasks/LinkedDevelopmentItems';
 import { FileVersionsPanel } from '@/components/files/FileVersionsPanel';
 import { listProjectMembers, type ProjectMember } from '@/services/projects';
 import { MentionTextarea, extractMentionIds, type MentionMember } from '@/components/ui/MentionTextarea';
@@ -140,6 +142,18 @@ function requestError(cause: unknown, fallback: string): string {
   }
   if (cause.status === 403) return 'Your current role does not allow this action.';
   return cause.message;
+}
+
+/**
+ * The dev-links section shows the backend's own message for 403/404/409,
+ * including the repository-level denial codes. Network failures (status 0)
+ * keep the client-side connectivity message from lib/api.
+ */
+function devLinksErrorMessage(cause: unknown, fallback: string): string {
+  if (cause instanceof ApiRequestError && [403, 404, 409].includes(cause.status)) {
+    return cause.message || fallback;
+  }
+  return requestError(cause, fallback);
 }
 
 const ACCEPTANCE_LABELS: Record<TaskAcceptanceStatus, string> = {
@@ -251,6 +265,12 @@ export default function TaskDetailPage() {
   // Workspace-switch guard
   const latestLoad = useRef(0);
   const loadedWorkspaceId = useRef<string | null>(null);
+  const devLinksWorkspaceId = useRef<string | null>(null);
+
+  // Linked development items (read-only view of the backend's dev-link list)
+  const [devLinks, setDevLinks] = useState<TaskDevLink[]>([]);
+  const [devLinksLoading, setDevLinksLoading] = useState(false);
+  const [devLinksError, setDevLinksError] = useState<string | null>(null);
 
   // Edit form state
   const [editing, setEditing] = useState(false);
@@ -479,6 +499,33 @@ export default function TaskDetailPage() {
     void Promise.resolve().then(() => { if (active) void loadFiles(); });
     return () => { active = false; };
   }, [activeWorkspace, canView, loadFiles]);
+
+  const loadDevLinks = useCallback(async () => {
+    if (!activeWorkspace || !canView) return;
+    const workspaceId = activeWorkspace.id;
+    setDevLinksLoading(true);
+    setDevLinksError(null);
+    try {
+      const data = await listTaskDevLinks(workspaceId, projectId, taskId);
+      if (devLinksWorkspaceId.current !== null && devLinksWorkspaceId.current !== workspaceId) return;
+      devLinksWorkspaceId.current = workspaceId;
+      setDevLinks(data);
+    } catch (cause) {
+      if (devLinksWorkspaceId.current !== null && devLinksWorkspaceId.current !== workspaceId) return;
+      devLinksWorkspaceId.current = workspaceId;
+      setDevLinks([]);
+      setDevLinksError(devLinksErrorMessage(cause, 'Linked development items could not be loaded.'));
+    } finally {
+      setDevLinksLoading(false);
+    }
+  }, [activeWorkspace, projectId, taskId, canView]);
+
+  useEffect(() => {
+    if (!activeWorkspace || !canView) return;
+    let active = true;
+    void Promise.resolve().then(() => { if (active) void loadDevLinks(); });
+    return () => { active = false; };
+  }, [activeWorkspace, canView, loadDevLinks]);
 
   // Abort an in-flight upload when the page unmounts.
   useEffect(() => () => { uploadAbortRef.current?.abort(); }, []);
@@ -1994,6 +2041,13 @@ export default function TaskDetailPage() {
               </ul>
             )}
           </Card>
+
+          <LinkedDevelopmentItems
+            links={devLinks}
+            loading={devLinksLoading}
+            error={devLinksError}
+            onRetry={() => { void loadDevLinks(); }}
+          />
 
           {/* Submission and review */}
           {showSubmissionSection && (

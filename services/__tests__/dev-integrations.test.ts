@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TaskDevLink, TaskDevLinkExternalType } from '../dev-integrations';
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -228,5 +229,44 @@ describe('dev-integrations repository access (FE-8)', () => {
     mocks.apiRequest.mockRejectedValueOnce(new ApiRequestError('That project member does not exist', 404, 'PROJECT_MEMBER_NOT_FOUND'));
     const { setRepositoryMemberOverride } = await import('../dev-integrations');
     await expect(setRepositoryMemberOverride(WS, PID, 'repo-1', 'u1', 'NONE')).rejects.toMatchObject({ status: 404, code: 'PROJECT_MEMBER_NOT_FOUND' });
+  });
+});
+
+describe('task dev-link list view (FE-10a)', () => {
+  function link(id: string, externalType: TaskDevLinkExternalType): TaskDevLink {
+    return {
+      id, taskId: 'task-1', projectId: PID, projectRepositoryId: 'repo-1',
+      provider: 'GITHUB', externalType, externalId: id, externalNumber: null,
+      title: 'Item', url: null, ref: null, headRef: null, baseRef: null,
+      state: 'open', repositoryFullName: 'acme/app', reviewState: null,
+      reviewerLogin: null, reviewedAt: null, mergedAt: null,
+      effectiveAccessLevel: 'READ', linkedById: 'u1',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+  }
+
+  it('returns the backend payload unchanged (no client-side filtering or masking)', async () => {
+    const payload = [
+      { ...link('m', 'PULL_REQUEST'), effectiveAccessLevel: 'METADATA', title: null, repositoryFullName: 'Restricted repository' },
+      { ...link('r', 'COMMIT'), effectiveAccessLevel: 'READ' },
+    ];
+    mocks.apiRequest.mockResolvedValue(payload);
+    const { listTaskDevLinks } = await import('../dev-integrations');
+    await expect(listTaskDevLinks(WS, PID, 'task-1')).resolves.toEqual(payload);
+  });
+
+  it('groups links as BRANCH, PULL_REQUEST, COMMIT and omits empty groups', async () => {
+    const { groupTaskDevLinks } = await import('../dev-integrations');
+    const groups = groupTaskDevLinks([link('c', 'COMMIT'), link('b', 'BRANCH'), link('p', 'PULL_REQUEST')]);
+    expect(groups.map((group) => group.type)).toEqual(['BRANCH', 'PULL_REQUEST', 'COMMIT']);
+    expect(groupTaskDevLinks([])).toEqual([]);
+  });
+
+  it('flags only METADATA links as masked', async () => {
+    const { isMaskedTaskDevLink } = await import('../dev-integrations');
+    expect(isMaskedTaskDevLink({ ...link('m', 'PULL_REQUEST'), effectiveAccessLevel: 'METADATA' })).toBe(true);
+    expect(isMaskedTaskDevLink({ ...link('r', 'PULL_REQUEST'), effectiveAccessLevel: 'READ' })).toBe(false);
+    expect(isMaskedTaskDevLink({ ...link('l', 'PULL_REQUEST'), effectiveAccessLevel: 'LINK' })).toBe(false);
+    expect(isMaskedTaskDevLink({ ...link('n', 'PULL_REQUEST'), effectiveAccessLevel: null })).toBe(false);
   });
 });

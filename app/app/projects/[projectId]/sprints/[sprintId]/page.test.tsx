@@ -88,6 +88,11 @@ const burndown = () => ({
 
 const MANAGER = ['project.view', 'task.view', 'task.update'];
 const VIEWER = ['project.view', 'task.view'];
+const BACKEND_ERRORS = [
+  [403, 'PERMISSION_DENIED', 'Backend 403 message'],
+  [404, 'SPRINT_NOT_FOUND', 'Backend 404 message'],
+  [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Backend 409 message'],
+] as const;
 
 describe('SprintDetailPage — board and reports', () => {
   beforeEach(() => {
@@ -117,6 +122,15 @@ describe('SprintDetailPage — board and reports', () => {
     expect(screen.getByText('Total tasks')).toBeInTheDocument();
     expect(screen.getByText('Done (APPROVED)')).toBeInTheDocument();
     expect(screen.getByText(/Metric: task count \(done = APPROVED\)/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove from sprint' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Assign tasks' })).not.toBeInTheDocument();
+  });
+
+  it('hides remove and assign controls from a view-only member', async () => {
+    setPermissions(VIEWER);
+    render(<SprintDetailPage />);
+
+    await screen.findByText('Implement endpoint');
     expect(screen.queryByRole('button', { name: 'Remove from sprint' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Assign tasks' })).not.toBeInTheDocument();
   });
@@ -183,5 +197,107 @@ describe('SprintDetailPage — board and reports', () => {
     mocks.getSprintBoard.mockRejectedValueOnce(new ApiRequestError(message, status, code));
     render(<SprintDetailPage />);
     expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it.each(BACKEND_ERRORS)('shows the backend message on %i when removing', async (status, code, message) => {
+    const user = userEvent.setup();
+    mocks.removeTaskFromSprint.mockRejectedValueOnce(new ApiRequestError(message, status, code));
+    render(<SprintDetailPage />);
+    await screen.findByText('Implement endpoint');
+    await user.click(screen.getAllByRole('button', { name: 'Remove from sprint' })[0]);
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it.each(BACKEND_ERRORS)('shows the backend message on %i when assigning', async (status, code, message) => {
+    const user = userEvent.setup();
+    mocks.addTasksToSprint.mockRejectedValueOnce(new ApiRequestError(message, status, code));
+    render(<SprintDetailPage />);
+    await user.click(await screen.findByRole('button', { name: 'Assign tasks' }));
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText('Backlog candidate')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('checkbox'));
+    await user.click(within(dialog).getByRole('button', { name: /Add 1 task/ }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it('shows the first-page hint when the response has a next-page cursor', async () => {
+    const user = userEvent.setup();
+    mocks.listTasks.mockResolvedValue({
+      items: [{ id: 'task-3', key: 'NX-3', title: 'Backlog candidate', status: 'ASSIGNED', sprintId: null }],
+      nextCursor: 'cursor-2',
+    });
+    render(<SprintDetailPage />);
+    await user.click(await screen.findByRole('button', { name: 'Assign tasks' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(await within(dialog).findByText(
+      'Showing the first 100 tasks. Narrow with status or search to find others.',
+    )).toBeInTheDocument();
+  });
+
+  it('shows the first-page hint when the response returns 100 items', async () => {
+    const user = userEvent.setup();
+    mocks.listTasks.mockResolvedValue({
+      items: Array.from({ length: 100 }, (_, index) => ({
+        id: `task-bulk-${index}`,
+        key: `NX-${index}`,
+        title: `Bulk task ${index}`,
+        status: 'ASSIGNED',
+        sprintId: null,
+      })),
+      nextCursor: null,
+    });
+    render(<SprintDetailPage />);
+    await user.click(await screen.findByRole('button', { name: 'Assign tasks' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(await within(dialog).findByText(
+      'Showing the first 100 tasks. Narrow with status or search to find others.',
+    )).toBeInTheDocument();
+  });
+
+  it('shows an actionable empty state when no candidates remain', async () => {
+    const user = userEvent.setup();
+    mocks.listTasks.mockResolvedValue({
+      items: [{ id: 'task-1', key: 'NX-1', title: 'Already in sprint', status: 'ASSIGNED', sprintId: 'sprint-1' }],
+      nextCursor: null,
+    });
+    render(<SprintDetailPage />);
+    await user.click(await screen.findByRole('button', { name: 'Assign tasks' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(await within(dialog).findByText(
+      'No tasks available here. Try another status or search term.',
+    )).toBeInTheDocument();
+    expect(within(dialog).queryByText('No tasks available to assign.')).not.toBeInTheDocument();
+  });
+
+  it('labels another-sprint tasks and states how many will be moved', async () => {
+    const user = userEvent.setup();
+    mocks.listTasks.mockResolvedValue({
+      items: [
+        { id: 'task-9', key: 'NX-9', title: 'Named sprint task', status: 'ASSIGNED', sprintId: 'sprint-2', sprintName: 'Sprint Beta' },
+        { id: 'task-10', key: 'NX-10', title: 'Unnamed sprint task', status: 'ASSIGNED', sprintId: 'sprint-3' },
+      ],
+      nextCursor: null,
+    });
+    render(<SprintDetailPage />);
+    await user.click(await screen.findByRole('button', { name: 'Assign tasks' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(await within(dialog).findByText('In another sprint (Sprint Beta), will be moved')).toBeInTheDocument();
+    expect(within(dialog).getByText('In another sprint, will be moved')).toBeInTheDocument();
+
+    await user.click(within(dialog).getAllByRole('checkbox')[0]);
+    expect(within(dialog).getByRole('button', { name: 'Add 1 task — 1 will be moved' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Add 1 task — 1 will be moved' }));
+
+    await waitFor(() => expect(mocks.addTasksToSprint).toHaveBeenCalledWith(
+      'ws-1', 'project-1', 'sprint-1', { taskIds: ['task-9'] },
+    ));
   });
 });

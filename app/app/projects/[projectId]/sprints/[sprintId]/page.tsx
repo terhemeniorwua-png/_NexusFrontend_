@@ -62,6 +62,15 @@ function taskCardClasses(status: TaskStatus): string {
   return base;
 }
 
+function sprintMembershipLabel(task: TaskSummary, currentSprintId: string): string {
+  if (task.sprintId && task.sprintId !== currentSprintId) {
+    return task.sprintName
+      ? `In another sprint (${task.sprintName}), will be moved`
+      : 'In another sprint, will be moved';
+  }
+  return task.sprintId ? 'In sprint' : 'In backlog';
+}
+
 export default function SprintDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
@@ -88,6 +97,7 @@ export default function SprintDetailPage() {
   const [assignTasks, setAssignTasks] = useState<TaskSummary[]>([]);
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [assignHasMore, setAssignHasMore] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [assignQuery, setAssignQuery] = useState<{ status: TaskStatus | ''; search: string }>({ status: '', search: '' });
 
@@ -172,6 +182,7 @@ export default function SprintDetailPage() {
     if (!activeWorkspace) return;
     setAssignLoading(true);
     setAssignError(null);
+    setAssignHasMore(false);
     try {
       const data = await listTasks(activeWorkspace.id, projectId, {
         status: query.status || undefined,
@@ -180,6 +191,7 @@ export default function SprintDetailPage() {
       });
       const inSprintIds = new Set(board?.columns.flatMap((c) => c.tasks.map((t) => t.id)) ?? []);
       setAssignTasks(data.items.filter((t) => !inSprintIds.has(t.id)));
+      setAssignHasMore(Boolean(data.nextCursor) || data.items.length >= 100);
     } catch (cause) {
       setAssignError(requestError(cause, 'Tasks could not be loaded.'));
     } finally {
@@ -190,6 +202,9 @@ export default function SprintDetailPage() {
   const boardColumns = board?.columns ?? [];
   const totalTasks = board?.totals.taskCount ?? 0;
   const doneCount = board?.totals.doneCount ?? 0;
+  const selectedMoveCount = assignTasks.filter(
+    (task) => selectedTaskIds.has(task.id) && Boolean(task.sprintId) && task.sprintId !== sprintId,
+  ).length;
 
   if (loading || permissionsLoading) {
     return (
@@ -212,10 +227,6 @@ export default function SprintDetailPage() {
     );
   }
   if (!sprint || !board) return <Alert variant="error">{error ?? 'Sprint not found.'}</Alert>;
-
-  // BACKLOG_ONLY guard: sprints are disabled
-  // (The sprints page should not be reachable for BACKLOG_ONLY projects, but
-  //  guard here too in case of direct URL access.)
 
   return (
     <div className="space-y-6">
@@ -460,6 +471,11 @@ export default function SprintDetailPage() {
                 />
               </div>
             </div>
+            {assignHasMore && (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Showing the first 100 tasks. Narrow with status or search to find others.
+              </p>
+            )}
             {assignError && <Alert variant="error">{assignError}</Alert>}
             {assignLoading ? (
               <div className="h-32 flex items-center justify-center">
@@ -469,7 +485,7 @@ export default function SprintDetailPage() {
               <div className="max-h-96 overflow-y-auto border rounded-[var(--radius-md)]">
                 {assignTasks.length === 0 ? (
                   <div className="p-4 text-center text-xs text-[var(--color-text-muted)]">
-                    No tasks available to assign.
+                    No tasks available here. Try another status or search term.
                   </div>
                 ) : (
                   <ul className="divide-y divide-[var(--color-border)]">
@@ -484,7 +500,7 @@ export default function SprintDetailPage() {
                           </div>
                           <div className="mt-1 text-sm font-medium truncate">{task.title}</div>
                           <div className="mt-1 text-xs text-[var(--color-text-muted)]">
-                            {task.sprintId ? `In sprint` : 'In backlog'}
+                            {sprintMembershipLabel(task, sprintId)}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -515,6 +531,7 @@ export default function SprintDetailPage() {
                 disabled={busy || selectedTaskIds.size === 0}
               >
                 Add {selectedTaskIds.size} task{selectedTaskIds.size !== 1 ? 's' : ''}
+                {selectedMoveCount > 0 ? ` — ${selectedMoveCount} will be moved` : ''}
               </Button>
             </div>
           </div>

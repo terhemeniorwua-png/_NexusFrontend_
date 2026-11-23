@@ -56,6 +56,11 @@ const sprint = (overrides: Record<string, unknown> = {}) => ({
 
 const MANAGER = ['project.view', 'project.update', 'task.view', 'task.update'];
 const VIEWER = ['project.view', 'task.view'];
+const BACKEND_ERRORS = [
+  [403, 'PERMISSION_DENIED', 'Backend 403 message'],
+  [404, 'PROJECT_NOT_FOUND', 'Backend 404 message'],
+  [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Backend 409 message'],
+] as const;
 
 describe('SprintsPage — list and lifecycle', () => {
   beforeEach(() => {
@@ -80,6 +85,21 @@ describe('SprintsPage — list and lifecycle', () => {
     expect(screen.getByRole('button', { name: 'Open board' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create sprint' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start sprint' })).not.toBeInTheDocument();
+  });
+
+  it('hides create, edit, start and complete controls from a view-only member', async () => {
+    setPermissions(VIEWER);
+    mocks.listSprints.mockResolvedValue({
+      items: [sprint(), sprint({ id: 'sprint-2', name: 'Sprint Beta', status: 'ACTIVE' })],
+      nextCursor: null,
+    });
+    render(<SprintsPage />);
+
+    await screen.findByText('Sprint Alpha');
+    expect(screen.queryByRole('button', { name: 'Create sprint' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start sprint' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Complete sprint' })).not.toBeInTheDocument();
   });
 
   it('opens the board for the selected sprint', async () => {
@@ -186,5 +206,53 @@ describe('SprintsPage — list and lifecycle', () => {
     await user.type(within(dialog).getByLabelText(/^Sprint name/), 'Sprint Beta');
     await user.click(within(dialog).getByRole('button', { name: 'Create sprint' }));
     expect(await screen.findByText('Sprints disabled for this project')).toBeInTheDocument();
+  });
+
+  it.each(BACKEND_ERRORS)('shows the backend message on %i when creating', async (status, code, message) => {
+    const user = userEvent.setup();
+    mocks.createSprint.mockRejectedValueOnce(new ApiRequestError(message, status, code));
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Create sprint' }));
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/^Sprint name/), 'Sprint Beta');
+    await user.click(within(dialog).getByRole('button', { name: 'Create sprint' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it.each(BACKEND_ERRORS)('shows the backend message on %i when editing', async (status, code, message) => {
+    const user = userEvent.setup();
+    mocks.updateSprint.mockRejectedValueOnce(new ApiRequestError(message, status, code));
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it.each(BACKEND_ERRORS)('shows the backend message on %i when starting', async (status, code, message) => {
+    const user = userEvent.setup();
+    mocks.startSprint.mockRejectedValueOnce(new ApiRequestError(message, status, code));
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Start sprint' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it.each(BACKEND_ERRORS)('shows the backend message on %i when completing', async (status, code, message) => {
+    const user = userEvent.setup();
+    mocks.listSprints.mockResolvedValue({ items: [sprint({ status: 'ACTIVE' })], nextCursor: null });
+    mocks.completeSprint.mockRejectedValueOnce(new ApiRequestError(message, status, code));
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Complete sprint' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    if (status === 409) {
+      expect(screen.getByText('Complete sprint', { selector: 'h2' })).toBeInTheDocument();
+    }
   });
 });

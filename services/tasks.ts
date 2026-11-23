@@ -133,6 +133,8 @@ export interface TaskSummary {
   reviewer?: TaskPersonRef | null;
   /** Optional so older responses and existing fixtures stay valid. */
   sprintId?: string | null;
+  /** Optional display name when the task list response includes sprint details. */
+  sprintName?: string | null;
   /** Optional so older responses and existing fixtures stay valid. */
   sprintPosition?: number | null;
 }

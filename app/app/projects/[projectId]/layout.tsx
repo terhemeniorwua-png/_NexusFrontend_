@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { ProjectUnavailableState } from '@/components/shared/PageAccessState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
@@ -9,6 +10,7 @@ import {
   ProjectPermissionsProvider,
   usePermissions,
 } from '@/providers/ProjectPermissionsProvider';
+import { getProject } from '@/services/projects';
 
 interface ProjectTab {
   href: string;
@@ -27,10 +29,31 @@ function ProjectLayoutContent({
   children: React.ReactNode;
 }) {
   const { can, isLoading, accessStatus } = usePermissions();
+  const { activeWorkspace } = useWorkspaceContext();
+  const [workflowMode, setWorkflowMode] = useState<'SPRINTS' | 'BACKLOG_ONLY' | null>(null);
+
+  const loadProject = useCallback(async () => {
+    if (!activeWorkspace) return;
+    try {
+      const data = await getProject(activeWorkspace.id, projectId);
+      setWorkflowMode(data.workflowMode);
+    } catch {
+      // Workflow mode is only used to hide the Sprints tab; fail silently.
+    }
+  }, [activeWorkspace, projectId]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => active ? loadProject() : undefined);
+    return () => { active = false; };
+  }, [loadProject]);
+
+  const sprintsEnabled = workflowMode === 'SPRINTS';
 
   const tabs: ProjectTab[] = [
     { href: `/app/projects/${encodeURIComponent(projectId)}`, label: 'Overview', exact: true, visible: true },
     { href: `/app/projects/${encodeURIComponent(projectId)}/tasks`, label: 'Tasks', visible: can('task.view') },
+    { href: `/app/projects/${encodeURIComponent(projectId)}/sprints`, label: 'Sprints', visible: can('project.view') && sprintsEnabled },
     { href: `/app/projects/${encodeURIComponent(projectId)}/members`, label: 'Members', visible: can('project.view') },
     { href: `/app/projects/${encodeURIComponent(projectId)}/checklists`, label: 'Checklists', visible: can('project.view') },
     { href: `/app/projects/${encodeURIComponent(projectId)}/reviews`, label: 'Reviews', visible: can('project.view') },

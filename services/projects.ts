@@ -62,6 +62,7 @@ export interface ProjectSummary {
   id: string; workspaceId: string; teamId: string | null; departmentId: string | null;
   name: string; key: string; description: string | null; category: string | null; labels: string[];
   status: ProjectStatus; type: ProjectType; visibility: ProjectVisibility; commentPolicy?: ProjectCommentPolicy; startDate: string | null; dueDate: string | null;
+  workflowMode: 'SPRINTS' | 'BACKLOG_ONLY';
   ownerId: string; owner: { id: string; name: string }; memberCount: number; taskCount: number;
   myRole: ProjectRole | null; createdAt: string; updatedAt: string;
 }
@@ -72,7 +73,7 @@ export interface ProjectInput {
   commentPolicy?: ProjectCommentPolicy;
   startDate?: string | null; dueDate?: string | null;
 }
-export type ProjectUpdate = Partial<ProjectInput> & { status?: Exclude<ProjectStatus, 'ARCHIVED'> };
+export type ProjectUpdate = Partial<ProjectInput> & { status?: Exclude<ProjectStatus, 'ARCHIVED'>; workflowMode?: 'SPRINTS' | 'BACKLOG_ONLY'; confirmActiveSprintCompletion?: boolean };
 
 /** Normalised payload of GET /workspaces/:workspaceId/projects/:projectId/permissions. */
 export interface ProjectPermissions {

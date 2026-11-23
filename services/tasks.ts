@@ -131,6 +131,10 @@ export interface TaskSummary {
   reviewerId?: string | null;
   /** Optional so older responses and existing fixtures stay valid. */
   reviewer?: TaskPersonRef | null;
+  /** Optional so older responses and existing fixtures stay valid. */
+  sprintId?: string | null;
+  /** Optional so older responses and existing fixtures stay valid. */
+  sprintPosition?: number | null;
 }
 
 export interface TaskProgress {
@@ -256,6 +260,7 @@ export interface CreateTaskInput {
   startDate?: string | null;
   dueDate?: string | null;
   position?: number;
+  sprintId?: string | null;
   parentTaskId?: string | null;
   weight?: number;
   assigneeIds?: string[];
@@ -274,6 +279,7 @@ export interface UpdateTaskInput {
   startDate?: string | null;
   dueDate?: string | null;
   position?: number;
+  sprintId?: string | null;
   parentTaskId?: string | null;
   weight?: number;
   reviewerId?: string | null;

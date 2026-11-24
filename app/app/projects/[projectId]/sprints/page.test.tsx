@@ -445,6 +445,36 @@ describe('SprintsPage — list and lifecycle', () => {
     expect(within(dialog).getByRole('option', { name: 'Far Planned Sprint' })).toBeInTheDocument();
   });
 
+  it('loads planned targets across pages with status=PLANNED on both calls', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {
+      if (query?.status === 'PLANNED') {
+        if (query?.cursor === 'cursor-2') {
+          return {
+            items: [sprint({ id: 'page-2', name: 'Second Page Planned' })],
+            nextCursor: null,
+          };
+        }
+        return {
+          items: [sprint({ id: 'page-1', name: 'First Page Planned' })],
+          nextCursor: 'cursor-2',
+        };
+      }
+      return { items: [sprint({ status: 'ACTIVE' })], nextCursor: null };
+    });
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
+    const dialog = screen.getByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText('Destination for unfinished tasks'), 'NEXT_SPRINT');
+
+    expect(within(dialog).getByRole('option', { name: 'First Page Planned' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('option', { name: 'Second Page Planned' })).toBeInTheDocument();
+    expect(mocks.listSprints.mock.calls.filter((call) => call[2]?.status === 'PLANNED')).toEqual([
+      ['ws-1', 'project-1', { status: 'PLANNED' }],
+      ['ws-1', 'project-1', { status: 'PLANNED', cursor: 'cursor-2' }],
+    ]);
+  });
+
   it('allows BACKLOG but blocks NEXT_SPRINT when there are no planned targets', async () => {
     const user = userEvent.setup();
     mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {

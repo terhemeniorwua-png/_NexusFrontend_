@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -55,6 +55,11 @@ function dateLabel(value: string | null): string {
   return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
 }
 
+interface CompleteResultView {
+  countLine: string;
+  destinationLine: string;
+}
+
 export default function SprintsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
@@ -96,6 +101,10 @@ export default function SprintsPage() {
   const [completeTarget, setCompleteTarget] = useState<'BACKLOG' | 'NEXT_SPRINT'>('BACKLOG');
   const [completeNextSprintId, setCompleteNextSprintId] = useState<string>('');
   const [completeError, setCompleteError] = useState<string | null>(null);
+  const [plannedTargets, setPlannedTargets] = useState<Sprint[]>([]);
+  const [plannedTargetsLoading, setPlannedTargetsLoading] = useState(false);
+  const [completeResult, setCompleteResult] = useState<CompleteResultView | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -125,6 +134,10 @@ export default function SprintsPage() {
     return () => { active = false; };
   }, [load]);
 
+  useEffect(() => {
+    if (completeResult) resultRef.current?.focus();
+  }, [completeResult]);
+
   const loadMore = useCallback(async () => {
     if (!activeWorkspace || !nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -143,6 +156,33 @@ export default function SprintsPage() {
       setLoadingMore(false);
     }
   }, [activeWorkspace, projectId, nextCursor, loadingMore]);
+
+  async function loadPlannedTargets(excludeSprintId: string) {
+    if (!activeWorkspace) return;
+    setPlannedTargetsLoading(true);
+    setCompleteError(null);
+    try {
+      const all: Sprint[] = [];
+      const seenCursors = new Set<string>();
+      let cursor: string | undefined;
+      do {
+        const page = await listSprints(activeWorkspace.id, projectId, {
+          status: 'PLANNED',
+          ...(cursor ? { cursor } : {}),
+        });
+        all.push(...page.items);
+        cursor = page.nextCursor ?? undefined;
+        if (cursor && seenCursors.has(cursor)) break;
+        if (cursor) seenCursors.add(cursor);
+      } while (cursor);
+      setPlannedTargets(all.filter((sprint) => sprint.id !== excludeSprintId));
+    } catch (cause) {
+      setPlannedTargets([]);
+      setCompleteError(sprintErrorMessage(cause, 'Planned sprints could not be loaded.'));
+    } finally {
+      setPlannedTargetsLoading(false);
+    }
+  }
 
   async function handleCreate() {
     if (!activeWorkspace) return;
@@ -212,7 +252,9 @@ export default function SprintsPage() {
     setCompleteTarget('BACKLOG');
     setCompleteNextSprintId('');
     setCompleteError(null);
+    setCompleteResult(null);
     setCompleteOpen(true);
+    await loadPlannedTargets(sprintId);
   }
 
   async function handleConfirmComplete() {
@@ -228,15 +270,36 @@ export default function SprintsPage() {
         }
         input.nextSprintId = completeNextSprintId;
       }
-      await completeSprint(activeWorkspace.id, projectId, completeSprintId, input);
-      setCompleteOpen(false);
-      await load();
-      setNotice('Sprint completed.');
+      const result = await completeSprint(activeWorkspace.id, projectId, completeSprintId, input);
+      setSprints((prev) => prev.map((sprint) => (sprint.id === completeSprintId ? result.sprint : sprint)));
+
+      const nextSprintId = result.destination?.nextSprintId;
+      const targetName = nextSprintId
+        ? plannedTargets.find((sprint) => sprint.id === nextSprintId)?.name
+        : undefined;
+      const destinationLine = result.destination?.type === 'BACKLOG'
+        ? 'Destination: Backlog'
+        : targetName
+          ? `Destination: ${targetName}`
+          : 'Moved to the next sprint';
+      const countLine = `${result.movedTaskCount} task${result.movedTaskCount !== 1 ? 's' : ''} moved${
+        result.archivedUnfinishedMovedCount ? ` (${result.archivedUnfinishedMovedCount} archived)` : ''
+      }`;
+
+      setCompleteResult({ countLine, destinationLine });
     } catch (cause) {
       setCompleteError(sprintErrorMessage(cause, 'Sprint could not be completed.'));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleDone() {
+    setCompleteOpen(false);
+    setCompleteResult(null);
+    setCompleteError(null);
+    await load();
+    setNotice('Sprint completed.');
   }
 
   async function handleRestore(sprintId: string) {
@@ -257,7 +320,7 @@ export default function SprintsPage() {
   const sortedSprints = [...sprints].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
   const currentSprints = sortedSprints.filter((s) => s.status === 'PLANNED' || s.status === 'ACTIVE');
   const historySprints = sortedSprints.filter((s) => s.status === 'COMPLETED' || s.status === 'ARCHIVED');
-  const plannedSprints = sprints.filter((s) => s.status === 'PLANNED');
+  const noPlannedTargets = plannedTargets.length === 0;
 
   const sprintCard = (sprint: Sprint) => (
     <Card key={sprint.id} className="p-4">
@@ -551,56 +614,80 @@ export default function SprintsPage() {
 
       {/* Complete sprint modal */}
       {completeOpen && (
-        <Modal open={completeOpen} onClose={() => setCompleteOpen(false)} title="Complete sprint" maxWidth="md">
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Choose what happens to unfinished tasks (status not APPROVED).
-          </p>
-          {completeError && <Alert variant="error">{completeError}</Alert>}
-          <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleConfirmComplete(); }}>
-            <Select
-              id="complete-target"
-              label="Destination for unfinished tasks"
-              value={completeTarget}
-              onChange={(event) => setCompleteTarget(event.target.value as 'BACKLOG' | 'NEXT_SPRINT')}
-              options={[
-                { value: 'BACKLOG', label: 'Backlog — tasks leave the sprint and return to the backlog' },
-                { value: 'NEXT_SPRINT', label: 'Next sprint — move unfinished tasks to another planned sprint' },
-              ]}
-            />
-            {completeTarget === 'NEXT_SPRINT' && (
-              <div>
-                <label htmlFor="complete-next-sprint" className="block text-sm font-medium mb-1">
-                  Target sprint
-                </label>
-                <Select
-                  id="complete-next-sprint"
-                  label="Target sprint"
-                  value={completeNextSprintId}
-                  onChange={(event) => setCompleteNextSprintId(event.target.value)}
-                  options={plannedSprints
-                    .filter((s) => s.id !== completeSprintId)
-                    .map((s) => ({ value: s.id, label: s.name }))
-                  }
-                  placeholder="Select a planned sprint…"
-                />
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  The target sprint must be in the same project and have status Planned.
-                </p>
+        <Modal
+          open={completeOpen}
+          onClose={() => setCompleteOpen(false)}
+          title={completeResult ? 'Sprint completed' : 'Complete sprint'}
+          maxWidth="md"
+        >
+          {completeResult ? (
+            <>
+              <div
+                ref={resultRef}
+                tabIndex={-1}
+                role="status"
+                aria-live="polite"
+                className="space-y-2 focus:outline-none"
+              >
+                <p className="text-base font-semibold">{completeResult.countLine}</p>
+                <p className="text-sm text-[var(--color-text-secondary)]">{completeResult.destinationLine}</p>
               </div>
-            )}
-          </form>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setCompleteOpen(false)} disabled={busy}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => void handleConfirmComplete()}
-              disabled={busy || (completeTarget === 'NEXT_SPRINT' && !completeNextSprintId)}
-            >
-              Complete sprint
-            </Button>
-          </div>
+              <div className="mt-4 flex justify-end">
+                <Button onClick={() => void handleDone()}>Done</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                Choose what happens to unfinished tasks (status not APPROVED).
+              </p>
+              {completeError && <Alert variant="error">{completeError}</Alert>}
+              <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleConfirmComplete(); }}>
+                <Select
+                  id="complete-target"
+                  label="Destination for unfinished tasks"
+                  value={completeTarget}
+                  onChange={(event) => setCompleteTarget(event.target.value as 'BACKLOG' | 'NEXT_SPRINT')}
+                  options={[
+                    { value: 'BACKLOG', label: 'Backlog — tasks leave the sprint and return to the backlog' },
+                    { value: 'NEXT_SPRINT', label: 'Next sprint — move unfinished tasks to another planned sprint' },
+                  ]}
+                />
+                {completeTarget === 'NEXT_SPRINT' && (
+                  <Select
+                    id="complete-next-sprint"
+                    label="Target sprint"
+                    value={completeNextSprintId}
+                    onChange={(event) => setCompleteNextSprintId(event.target.value)}
+                    options={plannedTargets
+                      .filter((sprint) => sprint.status === 'PLANNED')
+                      .map((sprint) => ({ value: sprint.id, label: sprint.name }))
+                    }
+                    placeholder={plannedTargetsLoading ? 'Loading planned sprints…' : 'Select a planned sprint…'}
+                    disabled={plannedTargetsLoading}
+                    helperText="The target sprint must be in the same project and have status Planned."
+                  />
+                )}
+              </form>
+              <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                <Button variant="secondary" onClick={() => setCompleteOpen(false)} disabled={busy}>
+                  Cancel
+                </Button>
+                {noPlannedTargets && (
+                  <span className="text-xs text-[var(--color-text-muted)]">
+                    No planned sprints are available in this project.
+                  </span>
+                )}
+                <Button
+                  variant="destructive"
+                  onClick={() => void handleConfirmComplete()}
+                  disabled={busy || (completeTarget === 'NEXT_SPRINT' && (!completeNextSprintId || noPlannedTargets))}
+                >
+                  Complete sprint
+                </Button>
+              </div>
+            </>
+          )}
         </Modal>
       )}
     </div>

@@ -154,7 +154,7 @@ describe('SprintsPage — list and lifecycle', () => {
     await waitFor(() => expect(mocks.startSprint).toHaveBeenCalledWith('ws-1', 'project-1', 'sprint-1'));
   });
 
-  it('completes an ACTIVE sprint to BACKLOG and reloads the list', async () => {
+  it('completes an ACTIVE sprint to BACKLOG and shows the result in the open dialog', async () => {
     const user = userEvent.setup();
     mocks.listSprints.mockResolvedValue({ items: [sprint({ status: 'ACTIVE' })], nextCursor: null });
     render(<SprintsPage />);
@@ -165,8 +165,10 @@ describe('SprintsPage — list and lifecycle', () => {
     await waitFor(() => expect(mocks.completeSprint).toHaveBeenCalledWith(
       'ws-1', 'project-1', 'sprint-1', { target: 'BACKLOG' },
     ));
-    expect(await screen.findByText('Sprint completed.')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await within(dialog).findByText('Sprint completed', { selector: 'h2' })).toBeInTheDocument();
+    expect(within(dialog).getByText('4 tasks moved (1 archived)')).toBeInTheDocument();
+    expect(within(dialog).getByText('Destination: Backlog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
   });
 
   it('completes an ACTIVE sprint to NEXT_SPRINT with the selected target', async () => {
@@ -174,6 +176,12 @@ describe('SprintsPage — list and lifecycle', () => {
     mocks.listSprints.mockResolvedValue({
       items: [sprint({ status: 'ACTIVE' }), sprint({ id: 'sprint-2', name: 'Sprint Beta' })],
       nextCursor: null,
+    });
+    mocks.completeSprint.mockResolvedValueOnce({
+      sprint: sprint({ status: 'COMPLETED' }),
+      movedTaskCount: 2,
+      archivedUnfinishedMovedCount: 0,
+      destination: { type: 'NEXT_SPRINT', nextSprintId: 'sprint-2' },
     });
     render(<SprintsPage />);
     await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
@@ -185,6 +193,9 @@ describe('SprintsPage — list and lifecycle', () => {
     await waitFor(() => expect(mocks.completeSprint).toHaveBeenCalledWith(
       'ws-1', 'project-1', 'sprint-1', { target: 'NEXT_SPRINT', nextSprintId: 'sprint-2' },
     ));
+    expect(await within(dialog).findByText('2 tasks moved')).toBeInTheDocument();
+    expect(within(dialog).getByText('Destination: Sprint Beta')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/archived/)).not.toBeInTheDocument();
   });
 
   it.each([
@@ -366,5 +377,112 @@ describe('SprintsPage — list and lifecycle', () => {
     expect(names.indexOf('Next Sprint')).toBeLessThan(names.indexOf('Live Sprint'));
     expect(names.indexOf('Live Sprint')).toBeLessThan(names.indexOf('Old Done'));
     expect(screen.getByText('History').closest('details')).not.toHaveAttribute('open');
+  });
+
+  it('focuses the result and Done closes the dialog and reloads the list', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {
+      if (query?.status === 'PLANNED') return { items: [], nextCursor: null };
+      return { items: [sprint({ status: 'ACTIVE' })], nextCursor: null };
+    });
+    mocks.completeSprint.mockResolvedValueOnce({
+      sprint: sprint({ status: 'COMPLETED' }),
+      movedTaskCount: 1,
+      archivedUnfinishedMovedCount: 0,
+      destination: { type: 'BACKLOG', nextSprintId: null },
+    });
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Complete sprint' }));
+
+    expect(await within(dialog).findByText('1 task moved')).toBeInTheDocument();
+    expect(within(dialog).getByRole('status')).toHaveFocus();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Done' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(mocks.listSprints).toHaveBeenCalledWith('ws-1', 'project-1');
+    expect(await screen.findByText('Sprint completed.')).toBeInTheDocument();
+  });
+
+  it('uses Moved to the next sprint when the destination name is unknown', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {
+      if (query?.status === 'PLANNED') return { items: [], nextCursor: null };
+      return { items: [sprint({ status: 'ACTIVE' })], nextCursor: null };
+    });
+    mocks.completeSprint.mockResolvedValueOnce({
+      sprint: sprint({ status: 'COMPLETED' }),
+      movedTaskCount: 3,
+      archivedUnfinishedMovedCount: 2,
+      destination: { type: 'NEXT_SPRINT', nextSprintId: 'deleted-target' },
+    });
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Complete sprint' }));
+
+    expect(await within(dialog).findByText('3 tasks moved (2 archived)')).toBeInTheDocument();
+    expect(within(dialog).getByText('Moved to the next sprint')).toBeInTheDocument();
+  });
+
+  it('loads planned targets from status=PLANNED instead of the first list page', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {
+      if (query?.status === 'PLANNED') {
+        return { items: [sprint({ id: 'far-target', name: 'Far Planned Sprint' })], nextCursor: null };
+      }
+      return { items: [sprint({ status: 'ACTIVE' })], nextCursor: null };
+    });
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
+    const dialog = screen.getByRole('dialog');
+    await user.selectOptions(within(dialog).getByLabelText('Destination for unfinished tasks'), 'NEXT_SPRINT');
+
+    expect(mocks.listSprints).toHaveBeenCalledWith('ws-1', 'project-1', { status: 'PLANNED' });
+    expect(within(dialog).getAllByLabelText('Target sprint')).toHaveLength(1);
+    expect(within(dialog).getByRole('option', { name: 'Far Planned Sprint' })).toBeInTheDocument();
+  });
+
+  it('allows BACKLOG but blocks NEXT_SPRINT when there are no planned targets', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {
+      if (query?.status === 'PLANNED') return { items: [], nextCursor: null };
+      return { items: [sprint({ status: 'ACTIVE' })], nextCursor: null };
+    });
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(await within(dialog).findByText('No planned sprints are available in this project.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Complete sprint' })).toBeEnabled();
+
+    await user.selectOptions(within(dialog).getByLabelText('Destination for unfinished tasks'), 'NEXT_SPRINT');
+
+    expect(within(dialog).getByRole('button', { name: 'Complete sprint' })).toBeDisabled();
+    expect(within(dialog).getByText('No planned sprints are available in this project.')).toBeInTheDocument();
+  });
+
+  it('keeps mapped completion errors inside the open dialog', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {
+      if (query?.status === 'PLANNED') return { items: [], nextCursor: null };
+      return { items: [sprint({ status: 'ACTIVE' })], nextCursor: null };
+    });
+    mocks.completeSprint.mockRejectedValueOnce(new ApiRequestError(
+      'Stage 2 cannot complete',
+      409,
+      'SPRINT_NOT_ACTIVE',
+    ));
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Complete sprint' }));
+
+    expect(await within(dialog).findByText('Only an active sprint can be completed.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Complete sprint', { selector: 'h2' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(within(dialog).queryByText(/stage 2/i)).not.toBeInTheDocument();
   });
 });

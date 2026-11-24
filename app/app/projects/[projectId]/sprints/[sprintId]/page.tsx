@@ -113,6 +113,7 @@ export default function SprintDetailPage() {
 
   // Remove task confirm
   const [removeTarget, setRemoveTarget] = useState<{ taskId: string; taskTitle: string } | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     if (!activeWorkspace || !sprintId) return;
@@ -147,6 +148,7 @@ export default function SprintDetailPage() {
   }, [loadAll]);
 
   async function handleRemoveTask(taskId: string, taskTitle: string) {
+    setRemoveError(null);
     setRemoveTarget({ taskId, taskTitle });
   }
 
@@ -156,10 +158,11 @@ export default function SprintDetailPage() {
     try {
       await removeTaskFromSprint(activeWorkspace.id, projectId, sprintId, removeTarget.taskId);
       setRemoveTarget(null);
+      setRemoveError(null);
       setNotice('Task removed from sprint.');
       await loadAll();
     } catch (cause) {
-      setError(sprintErrorMessage(cause, 'Task could not be removed from sprint.'));
+      setRemoveError(sprintErrorMessage(cause, 'Task could not be removed from sprint.'));
     } finally {
       setRemoveBusy(null);
     }
@@ -370,42 +373,44 @@ export default function SprintDetailPage() {
                   No tasks
                 </div>
               ) : (
-                column.tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className={taskCardClasses(task.status)}
-                    onClick={() => {
-                      router.push(`/app/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(task.id)}`);
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/app/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(task.id)}`); }}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="text-xs font-mono font-medium">{task.key}</span>
-                      {can('task.update') && task.archivedAt ? (
-                        <Badge variant="outline">Archived</Badge>
-                      ) : null}
-                    </div>
-                    <div className="mt-1 text-sm font-medium">{task.title}</div>
-                    <div className="mt-1 flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
-                      {task.assignees.map((a) => (
-                        <span key={a.userId} className="truncate max-w-[120px]">{a.name}</span>
-                      ))}
-                      {task.dueDate && <span>· {dateLabel(task.dueDate)}</span>}
-                    </div>
-                    {can('task.update') && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); void handleRemoveTask(task.id, task.title); }}
-                        disabled={removeBusy === task.id}
-                      >
-                        Remove from sprint
-                      </Button>
-                    )}
-                  </div>
-                ))
+                column.tasks.map((task) => {
+                  const taskHref = `/app/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(task.id)}`;
+                  return (
+                    <Card key={task.id} className={taskCardClasses(task.status)}>
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-xs font-mono font-medium">{task.key}</span>
+                        {can('task.update') && task.archivedAt ? (
+                          <Badge variant="outline">Archived</Badge>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 text-sm font-medium">
+                        <a
+                          href={taskHref}
+                          onClick={(event) => { event.preventDefault(); router.push(taskHref); }}
+                          className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                        >
+                          {task.title}
+                        </a>
+                      </div>
+                      <div className="mt-1 flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
+                        {task.assignees.map((a) => (
+                          <span key={a.userId} className="truncate max-w-[120px]">{a.name}</span>
+                        ))}
+                        {task.dueDate && <span>· {dateLabel(task.dueDate)}</span>}
+                      </div>
+                      {can('task.update') && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => void handleRemoveTask(task.id, task.title)}
+                          disabled={removeBusy === task.id}
+                        >
+                          Remove from sprint
+                        </Button>
+                      )}
+                    </Card>
+                  );
+                })
               )}
             </div>
           </Card>
@@ -542,6 +547,7 @@ export default function SprintDetailPage() {
           description={`Remove \"${removeTarget.taskTitle}\" from this sprint? It will return to the backlog.`}
           confirmLabel="Remove"
           loading={removeBusy === removeTarget.taskId}
+          error={removeError ?? undefined}
         />
       )}
     </div>

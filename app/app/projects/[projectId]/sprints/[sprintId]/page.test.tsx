@@ -414,13 +414,93 @@ describe('SprintDetailPage — board and reports', () => {
       'TASK_NOT_IN_SPRINT',
     ));
     render(<SprintDetailPage />);
-    await screen.findByText('Implement endpoint');
+    await screen.findByRole('link', { name: 'Implement endpoint' });
     await user.click(screen.getAllByRole('button', { name: 'Remove from sprint' })[0]);
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
-    expect(await screen.findByText('That task is no longer in this sprint.')).toBeInTheDocument();
+    expect(await within(dialog).findByText('That task is no longer in this sprint.')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
     expect(screen.queryByText(/TASK_NOT_IN_SPRINT/)).not.toBeInTheDocument();
     expect(screen.queryByText(/stage 2/i)).not.toBeInTheDocument();
+  });
+
+  it('uses a title link and a sibling Remove button with no nested interactive elements', async () => {
+    render(<SprintDetailPage />);
+    const link = await screen.findByRole('link', { name: 'Implement endpoint' });
+    const remove = screen.getAllByRole('button', { name: 'Remove from sprint' })[0];
+
+    expect(link.closest('button')).toBeNull();
+    expect(link.closest('[role="button"]')).toBeNull();
+    expect(remove.closest('a')).toBeNull();
+    expect(remove.closest('[role="button"]')).toBeNull();
+  });
+
+  it('reaches the link then Remove with Tab and follows the link with Enter', async () => {
+    const user = userEvent.setup();
+    render(<SprintDetailPage />);
+    const link = await screen.findByRole('link', { name: 'Implement endpoint' });
+    const remove = screen.getAllByRole('button', { name: 'Remove from sprint' })[0];
+
+    link.focus();
+    await user.tab();
+    expect(remove).toHaveFocus();
+
+    link.focus();
+    await user.keyboard('{Enter}');
+    expect(push).toHaveBeenCalledWith('/app/projects/project-1/tasks/task-1');
+  });
+
+  it('activates Remove with Space', async () => {
+    const user = userEvent.setup();
+    render(<SprintDetailPage />);
+    const remove = (await screen.findAllByRole('button', { name: 'Remove from sprint' }))[0];
+
+    remove.focus();
+    await user.keyboard(' ');
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByText(/Remove "Implement endpoint" from this sprint/)).toBeInTheDocument();
+  });
+
+  it('activates Remove with Enter', async () => {
+    const user = userEvent.setup();
+    render(<SprintDetailPage />);
+    const remove = (await screen.findAllByRole('button', { name: 'Remove from sprint' }))[0];
+
+    remove.focus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('labels the CHANGES_REQUESTED column with a space', async () => {
+    const currentBoard = board();
+    mocks.getSprintBoard.mockResolvedValue({
+      ...currentBoard,
+      columns: [...currentBoard.columns, { status: 'CHANGES_REQUESTED', count: 0, tasks: [] }],
+      totals: { ...currentBoard.totals, taskCount: 2 },
+    });
+    render(<SprintDetailPage />);
+
+    expect(await screen.findByText('CHANGES REQUESTED')).toBeInTheDocument();
+    expect(screen.queryByText('CHANGES_REQUESTED')).not.toBeInTheDocument();
+  });
+
+  it('keeps remove-confirm errors inside the ConfirmDialog', async () => {
+    const user = userEvent.setup();
+    mocks.removeTaskFromSprint.mockRejectedValueOnce(new ApiRequestError(
+      'Stage 2 remove blocked',
+      409,
+      'TASK_NOT_IN_SPRINT',
+    ));
+    render(<SprintDetailPage />);
+    await user.click((await screen.findAllByRole('button', { name: 'Remove from sprint' }))[0]);
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    expect(await within(dialog).findByText('That task is no longer in this sprint.')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(within(dialog).queryByText(/stage 2/i)).not.toBeInTheDocument();
   });
 });

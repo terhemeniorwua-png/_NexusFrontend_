@@ -300,6 +300,26 @@ describe('SprintsPage — list and lifecycle', () => {
     expect(screen.getAllByRole('button', { name: 'Create sprint' }).length).toBeGreaterThan(0);
   });
 
+  it('keeps the page shell on a first-load failure and retries without showing the empty state', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints
+      .mockRejectedValueOnce(new ApiRequestError('Backend list failed', 500, 'LIST_FAILED'))
+      .mockResolvedValueOnce({ items: [sprint()], nextCursor: null });
+    render(<SprintsPage />);
+
+    expect(await screen.findByText('Backend list failed')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sprints' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create sprint' })).toBeInTheDocument();
+    expect(screen.queryByText('No sprints yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('Create your first sprint to start planning work.')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('Sprint Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Backend list failed')).not.toBeInTheDocument();
+    expect(mocks.listSprints).toHaveBeenCalledTimes(2);
+  });
+
   it('renders one status label per card and no duplicate Status row', async () => {
     render(<SprintsPage />);
 

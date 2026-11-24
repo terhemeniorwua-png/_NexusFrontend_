@@ -592,6 +592,13 @@ The frontend must reflect permissions supplied by the backend.
 - Do not invent permissions.
 - Do not use frontend checks as a replacement for backend authorisation.
 
+### Shared UI permission rules for new screens
+
+- **Role rule 1 — hide unauthorised controls.** Use `Can` or `usePermissions` so a control the user cannot use is not rendered.
+- **Role rule 2 — avoid empty action areas.** Render a button or its container only when at least one control inside it is visible.
+- **Narrow disabled exception.** A control the user is allowed to use may be disabled only while it is temporarily unavailable, and the reason must be visible next to it (for example, backlog reorder while pages are still loading).
+- `PermissionButton` is deprecated for new screens because it renders a disabled, focusable wrapper when permission is missing. Prefer `Can` plus a normal `Button`. Existing usages are not migrated by this change, and no lint rule enforces this yet.
+
 ---
 
 # 12. Project and Task Management

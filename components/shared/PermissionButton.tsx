@@ -16,6 +16,10 @@ interface PermissionButtonProps extends Omit<React.ComponentProps<typeof Button>
  * Button that renders disabled, with an accessible explanation, when the
  * backend did not grant the required permission. The wrapper stays focusable
  * so keyboard and screen-reader users can discover why the action is blocked.
+ *
+ * @deprecated Do not use on new screens. When permission is missing, prefer
+ * `Can` (or a permission check) that renders nothing instead of a disabled,
+ * focusable placeholder. Existing usages may stay until they are migrated.
  */
 export function PermissionButton({
   permission,

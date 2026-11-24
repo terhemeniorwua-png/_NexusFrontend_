@@ -52,6 +52,7 @@ const STATUS_ORDER: Record<SprintStatus, number> = {
 };
 
 const PLANNED_TARGETS_LOAD_ERROR = 'Planned sprints could not be loaded. Choose Backlog or try again.';
+const LOAD_MORE_ERROR = 'More sprints could not be loaded.';
 
 function dateLabel(value: string | null): string {
   return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
@@ -155,8 +156,8 @@ export default function SprintsPage() {
         return Array.from(byId.values());
       });
       setNextCursor(data.nextCursor);
-    } catch (cause) {
-      setLoadMoreError(sprintErrorMessage(cause, 'More sprints could not be loaded.'));
+    } catch {
+      setLoadMoreError(LOAD_MORE_ERROR);
     } finally {
       setLoadingMore(false);
     }
@@ -455,6 +456,7 @@ export default function SprintsPage() {
         </Alert>
       )}
       {actionError && <Alert variant="error">{actionError}</Alert>}
+      {loadMoreError && <Alert variant="error">{loadMoreError}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}
 
       {showEmptyState ? (
@@ -493,11 +495,6 @@ export default function SprintsPage() {
               <Button variant="secondary" onClick={() => void loadMore()} disabled={loadingMore || busy}>
                 {loadingMore ? 'Loading…' : 'Load more'}
               </Button>
-              {loadMoreError && (
-                <span role="alert" className="text-sm text-[var(--color-error)]">
-                  {loadMoreError}
-                </span>
-              )}
             </div>
           )}
         </>

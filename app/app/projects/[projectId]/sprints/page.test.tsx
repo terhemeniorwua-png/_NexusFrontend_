@@ -59,7 +59,7 @@ const VIEWER = ['project.view', 'task.view'];
 const BACKEND_ERRORS = [
   [403, 'PERMISSION_DENIED', 'Backend 403 message'],
   [404, 'PROJECT_NOT_FOUND', 'Backend 404 message'],
-  [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Backend 409 message'],
+  [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Sprints are turned off for this project.'],
 ] as const;
 
 describe('SprintsPage — list and lifecycle', () => {
@@ -190,14 +190,14 @@ describe('SprintsPage — list and lifecycle', () => {
   it.each([
     [403, 'PERMISSION_DENIED', 'You cannot view sprints here'],
     [404, 'PROJECT_NOT_FOUND', 'Project not found'],
-    [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Sprints are disabled'],
-  ])('shows the backend message on %i (%s)', async (status, code, message) => {
+    [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Sprints are turned off for this project.'],
+  ])('shows the user-facing copy on %i (%s)', async (status, code, message) => {
     mocks.listSprints.mockRejectedValueOnce(new ApiRequestError(message, status, code));
     render(<SprintsPage />);
     expect(await screen.findByText(message)).toBeInTheDocument();
   });
 
-  it('shows a backend 409 message when creating fails', async () => {
+  it('shows mapped copy instead of a backend 409 message when creating fails', async () => {
     const user = userEvent.setup();
     mocks.createSprint.mockRejectedValueOnce(new ApiRequestError('Sprints disabled for this project', 409, 'SPRINTS_DISABLED_FOR_PROJECT'));
     render(<SprintsPage />);
@@ -205,7 +205,8 @@ describe('SprintsPage — list and lifecycle', () => {
     const dialog = screen.getByRole('dialog');
     await user.type(within(dialog).getByLabelText(/^Sprint name/), 'Sprint Beta');
     await user.click(within(dialog).getByRole('button', { name: 'Create sprint' }));
-    expect(await screen.findByText('Sprints disabled for this project')).toBeInTheDocument();
+    expect(await screen.findByText('Sprints are turned off for this project.')).toBeInTheDocument();
+    expect(screen.queryByText('Sprints disabled for this project')).not.toBeInTheDocument();
   });
 
   it.each(BACKEND_ERRORS)('shows the backend message on %i when creating', async (status, code, message) => {
@@ -254,5 +255,20 @@ describe('SprintsPage — list and lifecycle', () => {
     if (status === 409) {
       expect(screen.getByText('Complete sprint', { selector: 'h2' })).toBeInTheDocument();
     }
+  });
+
+  it('renders mapped copy without a raw code or stage-2 text for known errors', async () => {
+    const user = userEvent.setup();
+    mocks.startSprint.mockRejectedValueOnce(new ApiRequestError(
+      'Stage 2 start blocked (SPRINT_NOT_STARTABLE)',
+      409,
+      'SPRINT_NOT_STARTABLE',
+    ));
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Start sprint' }));
+
+    expect(await screen.findByText('Only planned sprints can be started.')).toBeInTheDocument();
+    expect(screen.queryByText(/stage 2/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/SPRINT_NOT_STARTABLE/)).not.toBeInTheDocument();
   });
 });

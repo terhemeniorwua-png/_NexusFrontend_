@@ -16,6 +16,7 @@ import { PageAccessState } from '@/components/shared/PageAccessState';
 import { PermissionButton } from '@/components/shared/PermissionButton';
 import { Can } from '@/components/shared/Can';
 import { ApiRequestError } from '@/lib/api';
+import { sprintErrorMessage } from '@/services/sprint-errors';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
@@ -30,10 +31,6 @@ import {
   type SprintStatus,
   type CompleteSprintInput,
 } from '@/services/sprints';
-
-function requestError(cause: unknown, fallback: string): string {
-  return cause instanceof ApiRequestError ? cause.message : fallback;
-}
 
 function statusLabel(s: SprintStatus): string {
   if (s === 'PLANNED') return 'Planned';
@@ -98,10 +95,8 @@ export default function SprintsPage() {
     } catch (cause) {
       if (cause instanceof ApiRequestError && cause.status === 401) {
         setAccessStatus(401);
-      } else if (cause instanceof ApiRequestError && [403, 404, 409].includes(cause.status)) {
-        setError(cause.message);
       } else {
-        setError(requestError(cause, 'Sprints could not be loaded.'));
+        setError(sprintErrorMessage(cause, 'Sprints could not be loaded.'));
       }
     } finally {
       setLoading(false);
@@ -134,7 +129,7 @@ export default function SprintsPage() {
       setCreateEndDate('');
       setNotice('Sprint created.');
     } catch (cause) {
-      setError(requestError(cause, 'Sprint could not be created.'));
+      setError(sprintErrorMessage(cause, 'Sprint could not be created.'));
     } finally {
       setBusy(false);
     }
@@ -155,7 +150,7 @@ export default function SprintsPage() {
       setEditOpen(false);
       setNotice('Sprint updated.');
     } catch (cause) {
-      setError(requestError(cause, 'Sprint could not be updated.'));
+      setError(sprintErrorMessage(cause, 'Sprint could not be updated.'));
     } finally {
       setBusy(false);
     }
@@ -170,7 +165,7 @@ export default function SprintsPage() {
       await load();
       setNotice('Sprint started.');
     } catch (cause) {
-      setError(requestError(cause, 'Sprint could not be started.'));
+      setError(sprintErrorMessage(cause, 'Sprint could not be started.'));
     } finally {
       setBusy(false);
     }
@@ -204,7 +199,7 @@ export default function SprintsPage() {
         `Sprint completed. ${result.movedTaskCount} task${result.movedTaskCount !== 1 ? 's' : ''} moved${result.archivedUnfinishedMovedCount ? ` (${result.archivedUnfinishedMovedCount} archived)` : ''}.`,
       );
     } catch (cause) {
-      setError(requestError(cause, 'Sprint could not be completed.'));
+      setError(sprintErrorMessage(cause, 'Sprint could not be completed.'));
     } finally {
       setBusy(false);
     }
@@ -219,7 +214,7 @@ export default function SprintsPage() {
       await load();
       setNotice('Sprint restored.');
     } catch (cause) {
-      setError(requestError(cause, 'Sprint could not be restored.'));
+      setError(sprintErrorMessage(cause, 'Sprint could not be restored.'));
     } finally {
       setBusy(false);
     }

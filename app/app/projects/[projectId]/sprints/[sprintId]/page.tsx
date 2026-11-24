@@ -16,6 +16,7 @@ import { PageAccessState } from '@/components/shared/PageAccessState';
 import { Can } from '@/components/shared/Can';
 import { ApiRequestError } from '@/lib/api';
 import { sprintReportReasonCopy } from '@/lib/sprint-report-reasons';
+import { sprintErrorMessage } from '@/services/sprint-errors';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
@@ -32,10 +33,6 @@ import {
   type SprintReportBurndown,
 } from '@/services/sprints';
 import { listTasks, type TaskSummary, type TaskStatus } from '@/services/tasks';
-
-function requestError(cause: unknown, fallback: string): string {
-  return cause instanceof ApiRequestError ? cause.message : fallback;
-}
 
 function statusLabel(status: string): string {
   return status.replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
@@ -135,10 +132,8 @@ export default function SprintDetailPage() {
     } catch (cause) {
       if (cause instanceof ApiRequestError && cause.status === 401) {
         setAccessStatus(401);
-      } else if (cause instanceof ApiRequestError && [403, 404, 409].includes(cause.status)) {
-        setError(cause.message);
       } else {
-        setError(requestError(cause, 'Sprint data could not be loaded.'));
+        setError(sprintErrorMessage(cause, 'Sprint data could not be loaded.'));
       }
     } finally {
       setLoading(false);
@@ -164,7 +159,7 @@ export default function SprintDetailPage() {
       setNotice('Task removed from sprint.');
       await loadAll();
     } catch (cause) {
-      setError(requestError(cause, 'Task could not be removed from sprint.'));
+      setError(sprintErrorMessage(cause, 'Task could not be removed from sprint.'));
     } finally {
       setRemoveBusy(null);
     }
@@ -183,7 +178,7 @@ export default function SprintDetailPage() {
       setNotice('Tasks added to sprint.');
       await loadAll();
     } catch (cause) {
-      setAssignError(requestError(cause, 'Tasks could not be added to sprint.'));
+      setAssignError(sprintErrorMessage(cause, 'Tasks could not be added to sprint.'));
     } finally {
       setBusy(false);
     }
@@ -206,7 +201,7 @@ export default function SprintDetailPage() {
       setAssignTasks(data.items.filter((t) => !inSprintIds.has(t.id)));
       setAssignHasMore(Boolean(data.nextCursor) || data.items.length >= 100);
     } catch (cause) {
-      setAssignError(requestError(cause, 'Tasks could not be loaded.'));
+      setAssignError(sprintErrorMessage(cause, 'Tasks could not be loaded.'));
     } finally {
       setAssignLoading(false);
     }

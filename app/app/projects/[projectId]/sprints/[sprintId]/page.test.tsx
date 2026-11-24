@@ -91,7 +91,7 @@ const VIEWER = ['project.view', 'task.view'];
 const BACKEND_ERRORS = [
   [403, 'PERMISSION_DENIED', 'Backend 403 message'],
   [404, 'SPRINT_NOT_FOUND', 'Backend 404 message'],
-  [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Backend 409 message'],
+  [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Sprints are turned off for this project.'],
 ] as const;
 
 describe('SprintDetailPage — board and reports', () => {
@@ -264,8 +264,8 @@ describe('SprintDetailPage — board and reports', () => {
   it.each([
     [403, 'PERMISSION_DENIED', 'No sprint access'],
     [404, 'SPRINT_NOT_FOUND', 'Sprint not found'],
-    [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Sprints are disabled'],
-  ])('shows the backend message on %i (%s)', async (status, code, message) => {
+    [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Sprints are turned off for this project.'],
+  ])('shows the user-facing copy on %i (%s)', async (status, code, message) => {
     mocks.getSprintBoard.mockRejectedValueOnce(new ApiRequestError(message, status, code));
     render(<SprintDetailPage />);
     expect(await screen.findByText(message)).toBeInTheDocument();
@@ -404,5 +404,23 @@ describe('SprintDetailPage — board and reports', () => {
 
     expect(within(dialog).getByText('Warning: 1 selected task will be moved from another sprint.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Add 2 tasks — 1 will be moved' })).toBeInTheDocument();
+  });
+
+  it('renders mapped copy without a raw code for sprint action errors', async () => {
+    const user = userEvent.setup();
+    mocks.removeTaskFromSprint.mockRejectedValueOnce(new ApiRequestError(
+      'Stage 2 task is gone (TASK_NOT_IN_SPRINT)',
+      404,
+      'TASK_NOT_IN_SPRINT',
+    ));
+    render(<SprintDetailPage />);
+    await screen.findByText('Implement endpoint');
+    await user.click(screen.getAllByRole('button', { name: 'Remove from sprint' })[0]);
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    expect(await screen.findByText('That task is no longer in this sprint.')).toBeInTheDocument();
+    expect(screen.queryByText(/TASK_NOT_IN_SPRINT/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/stage 2/i)).not.toBeInTheDocument();
   });
 });

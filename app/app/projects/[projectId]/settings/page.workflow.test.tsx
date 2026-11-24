@@ -107,6 +107,10 @@ describe('ProjectSettingsPage — workflow mode toggle', () => {
     render(<SettingsPage />);
     const select = await screen.findByLabelText('Project workflow mode');
 
+    expect(
+      screen.getByText('Switching to backlog only completes the active sprint and moves its unfinished tasks to the backlog.'),
+    ).toBeInTheDocument();
+
     await user.selectOptions(select, 'BACKLOG_ONLY');
 
     await waitFor(() =>
@@ -122,19 +126,78 @@ describe('ProjectSettingsPage — workflow mode toggle', () => {
     expect(screen.queryByLabelText('Project workflow mode')).not.toBeInTheDocument();
   });
 
-  it('shows the 409 confirmation dialog with openTaskCount and resends with confirmation', async () => {
+  it('shows openTaskCount in the 409 dialog without the backend message', async () => {
     const user = userEvent.setup();
-    mocks.getProject.mockResolvedValue(makeProject({ workflowMode: 'SPRINTS' }));
-    mocks.updateProject
-      .mockRejectedValueOnce(new ApiRequestError('Active sprint must be completed first', 409, 'ACTIVE_SPRINT_EXISTS', { sprintId: 'sprint-1', openTaskCount: 7 }))
-      .mockResolvedValueOnce(makeProject({ workflowMode: 'BACKLOG_ONLY' }));
+    mocks.updateProject.mockRejectedValueOnce(
+      new ApiRequestError('Active sprint must be completed first', 409, 'ACTIVE_SPRINT_EXISTS', {
+        sprintId: 'sprint-1', openTaskCount: 7,
+      }),
+    );
 
     render(<SettingsPage />);
     const select = await screen.findByLabelText('Project workflow mode');
     await user.selectOptions(select, 'BACKLOG_ONLY');
 
+    expect(await screen.findByText(
+      'This project has an active sprint with 7 unfinished tasks. Confirming will complete it and move its unfinished tasks to the backlog.',
+    )).toBeInTheDocument();
+    expect(screen.queryByText(/Active sprint must be completed first/)).not.toBeInTheDocument();
+  });
+
+  it('omits the count sentence when openTaskCount is missing', async () => {
+    const user = userEvent.setup();
+    mocks.updateProject.mockRejectedValueOnce(
+      new ApiRequestError('Active sprint must be completed first', 409, 'ACTIVE_SPRINT_EXISTS', {
+        sprintId: 'sprint-1',
+      }),
+    );
+
+    render(<SettingsPage />);
+    const select = await screen.findByLabelText('Project workflow mode');
+    await user.selectOptions(select, 'BACKLOG_ONLY');
+
+    expect(await screen.findByText(
+      'Confirming will complete it and move its unfinished tasks to the backlog.',
+    )).toBeInTheDocument();
+    expect(screen.queryByText(/This project has an active sprint with/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 unfinished/)).not.toBeInTheDocument();
+  });
+
+  it('clears the page error and sends no further request when the 409 dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    mocks.updateProject.mockRejectedValueOnce(
+      new ApiRequestError('Active sprint must be completed first', 409, 'ACTIVE_SPRINT_EXISTS', {
+        sprintId: 'sprint-1', openTaskCount: 3,
+      }),
+    );
+
+    render(<SettingsPage />);
+    const select = await screen.findByLabelText('Project workflow mode');
+    await user.selectOptions(select, 'BACKLOG_ONLY');
+    expect(await screen.findByText(/3 unfinished tasks/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('Confirm workflow mode change?')).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Active sprint must be completed first/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/3 unfinished tasks/)).not.toBeInTheDocument();
+    expect(mocks.updateProject).toHaveBeenCalledTimes(1);
+  });
+
+  it('resends the confirmed workflow change with confirmActiveSprintCompletion', async () => {
+    const user = userEvent.setup();
+    mocks.updateProject
+      .mockRejectedValueOnce(new ApiRequestError('Active sprint must be completed first', 409, 'ACTIVE_SPRINT_EXISTS', {
+        sprintId: 'sprint-1', openTaskCount: 7,
+      }))
+      .mockResolvedValueOnce(makeProject({ workflowMode: 'BACKLOG_ONLY' }));
+
+    render(<SettingsPage />);
+    const select = await screen.findByLabelText('Project workflow mode');
+    await user.selectOptions(select, 'BACKLOG_ONLY');
     expect(await screen.findByText(/7 unfinished tasks/)).toBeInTheDocument();
-    expect(screen.getByText(/Active sprint must be completed first/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
 
@@ -143,6 +206,7 @@ describe('ProjectSettingsPage — workflow mode toggle', () => {
         workflowMode: 'BACKLOG_ONLY', confirmActiveSprintCompletion: true,
       }),
     );
+    expect(await screen.findByText('Workflow mode updated.')).toBeInTheDocument();
   });
 
   it('shows the backend message on a 403 workflow change error', async () => {

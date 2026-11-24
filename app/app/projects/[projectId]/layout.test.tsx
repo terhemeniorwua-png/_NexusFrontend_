@@ -62,6 +62,28 @@ describe('ProjectLayout — sprint tab visibility', () => {
     await waitFor(() => expect(mocks.getProject).toHaveBeenCalledWith('ws-1', 'project-1'));
     expect(screen.queryByRole('link', { name: 'Sprints' })).not.toBeInTheDocument();
   });
+
+  it('shows Dev activity to viewers and hides Developer activity without project.update', async () => {
+    render(<ProjectLayout><div>Page content</div></ProjectLayout>);
+    expect(await screen.findByRole('link', { name: 'Dev activity' })).toHaveAttribute(
+      'href',
+      '/app/projects/project-1/dev-activity',
+    );
+    expect(screen.queryByRole('link', { name: 'Developer activity' })).not.toBeInTheDocument();
+  });
+
+  it('places Developer activity immediately after Dev activity for users with project.update', async () => {
+    setPermissions(['project.view', 'project.update']);
+    render(<ProjectLayout><div>Page content</div></ProjectLayout>);
+    const labels = await waitFor(() => screen.getAllByRole('link').map((link) => link.textContent));
+    const devIndex = labels.indexOf('Dev activity');
+    expect(devIndex).toBeGreaterThanOrEqual(0);
+    expect(labels[devIndex + 1]).toBe('Developer activity');
+    expect(screen.getByRole('link', { name: 'Developer activity' })).toHaveAttribute(
+      'href',
+      '/app/projects/project-1/dev-activity/developers',
+    );
+  });
 });
 
 describe('ProjectLayout — section order by project type', () => {

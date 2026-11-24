@@ -7,6 +7,7 @@ import ProjectDevActivityPage from './page';
 const mocks = vi.hoisted(() => ({
   activeWorkspace: { id: 'ws-1', name: 'WS', type: 'COMPANY', role: 'OWNER', organizationRole: null } as null | { id: string; name: string; type: string; role: string; organizationRole: null },
   permissionState: null as unknown,
+  pathname: '/app/projects/project-1/dev-activity',
   listDevActivityCommits: vi.fn(),
   listDevActivityDevelopers: vi.fn(),
 }));
@@ -25,6 +26,7 @@ function setPermissions(perms: string[]) {
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ projectId: 'project-1' }),
+  usePathname: () => mocks.pathname,
 }));
 vi.mock('@/hooks/useWorkspaceRedirect', () => ({ useWorkspaceRedirect: () => undefined }));
 vi.mock('@/providers/WorkspaceProvider', () => ({
@@ -88,6 +90,7 @@ const devReport = (overrides: Record<string, unknown> = {}) => ({
 describe('ProjectDevActivityPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.pathname = '/app/projects/project-1/dev-activity';
     setPermissions(['project.view', 'project.update']);
     mocks.listDevActivityCommits.mockResolvedValue({ items: [commit()], nextCursor: null });
     mocks.listDevActivityDevelopers.mockResolvedValue(devReport());
@@ -177,6 +180,7 @@ describe('ProjectDevActivityPage', () => {
 describe('Developer report', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.pathname = '/app/projects/project-1/dev-activity';
     setPermissions(['project.view', 'project.update']);
     mocks.listDevActivityCommits.mockResolvedValue({ items: [], nextCursor: null });
     mocks.listDevActivityDevelopers.mockResolvedValue(devReport());
@@ -189,6 +193,17 @@ describe('Developer report', () => {
     expect(screen.queryByText('Developer activity')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
     expect(screen.queryByText('How these counts work')).not.toBeInTheDocument();
+    expect(mocks.listDevActivityDevelopers).not.toHaveBeenCalled();
+  });
+
+  it('shows the standard access page for a direct visit to the manager-only route', async () => {
+    setPermissions(['project.view']);
+    mocks.pathname = '/app/projects/project-1/dev-activity/developers';
+    render(<ProjectDevActivityPage />);
+
+    expect(await screen.findByText('You do not have access')).toBeInTheDocument();
+    expect(screen.queryByText('Developer activity')).not.toBeInTheDocument();
+    expect(mocks.listDevActivityCommits).not.toHaveBeenCalled();
     expect(mocks.listDevActivityDevelopers).not.toHaveBeenCalled();
   });
 
@@ -247,6 +262,25 @@ describe('Developer report', () => {
     expect(screen.getByText('History starts when the repository was connected and is not backfilled.')).toBeInTheDocument();
   });
 
+  it('falls back to Unknown developer for an unmapped row without login or display name', async () => {
+    mocks.listDevActivityDevelopers.mockResolvedValue(devReport({
+      developers: [{
+        type: 'unmapped',
+        user: null,
+        providerLogin: null,
+        displayName: '',
+        commits: 1,
+        pullRequestsOpened: 0,
+        pullRequestsMerged: 0,
+        reviewsGiven: 0,
+      }],
+    }));
+    render(<ProjectDevActivityPage />);
+
+    expect((await screen.findAllByText('Unknown developer')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('@')).not.toBeInTheDocument();
+  });
+
   it('shows coverage null and empty range state', async () => {
     mocks.listDevActivityDevelopers.mockResolvedValue(devReport({ coverageStartedAt: null, developers: [] }));
     render(<ProjectDevActivityPage />);
@@ -262,6 +296,7 @@ describe('Developer report', () => {
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 
     vi.clearAllMocks();
+    mocks.pathname = '/app/projects/project-1/dev-activity';
     setPermissions(['project.view', 'project.update']);
     mocks.listDevActivityCommits.mockResolvedValue({ items: [], nextCursor: null });
     mocks.listDevActivityDevelopers.mockRejectedValueOnce(new ApiRequestError('Not found', 404, 'PROJECT_REPOSITORY_NOT_FOUND'));
@@ -274,6 +309,7 @@ describe('Developer report', () => {
 describe('Accessibility and polish', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.pathname = '/app/projects/project-1/dev-activity';
     setPermissions(['project.view', 'project.update']);
     mocks.listDevActivityCommits.mockResolvedValue({ items: [commit()], nextCursor: 'c2' });
     mocks.listDevActivityDevelopers.mockResolvedValue(devReport());

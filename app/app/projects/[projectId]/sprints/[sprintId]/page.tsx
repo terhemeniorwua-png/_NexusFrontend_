@@ -68,7 +68,19 @@ function sprintMembershipLabel(task: TaskSummary, currentSprintId: string): stri
       ? `In another sprint (${task.sprintName}), will be moved`
       : 'In another sprint, will be moved';
   }
-  return task.sprintId ? 'In sprint' : 'In backlog';
+  return 'In backlog';
+}
+
+function assignmentButtonLabel(selectedCount: number, moveCount: number): string {
+  const taskLabel = selectedCount === 1 ? 'task' : 'tasks';
+  if (selectedCount > 0 && moveCount === selectedCount) return `Move ${selectedCount} ${taskLabel}`;
+  const moveSuffix = moveCount > 0 ? ` — ${moveCount} will be moved` : '';
+  return `Add ${selectedCount} ${taskLabel}${moveSuffix}`;
+}
+
+function moveWarningText(moveCount: number): string {
+  const taskLabel = moveCount === 1 ? 'task' : 'tasks';
+  return `Warning: ${moveCount} selected ${taskLabel} will be moved from another sprint.`;
 }
 
 export default function SprintDetailPage() {
@@ -160,7 +172,7 @@ export default function SprintDetailPage() {
   async function handleAssign() {
     if (!activeWorkspace || selectedTaskIds.size === 0) return;
     setBusy(true);
-    setError(null);
+    setAssignError(null);
     try {
       await addTasksToSprint(activeWorkspace.id, projectId, sprintId, {
         taskIds: Array.from(selectedTaskIds),
@@ -170,7 +182,7 @@ export default function SprintDetailPage() {
       setNotice('Tasks added to sprint.');
       await loadAll();
     } catch (cause) {
-      setError(requestError(cause, 'Tasks could not be added to sprint.'));
+      setAssignError(requestError(cause, 'Tasks could not be added to sprint.'));
     } finally {
       setBusy(false);
     }
@@ -471,19 +483,25 @@ export default function SprintDetailPage() {
                 />
               </div>
             </div>
+            {assignError && <Alert variant="error">{assignError}</Alert>}
+            {selectedMoveCount > 0 && (
+              <Alert variant="warning">
+                <span aria-hidden="true" className="mr-2">⚠</span>
+                <span>{moveWarningText(selectedMoveCount)}</span>
+              </Alert>
+            )}
             {assignHasMore && (
               <p className="text-xs text-[var(--color-text-muted)]">
-                Showing the first 100 tasks. Narrow with status or search to find others.
+                Showing a partial list. Narrow with status or search to find others.
               </p>
             )}
-            {assignError && <Alert variant="error">{assignError}</Alert>}
             {assignLoading ? (
               <div className="h-32 flex items-center justify-center">
                 <Skeleton className="h-8 w-32 rounded-lg" />
               </div>
             ) : (
               <div className="max-h-96 overflow-y-auto border rounded-[var(--radius-md)]">
-                {assignTasks.length === 0 ? (
+                {assignError ? null : assignTasks.length === 0 ? (
                   <div className="p-4 text-center text-xs text-[var(--color-text-muted)]">
                     No tasks available here. Try another status or search term.
                   </div>
@@ -498,7 +516,7 @@ export default function SprintDetailPage() {
                               {task.status.replaceAll('_', ' ')}
                             </Badge>
                           </div>
-                          <div className="mt-1 text-sm font-medium truncate">{task.title}</div>
+                          <div className="mt-1 text-sm font-medium line-clamp-2">{task.title}</div>
                           <div className="mt-1 text-xs text-[var(--color-text-muted)]">
                             {sprintMembershipLabel(task, sprintId)}
                           </div>
@@ -530,8 +548,7 @@ export default function SprintDetailPage() {
                 onClick={() => void handleAssign()}
                 disabled={busy || selectedTaskIds.size === 0}
               >
-                Add {selectedTaskIds.size} task{selectedTaskIds.size !== 1 ? 's' : ''}
-                {selectedMoveCount > 0 ? ` — ${selectedMoveCount} will be moved` : ''}
+                {assignmentButtonLabel(selectedTaskIds.size, selectedMoveCount)}
               </Button>
             </div>
           </div>

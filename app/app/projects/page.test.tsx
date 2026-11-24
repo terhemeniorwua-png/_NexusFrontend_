@@ -135,6 +135,7 @@ describe('ProjectsPage', () => {
 
     const typeSelect = await screen.findByLabelText('Type');
     expect(typeSelect).toHaveValue('GENERAL');
+    expect(screen.getByText('Classification only. It does not grant access or change permissions. Changing it never deletes or hides work.')).toBeInTheDocument();
     await user.selectOptions(typeSelect, 'DESIGN');
     await user.type(screen.getByLabelText(/Project name/), 'Design Project');
     await user.click(screen.getByRole('button', { name: 'Create project' }));

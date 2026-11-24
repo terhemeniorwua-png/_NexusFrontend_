@@ -1,9 +1,9 @@
 /**
  * Canonical project classification values from the backend `ProjectType` enum.
  *
- * This is a display classification only: it selects which environment renders
- * a project and grants NO access. Never use it in permission checks — the
- * backend remains the only authority for project access.
+ * Classification only: it does not grant access or change permissions, and
+ * changing it never deletes or hides work. Never use it in permission checks —
+ * the backend remains the only authority for project access.
  */
 
 /** Backend contract: ProjectType = GENERAL | ENGINEERING | DESIGN | OPERATIONS | MARKETING | HR. */

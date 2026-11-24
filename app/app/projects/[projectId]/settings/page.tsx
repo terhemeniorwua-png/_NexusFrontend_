@@ -106,6 +106,14 @@ function requestError(cause: unknown, fallback: string): string {
   return cause.message;
 }
 
+/** Workflow errors must surface the backend message for 403/404/409. */
+function workflowRequestError(cause: unknown, fallback: string): string {
+  if (cause instanceof ApiRequestError && [403, 404, 409].includes(cause.status)) {
+    return cause.message;
+  }
+  return requestError(cause, fallback);
+}
+
 export default function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
@@ -130,6 +138,13 @@ export default function ProjectSettingsPage() {
   const [startDate, setStartDate] = useState<string>('');
   const [dueDate, setDueDate] = useState<string>('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Workflow mode (sprints on/off)
+  const [workflowMode, setWorkflowMode] = useState<'SPRINTS' | 'BACKLOG_ONLY'>('SPRINTS');
+  const [pendingWorkflowMode, setPendingWorkflowMode] = useState<'SPRINTS' | 'BACKLOG_ONLY'>('SPRINTS');
+  const [workflowConfirmOpen, setWorkflowConfirmOpen] = useState(false);
+  const [workflowOpenTaskCount, setWorkflowOpenTaskCount] = useState(0);
+  const [workflowBackendMessage, setWorkflowBackendMessage] = useState<string | null>(null);
 
   // Visibility change confirmation
   const [pendingVisibility, setPendingVisibility] = useState<ProjectVisibility | null>(null);
@@ -193,6 +208,7 @@ export default function ProjectSettingsPage() {
       setType(normaliseProjectType(data.type));
       setVisibility(data.visibility);
       setCommentPolicy(data.commentPolicy ?? 'ASSIGNEES_ONLY');
+      setWorkflowMode(data.workflowMode);
       setStartDate(data.startDate ? new Date(data.startDate).toISOString().slice(0, 10) : '');
       setDueDate(data.dueDate ? new Date(data.dueDate).toISOString().slice(0, 10) : '');
       setOrgTeamId(data.teamId ?? '');
@@ -383,6 +399,48 @@ export default function ProjectSettingsPage() {
     } finally { setBusy(false); }
   }
 
+  async function handleWorkflowModeChange(nextMode: 'SPRINTS' | 'BACKLOG_ONLY') {
+    if (!activeWorkspace || !project) return;
+    setError(null);
+    setPendingWorkflowMode(nextMode);
+    try {
+      await updateProject(activeWorkspace.id, project.id, { workflowMode: nextMode });
+      setWorkflowMode(nextMode);
+      setProject((current) => current ? { ...current, workflowMode: nextMode } : current);
+      setNotice('Workflow mode updated.');
+    } catch (cause) {
+      if (cause instanceof ApiRequestError && cause.status === 409 && cause.code === 'ACTIVE_SPRINT_EXISTS') {
+        const details = cause.details as { sprintId?: string; openTaskCount?: number } | undefined;
+        setWorkflowOpenTaskCount(details?.openTaskCount ?? 0);
+        setWorkflowBackendMessage(cause.message);
+        setWorkflowConfirmOpen(true);
+      } else {
+        setPendingWorkflowMode(workflowMode);
+        setError(workflowRequestError(cause, 'Workflow mode could not be changed.'));
+      }
+    }
+  }
+
+  async function confirmWorkflowModeChange() {
+    if (!activeWorkspace || !project) return;
+    setBusy(true);
+    try {
+      await updateProject(activeWorkspace.id, project.id, {
+        workflowMode: pendingWorkflowMode,
+        confirmActiveSprintCompletion: true,
+      });
+      setWorkflowMode(pendingWorkflowMode);
+      setProject((current) => current ? { ...current, workflowMode: pendingWorkflowMode } : current);
+      setNotice('Workflow mode updated.');
+    } catch (cause) {
+      setError(workflowRequestError(cause, 'Workflow mode could not be changed.'));
+    } finally {
+      setWorkflowConfirmOpen(false);
+      setPendingWorkflowMode(workflowMode);
+      setBusy(false);
+    }
+  }
+
   async function handleArchive() {
     if (!activeWorkspace || !project) return;
     setBusy(true); setError(null);
@@ -570,6 +628,37 @@ export default function ProjectSettingsPage() {
               helperText="Everyone who can see a task can read its discussion. This controls who can add comments."
             />
           </div>
+          {can('project.update') && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                  Workflow mode
+                </span>
+                <span className="text-xs font-medium px-2 py-1 rounded bg-[var(--color-surface-secondary)] text-[var(--color-text-secondary)]">
+                  {workflowMode === 'SPRINTS' ? 'Sprints enabled' : 'Sprints disabled (backlog only)'}
+                </span>
+              </div>
+              <Select
+                id="settings-workflow-mode"
+                label="Project workflow mode"
+                value={workflowMode}
+                onChange={(event) => void handleWorkflowModeChange(event.target.value as 'SPRINTS' | 'BACKLOG_ONLY')}
+                options={[
+                  { value: 'SPRINTS', label: 'Sprints (plan and track work in sprints)' },
+                  { value: 'BACKLOG_ONLY', label: 'Backlog only (no sprints)' },
+                ]}
+                helperText={
+                  workflowMode === 'SPRINTS'
+                    ? 'Sprints are enabled for this project. Switching to backlog only with an active sprint requires completing that sprint first.'
+                    : 'Sprints are disabled. All tasks live in the backlog. Switching to sprints does not start any sprint.'
+                }
+                disabled={busy}
+              />
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                Changing the workflow mode requires project manager permission. Switching from sprints to backlog only with an active sprint will complete that sprint and move unfinished tasks to the backlog.
+              </p>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="settings-start-date" className="block text-sm font-medium mb-1">
@@ -955,6 +1044,21 @@ export default function ProjectSettingsPage() {
         description={`Transfer ${project.name} to ${workspaceMembers.find((m) => m.userId === transferTargetId)?.name ?? 'the selected member'}? This action is immediate and cannot be undone. The new owner becomes the project manager.`}
         confirmLabel="Transfer ownership"
         destructive
+        loading={busy}
+      />
+
+      {/* Workflow mode change confirmation (409 active sprint exists) */}
+      <ConfirmDialog
+        open={workflowConfirmOpen}
+        onClose={() => setWorkflowConfirmOpen(false)}
+        onConfirm={() => void confirmWorkflowModeChange()}
+        title="Confirm workflow mode change?"
+        description={
+          `${pendingWorkflowMode === 'BACKLOG_ONLY'
+            ? `This project has an active sprint with ${workflowOpenTaskCount} unfinished task${workflowOpenTaskCount !== 1 ? 's' : ''}. Confirming will complete the active sprint and move its unfinished tasks to the backlog.`
+            : `Switching to ${pendingWorkflowMode === 'SPRINTS' ? 'sprints' : 'backlog only'} mode.`}${workflowBackendMessage ? ` ${workflowBackendMessage}` : ''}`
+        }
+        confirmLabel="Confirm"
         loading={busy}
       />
     </div>

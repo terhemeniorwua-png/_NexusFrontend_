@@ -350,7 +350,7 @@ describe('SprintsPage — list and lifecycle', () => {
     expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
   });
 
-  it('shows a load-more error below the grid with an unknown code', async () => {
+  it('shows a load-more error above the grid and keeps Load more available', async () => {
     const user = userEvent.setup();
     mocks.listSprints
       .mockResolvedValueOnce({ items: [sprint()], nextCursor: 'cursor-2' })
@@ -360,7 +360,11 @@ describe('SprintsPage — list and lifecycle', () => {
 
     await user.click(screen.getByRole('button', { name: 'Load more' }));
 
-    expect(await screen.findByText('Backend page failed')).toBeInTheDocument();
+    const alert = await screen.findByText('More sprints could not be loaded.');
+    expect(alert).toBeInTheDocument();
+    expect(alert.compareDocumentPosition(screen.getByText('Sprint Alpha')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('Backend page failed')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Load more' })).toBeInTheDocument();
   });
 
   it('keeps mapped dialog errors visible inside the open modal', async () => {

@@ -345,7 +345,6 @@ function CommitsPanel({ workspaceId, projectId }: { workspaceId: string; project
 
       {loading ? (
         <div className="space-y-3" role="status" aria-label="Loading commits">
-          <p className="sr-only">Loading commits…</p>
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
         </div>
       ) : error ? (
@@ -588,7 +587,6 @@ function DeveloperReportPanel({ workspaceId, projectId }: { workspaceId: string;
 
       {loading ? (
         <div className="space-y-3" role="status" aria-label="Loading developer activity">
-          <p className="sr-only">Loading developer activity…</p>
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
         </div>
       ) : error ? (

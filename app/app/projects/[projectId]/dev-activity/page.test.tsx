@@ -270,3 +270,41 @@ describe('Developer report', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 });
+
+describe('Accessibility and polish', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setPermissions(['project.view', 'project.update']);
+    mocks.listDevActivityCommits.mockResolvedValue({ items: [commit()], nextCursor: 'c2' });
+    mocks.listDevActivityDevelopers.mockResolvedValue(devReport());
+  });
+
+  it('has status/error roles and keyboard-operable controls', async () => {
+    const user = userEvent.setup();
+    mocks.listDevActivityCommits
+      .mockResolvedValueOnce({ items: [commit()], nextCursor: 'c2' })
+      .mockRejectedValueOnce(new ApiRequestError('bad', 500, 'INTERNAL'));
+    render(<ProjectDevActivityPage />);
+    expect(await screen.findByRole('button', { name: 'Load more' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('bad');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+
+    // disclosure keyboard operable
+    const disclosure = screen.getByRole('button', { name: 'How these counts work' });
+    disclosure.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByText('Merge commits are counted.')).toBeInTheDocument();
+  });
+
+  it('mobile developer cards include sort controls and all fields', async () => {
+    render(<ProjectDevActivityPage />);
+    expect(await screen.findByText('Developer activity summary')).toBeInTheDocument();
+    expect(screen.getByLabelText('Sort by')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ascending|Descending/ })).toBeInTheDocument();
+    // card fields present
+    expect(screen.getAllByText('PRs opened').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('PRs merged').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Reviews given').length).toBeGreaterThan(0);
+  });
+});

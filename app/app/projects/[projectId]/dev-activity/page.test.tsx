@@ -173,3 +173,100 @@ describe('ProjectDevActivityPage', () => {
     expect(screen.getAllByText(/Showing activity from the default branch of linked repositories you can read/).length).toBeGreaterThan(0);
   });
 });
+
+describe('Developer report', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setPermissions(['project.view', 'project.update']);
+    mocks.listDevActivityCommits.mockResolvedValue({ items: [], nextCursor: null });
+    mocks.listDevActivityDevelopers.mockResolvedValue(devReport());
+  });
+
+  it('is hidden for non-managers with no element of any kind', async () => {
+    setPermissions(['project.view']);
+    render(<ProjectDevActivityPage />);
+    await screen.findByText('No commits have been recorded for this project yet.');
+    expect(screen.queryByText('Developer activity')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
+    expect(screen.queryByText('How these counts work')).not.toBeInTheDocument();
+    expect(mocks.listDevActivityDevelopers).not.toHaveBeenCalled();
+  });
+
+  it('uses default 30 day range and validates range with no request sent', async () => {
+    const user = userEvent.setup();
+    render(<ProjectDevActivityPage />);
+    await screen.findByRole('heading', { name: 'Developer activity' });
+    // default 30 day range: first call should have from ~30 days before to
+    const firstCall = mocks.listDevActivityDevelopers.mock.calls[0][2];
+    const from = new Date(firstCall.from).getTime();
+    const to = new Date(firstCall.to).getTime();
+    const days = (to - from) / (24 * 60 * 60 * 1000);
+    expect(days).toBeGreaterThan(29);
+    expect(days).toBeLessThan(31);
+
+    const callsBefore = mocks.listDevActivityDevelopers.mock.calls.length;
+    await user.clear(screen.getByLabelText('Start date'));
+    await user.clear(screen.getByLabelText('End date'));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(screen.getByText('Select a start and end date.')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Start date'), '2026-11-20');
+    await user.type(screen.getByLabelText('End date'), '2026-11-10');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(screen.getByText('The start date must be before the end date.')).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('Start date'));
+    await user.clear(screen.getByLabelText('End date'));
+    await user.type(screen.getByLabelText('Start date'), '2026-01-01');
+    await user.type(screen.getByLabelText('End date'), '2026-05-01');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(screen.getByText('Choose a range of 90 days or less.')).toBeInTheDocument();
+
+    expect(mocks.listDevActivityDevelopers.mock.calls.length).toBe(callsBefore);
+  });
+
+  it('renders mapped and unmapped rows, sort, coverage, disclosure, and empty state', async () => {
+    const user = userEvent.setup();
+    render(<ProjectDevActivityPage />);
+    expect((await screen.findAllByText('Alice')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('@ghost').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Unmapped').length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle('This GitHub account is not linked to a workspace member.').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Activity is counted from/)).toBeInTheDocument();
+
+    const commitsSort = screen.getByRole('button', { name: 'Commits' });
+    expect(commitsSort.closest('th')).toHaveAttribute('aria-sort', 'descending');
+    await user.click(commitsSort);
+    expect(commitsSort.closest('th')).toHaveAttribute('aria-sort', 'ascending');
+
+    const disclosure = screen.getByRole('button', { name: 'How these counts work' });
+    await user.click(disclosure);
+    expect(screen.getByText('Merge commits are counted.')).toBeInTheDocument();
+    expect(screen.getByText('Force-pushes can leave rewritten history in the counts.')).toBeInTheDocument();
+    expect(screen.getByText('Partial push truncation is not detected.')).toBeInTheDocument();
+    expect(screen.getByText('History starts when the repository was connected and is not backfilled.')).toBeInTheDocument();
+  });
+
+  it('shows coverage null and empty range state', async () => {
+    mocks.listDevActivityDevelopers.mockResolvedValue(devReport({ coverageStartedAt: null, developers: [] }));
+    render(<ProjectDevActivityPage />);
+    expect(await screen.findByText('No activity has been recorded yet.')).toBeInTheDocument();
+    expect(screen.getByText('No developer activity in this range.')).toBeInTheDocument();
+    expect(screen.getByText('How these counts work')).toBeInTheDocument();
+  });
+
+  it('handles 403 and 404 mapped copy', async () => {
+    mocks.listDevActivityDevelopers.mockRejectedValueOnce(new ApiRequestError('Forbidden', 403, 'PERMISSION_DENIED'));
+    render(<ProjectDevActivityPage />);
+    expect(await screen.findByText('You do not have access to this report.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+
+    vi.clearAllMocks();
+    setPermissions(['project.view', 'project.update']);
+    mocks.listDevActivityCommits.mockResolvedValue({ items: [], nextCursor: null });
+    mocks.listDevActivityDevelopers.mockRejectedValueOnce(new ApiRequestError('Not found', 404, 'PROJECT_REPOSITORY_NOT_FOUND'));
+    render(<ProjectDevActivityPage />);
+    expect(await screen.findByText('This repository is not available.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+});

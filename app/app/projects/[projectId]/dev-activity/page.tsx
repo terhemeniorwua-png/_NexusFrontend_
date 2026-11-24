@@ -1,8 +1,9 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -15,7 +16,10 @@ import { PageAccessState } from '@/components/shared/PageAccessState';
 import { devActivityErrorMessage } from '@/services/dev-activity-errors';
 import {
   listDevActivityCommits,
+  listDevActivityDevelopers,
   type DevActivityCommit,
+  type DevActivityDeveloper,
+  type DevActivityDevelopersReport,
 } from '@/services/dev-integrations';
 
 type CommitFilters = {
@@ -397,11 +401,302 @@ function CommitsPanel({ workspaceId, projectId }: { workspaceId: string; project
   );
 }
 
+type DevSortKey = 'displayName' | 'commits' | 'pullRequestsOpened' | 'pullRequestsMerged' | 'reviewsGiven';
+type SortDir = 'asc' | 'desc';
+
+function compareDevelopers(a: DevActivityDeveloper, b: DevActivityDeveloper, key: DevSortKey, dir: SortDir): number {
+  const mul = dir === 'asc' ? 1 : -1;
+  let cmp = 0;
+  if (key === 'displayName') {
+    cmp = a.displayName.localeCompare(b.displayName);
+  } else {
+    cmp = a[key] - b[key];
+  }
+  if (cmp !== 0) return cmp * mul;
+  // stable tie-breaker: commits desc, then displayName asc
+  if (key !== 'commits') {
+    const c = b.commits - a.commits;
+    if (c !== 0) return c;
+  }
+  return a.displayName.localeCompare(b.displayName);
+}
+
+function developerRowKey(dev: DevActivityDeveloper): string {
+  if (dev.type === 'workspace_user' && dev.user?.id) return `user:${dev.user.id}`;
+  const login = (dev.providerLogin ?? dev.displayName).toLowerCase();
+  return `unmapped:${login}`;
+}
+
+function developerLabel(dev: DevActivityDeveloper): string {
+  if (dev.type === 'workspace_user') return dev.user?.name?.trim() || dev.displayName;
+  return `@${dev.providerLogin ?? dev.displayName ?? 'Unknown developer'}`;
+}
+
+function defaultDeveloperRange(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - 30);
+  return { from: isoToLocalDateValue(from.toISOString()), to: isoToLocalDateValue(to.toISOString()) };
+}
+
+function DeveloperReportPanel({ workspaceId, projectId }: { workspaceId: string; projectId: string }) {
+  const defaults = useMemo(() => defaultDeveloperRange(), []);
+  const [draftFrom, setDraftFrom] = useState(defaults.from);
+  const [draftTo, setDraftTo] = useState(defaults.to);
+  const [applied, setApplied] = useState(defaults);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+  const [report, setReport] = useState<DevActivityDevelopersReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [sortKey, setSortKey] = useState<DevSortKey>('commits');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [caveatsOpen, setCaveatsOpen] = useState(false);
+  const requestRef = useRef(0);
+
+  const load = useCallback(async (range: { from: string; to: string }) => {
+    const reqId = ++requestRef.current;
+    setLoading(true);
+    setError(null);
+    setAccessDenied(false);
+    try {
+      const params = {
+        from: localDateToIsoStart(range.from),
+        to: localDateToIsoEnd(range.to),
+      };
+      const data = await listDevActivityDevelopers(workspaceId, projectId, params);
+      if (reqId !== requestRef.current) return;
+      setReport(data);
+    } catch (cause) {
+      if (reqId !== requestRef.current) return;
+      if (cause instanceof ApiRequestError && cause.status === 403) {
+        setAccessDenied(true);
+        setReport(null);
+      } else {
+        setError(devActivityErrorMessage(cause, 'developers'));
+      }
+    } finally {
+      if (reqId === requestRef.current) setLoading(false);
+    }
+  }, [projectId, workspaceId]);
+
+  useEffect(() => {
+    void load(defaults);
+  }, [defaults, load]);
+
+  function applyRange() {
+    if (!draftFrom || !draftTo) {
+      setRangeError('Select a start and end date.');
+      return;
+    }
+    const fromIso = localDateToIsoStart(draftFrom);
+    const toIso = localDateToIsoEnd(draftTo);
+    const fromMs = new Date(fromIso).getTime();
+    const toMs = new Date(toIso).getTime();
+    if (!(fromMs < toMs)) {
+      setRangeError('The start date must be before the end date.');
+      return;
+    }
+    const maxRangeMs = 90 * 24 * 60 * 60 * 1000;
+    if (toMs - fromMs > maxRangeMs) {
+      setRangeError('Choose a range of 90 days or less.');
+      return;
+    }
+    setRangeError(null);
+    const next = { from: draftFrom, to: draftTo };
+    setApplied(next);
+    void load(next);
+  }
+
+  function toggleSort(key: DevSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'displayName' ? 'asc' : 'desc');
+    }
+  }
+
+  const sortedDevelopers = useMemo(() => {
+    const rows = report?.developers ?? [];
+    return [...rows].sort((a, b) => compareDevelopers(a, b, sortKey, sortDir));
+  }, [report, sortKey, sortDir]);
+
+  if (accessDenied) {
+    return (
+      <section aria-labelledby="dev-developers-heading" className="space-y-4">
+        <h2 id="dev-developers-heading" className="text-xl font-semibold">Developer activity</h2>
+        <Alert variant="error" role="alert">You do not have access to this report.</Alert>
+      </section>
+    );
+  }
+
+  const ariaSort = (key: DevSortKey): 'ascending' | 'descending' | 'none' =>
+    sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+
+  const sortButton = (key: DevSortKey, label: string) => (
+    <th scope="col" aria-sort={ariaSort(key)} className="px-3 py-2 text-left text-xs font-medium text-[var(--color-text-muted)]">
+      <button type="button" className="inline-flex items-center gap-1 underline-offset-2 hover:underline" onClick={() => toggleSort(key)}>
+        {label}
+      </button>
+    </th>
+  );
+
+  return (
+    <section aria-labelledby="dev-developers-heading" className="space-y-4">
+      <h2 id="dev-developers-heading" className="text-xl font-semibold">Developer activity</h2>
+
+      <Card className="p-4">
+        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">Start date</span>
+            <input type="date" className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm" value={draftFrom} onChange={(e) => setDraftFrom(e.target.value)} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">End date</span>
+            <input type="date" className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm" value={draftTo} onChange={(e) => setDraftTo(e.target.value)} />
+          </label>
+          <Button type="button" onClick={applyRange}>Apply</Button>
+        </div>
+        {rangeError && <p className="mt-2 text-sm text-[var(--color-danger)]" role="alert">{rangeError}</p>}
+        <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+          {report?.coverageStartedAt
+            ? `Activity is counted from ${formatDate(report.coverageStartedAt)}. Earlier history is not included.`
+            : 'No activity has been recorded yet.'}
+        </p>
+      </Card>
+
+      <div>
+        <button
+          type="button"
+          className="text-sm font-medium text-[var(--color-primary)] underline underline-offset-2"
+          aria-expanded={caveatsOpen}
+          aria-controls="dev-activity-caveats"
+          onClick={() => setCaveatsOpen((v) => !v)}
+        >
+          How these counts work
+        </button>
+        {caveatsOpen && (
+          <ul id="dev-activity-caveats" className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--color-text-secondary)]">
+            <li>Merge commits are counted.</li>
+            <li>Force-pushes can leave rewritten history in the counts.</li>
+            <li>Partial push truncation is not detected.</li>
+            <li>History starts when the repository was connected and is not backfilled.</li>
+          </ul>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="space-y-3" role="status" aria-label="Loading developer activity">
+          <p className="sr-only">Loading developer activity…</p>
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+        </div>
+      ) : error ? (
+        <div className="space-y-3">
+          <Alert variant="error" role="alert">{error}</Alert>
+          <Button type="button" variant="secondary" onClick={() => void load(applied)}>Retry</Button>
+        </div>
+      ) : sortedDevelopers.length === 0 ? (
+        <EmptyState title="No developer activity in this range." description="Try a different date range." />
+      ) : (
+        <>
+          <div className="hidden md:block">
+            <Card className="overflow-x-auto p-0">
+              <table className="min-w-full text-sm">
+                <caption className="sr-only">Developer activity summary</caption>
+                <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
+                  <tr>
+                    {sortButton('displayName', 'Developer')}
+                    <th scope="col" aria-sort={ariaSort('commits')} className="px-3 py-2 text-right text-xs font-medium text-[var(--color-text-muted)]">
+                      <button type="button" className="inline-flex items-center gap-1 underline-offset-2 hover:underline" onClick={() => toggleSort('commits')}>Commits</button>
+                    </th>
+                    <th scope="col" aria-sort={ariaSort('pullRequestsOpened')} className="px-3 py-2 text-right text-xs font-medium text-[var(--color-text-muted)]">
+                      <button type="button" className="inline-flex items-center gap-1 underline-offset-2 hover:underline" onClick={() => toggleSort('pullRequestsOpened')}>PRs opened</button>
+                    </th>
+                    <th scope="col" aria-sort={ariaSort('pullRequestsMerged')} className="px-3 py-2 text-right text-xs font-medium text-[var(--color-text-muted)]">
+                      <button type="button" className="inline-flex items-center gap-1 underline-offset-2 hover:underline" onClick={() => toggleSort('pullRequestsMerged')}>PRs merged</button>
+                    </th>
+                    <th scope="col" aria-sort={ariaSort('reviewsGiven')} className="px-3 py-2 text-right text-xs font-medium text-[var(--color-text-muted)]">
+                      <button type="button" className="inline-flex items-center gap-1 underline-offset-2 hover:underline" onClick={() => toggleSort('reviewsGiven')}>Reviews given</button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border)]">
+                  {sortedDevelopers.map((dev) => (
+                    <tr key={developerRowKey(dev)}>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{developerLabel(dev)}</span>
+                          {dev.type === 'unmapped' && (
+                            <span title="This GitHub account is not linked to a workspace member.">
+                              <Badge variant="outline">Unmapped</Badge>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right">{dev.commits}</td>
+                      <td className="px-3 py-2 text-right">{dev.pullRequestsOpened}</td>
+                      <td className="px-3 py-2 text-right">{dev.pullRequestsMerged}</td>
+                      <td className="px-3 py-2 text-right">{dev.reviewsGiven}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          </div>
+
+          <div className="space-y-3 md:hidden">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">Sort by</span>
+                <select
+                  className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm"
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as DevSortKey)}
+                >
+                  <option value="commits">Commits</option>
+                  <option value="pullRequestsOpened">PRs opened</option>
+                  <option value="pullRequestsMerged">PRs merged</option>
+                  <option value="reviewsGiven">Reviews given</option>
+                  <option value="displayName">Developer</option>
+                </select>
+              </label>
+              <div className="flex items-end">
+                <Button type="button" variant="secondary" onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}>
+                  {sortDir === 'asc' ? 'Ascending' : 'Descending'}
+                </Button>
+              </div>
+            </div>
+
+            {sortedDevelopers.map((dev) => (
+              <Card key={developerRowKey(dev)} className="p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{developerLabel(dev)}</p>
+                  {dev.type === 'unmapped' && (
+                    <span title="This GitHub account is not linked to a workspace member.">
+                      <Badge variant="outline">Unmapped</Badge>
+                    </span>
+                  )}
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <div><dt className="text-[var(--color-text-muted)]">Commits</dt><dd className="font-medium">{dev.commits}</dd></div>
+                  <div><dt className="text-[var(--color-text-muted)]">PRs opened</dt><dd className="font-medium">{dev.pullRequestsOpened}</dd></div>
+                  <div><dt className="text-[var(--color-text-muted)]">PRs merged</dt><dd className="font-medium">{dev.pullRequestsMerged}</dd></div>
+                  <div><dt className="text-[var(--color-text-muted)]">Reviews given</dt><dd className="font-medium">{dev.reviewsGiven}</dd></div>
+                </dl>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
 
 export default function ProjectDevActivityPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
-  const { isLoading: permissionsLoading } = usePermissions();
+  const { can, isLoading: permissionsLoading } = usePermissions();
   useWorkspaceRedirect();
 
   if (workspaceLoading || permissionsLoading) {
@@ -410,10 +705,13 @@ export default function ProjectDevActivityPage() {
 
   if (!activeWorkspace) return <PageAccessState status={401} />;
 
+  const canViewDevelopers = can('project.update');
+
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold">Dev activity</h1>
       <CommitsPanel workspaceId={activeWorkspace.id} projectId={projectId} />
+      {canViewDevelopers ? <DeveloperReportPanel workspaceId={activeWorkspace.id} projectId={projectId} /> : null}
     </div>
   );
 }

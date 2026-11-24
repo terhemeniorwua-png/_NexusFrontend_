@@ -121,6 +121,35 @@ export interface TaskDevLink {
   updatedAt: string;
 }
 
+/** Group order follows the backend's TaskDevLinkExternalType union. */
+export const TASK_DEV_LINK_GROUP_ORDER: readonly TaskDevLinkExternalType[] = [
+  'BRANCH',
+  'PULL_REQUEST',
+  'COMMIT',
+] as const;
+
+export type TaskDevLinkGroupType = TaskDevLinkExternalType;
+
+export interface TaskDevLinkGroup {
+  type: TaskDevLinkGroupType;
+  items: TaskDevLink[];
+}
+
+/**
+ * Group only what the backend returned. NONE-level links are omitted by the
+ * backend, so no empty group, count or placeholder is produced for them.
+ */
+export function groupTaskDevLinks(links: TaskDevLink[]): TaskDevLinkGroup[] {
+  return TASK_DEV_LINK_GROUP_ORDER
+    .map((type) => ({ type, items: links.filter((link) => link.externalType === type) }))
+    .filter((group) => group.items.length > 0);
+}
+
+/** METADATA is the only level whose dev-link fields arrive masked. */
+export function isMaskedTaskDevLink(link: TaskDevLink): boolean {
+  return link.effectiveAccessLevel === 'METADATA';
+}
+
 function authed<T>(path: string, options: RequestInit = {}): Promise<T> {
   return withAuthRetry(() => apiRequest<T>(path, { ...options, authenticated: true }));
 }

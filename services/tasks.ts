@@ -2,6 +2,25 @@ import { apiRequest, ApiRequestError } from '@/lib/api';
 import { refreshSession } from '@/services/auth';
 
 // ---------------------------------------------------------------------------
+// Task dev-links — read-only "Linked development items" view on the task page
+// ---------------------------------------------------------------------------
+
+/**
+ * Task-page consumers can import the dev-link service and its view helpers
+ * from the task service surface. The implementation is not duplicated here.
+ */
+export {
+  listTaskDevLinks,
+  groupTaskDevLinks,
+  isMaskedTaskDevLink,
+  TASK_DEV_LINK_GROUP_ORDER,
+  type TaskDevLink,
+  type TaskDevLinkExternalType,
+  type TaskDevLinkGroup,
+  type TaskDevLinkGroupType,
+} from '@/services/dev-integrations';
+
+// ---------------------------------------------------------------------------
 // Types — matching backend task.schemas.ts and task.service.ts response shapes
 // ---------------------------------------------------------------------------
 

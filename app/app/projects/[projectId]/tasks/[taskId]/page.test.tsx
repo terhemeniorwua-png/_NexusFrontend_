@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   uploadFile: vi.fn(),
   deleteFile: vi.fn(),
   listProjectMembers: vi.fn(),
+  listTaskDevLinks: vi.fn(),
   push: vi.fn(),
 }));
 
@@ -140,6 +141,11 @@ vi.mock('@/services/clarifications', () => ({
   answerClarification: mocks.answerClarification,
 }));
 
+vi.mock('@/services/dev-integrations', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/dev-integrations')>();
+  return { ...actual, listTaskDevLinks: mocks.listTaskDevLinks };
+});
+
 const task1 = {
   id: 'task-1', projectId: 'project-1', key: 'NX-1', title: 'Fix authentication bug',
   description: null, status: 'ASSIGNED', priority: 'HIGH', category: null, labels: [],
@@ -188,6 +194,7 @@ describe('TaskDetailPage — four roles', () => {
     mocks.listClarifications.mockResolvedValue({ items: [], nextCursor: null });
     mocks.listFiles.mockResolvedValue({ items: [], nextCursor: null, totalBytes: 0 });
     mocks.listProjectMembers.mockResolvedValue([]);
+    mocks.listTaskDevLinks.mockResolvedValue([]);
     mocks.reviewTask.mockResolvedValue({ ...task1, status: 'APPROVED' });
     mocks.submitTask.mockResolvedValue({ ...task1, status: 'SUBMITTED' });
     mocks.acceptTask.mockResolvedValue(acceptanceResponse(task1, 'ACCEPTED'));
@@ -1038,5 +1045,88 @@ describe('TaskDetailPage — four roles', () => {
     expect(await screen.findByText('This clarification is already resolved')).toBeInTheDocument();
     await waitFor(() => expect(mocks.getTask.mock.calls.length).toBeGreaterThan(1));
     expect(mocks.listClarifications.mock.calls.length).toBeGreaterThan(1);
+  });
+});
+
+describe('TaskDetailPage — linked development items', () => {
+  const baseLink = {
+    id: 'dl-1',
+    taskId: 'task-1',
+    projectId: 'project-1',
+    projectRepositoryId: 'repo-1',
+    provider: 'GITHUB',
+    externalId: '42',
+    externalNumber: 42,
+    title: 'Link PR',
+    url: 'https://github.com/acme/app/pull/42',
+    ref: 'feat/x',
+    headRef: 'feat/x',
+    baseRef: 'main',
+    state: 'open',
+    repositoryFullName: 'acme/app',
+    reviewState: null,
+    reviewerLogin: null,
+    reviewedAt: null,
+    mergedAt: null,
+    linkedById: 'user-1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
+    mocks.user = { id: 'user-2', name: 'Bob', email: 'bob@example.com' };
+    mocks.getTask.mockResolvedValue(task1);
+    mocks.listComments.mockResolvedValue([]);
+    mocks.listClarifications.mockResolvedValue({ items: [], nextCursor: null });
+    mocks.listFiles.mockResolvedValue({ items: [], nextCursor: null, totalBytes: 0 });
+    mocks.listProjectMembers.mockResolvedValue([]);
+    mocks.listTaskDevLinks.mockResolvedValue([]);
+    setRole('VIEWER');
+  });
+
+  it('renders exactly the backend links, grouped by type, for a view-only member', async () => {
+    mocks.listTaskDevLinks.mockResolvedValue([
+      { ...baseLink, id: 'p', externalType: 'PULL_REQUEST', effectiveAccessLevel: 'LINK' },
+      { ...baseLink, id: 'b', externalType: 'BRANCH', externalId: 'feature/x', ref: 'feature/x', effectiveAccessLevel: 'READ' },
+      { ...baseLink, id: 'c', externalType: 'COMMIT', externalId: 'abc1234', title: 'Fix parser', effectiveAccessLevel: 'READ' },
+      { ...baseLink, id: 'm', externalType: 'PULL_REQUEST', effectiveAccessLevel: 'METADATA', externalId: 'restricted', externalNumber: null, title: null, url: null, ref: null, headRef: null, baseRef: null, repositoryFullName: 'Restricted repository' },
+    ]);
+
+    render(<TaskDetailPage />);
+    expect(await screen.findByRole('heading', { name: 'Linked development items' })).toBeInTheDocument();
+    expect(mocks.listTaskDevLinks).toHaveBeenCalledWith('ws-1', 'project-1', 'task-1');
+
+    expect(screen.getByRole('heading', { name: 'Branches' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Pull requests' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Commits' })).toBeInTheDocument();
+    expect(screen.getByText('Restricted repository')).toBeInTheDocument();
+    expect(screen.queryByText('Link')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Unlink' })).not.toBeInTheDocument();
+  });
+
+  it('shows the empty state when the backend returns no links', async () => {
+    render(<TaskDetailPage />);
+    expect(await screen.findByText(/No development items are linked to this task yet/)).toBeInTheDocument();
+  });
+
+  it.each([
+    [403, 'PERMISSION_DENIED', 'Your repository access does not allow this action'],
+    [404, 'PROJECT_REPOSITORY_NOT_FOUND', 'Linked repository not found'],
+    [409, 'DEV_INTEGRATION_NOT_ACTIVE', 'Integration connection is not active'],
+  ])('shows the backend message for %i', async (status, code, message) => {
+    mocks.listTaskDevLinks.mockRejectedValue(new ApiRequestError(message, status, code));
+    render(<TaskDetailPage />);
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('shows the network failure message', async () => {
+    mocks.listTaskDevLinks.mockRejectedValue(
+      new ApiRequestError('Unable to reach PITERON. Check your connection and try again.', 0),
+    );
+    render(<TaskDetailPage />);
+    expect(await screen.findByText('Unable to reach PITERON. Check your connection and try again.')).toBeInTheDocument();
   });
 });

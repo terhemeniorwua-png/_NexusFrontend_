@@ -154,7 +154,7 @@ describe('SprintsPage — list and lifecycle', () => {
     await waitFor(() => expect(mocks.startSprint).toHaveBeenCalledWith('ws-1', 'project-1', 'sprint-1'));
   });
 
-  it('completes an ACTIVE sprint to BACKLOG and shows moved/archived counts', async () => {
+  it('completes an ACTIVE sprint to BACKLOG and reloads the list', async () => {
     const user = userEvent.setup();
     mocks.listSprints.mockResolvedValue({ items: [sprint({ status: 'ACTIVE' })], nextCursor: null });
     render(<SprintsPage />);
@@ -165,8 +165,8 @@ describe('SprintsPage — list and lifecycle', () => {
     await waitFor(() => expect(mocks.completeSprint).toHaveBeenCalledWith(
       'ws-1', 'project-1', 'sprint-1', { target: 'BACKLOG' },
     ));
-    expect(await screen.findByText(/4 tasks moved/)).toBeInTheDocument();
-    expect(screen.getByText(/1 archived/)).toBeInTheDocument();
+    expect(await screen.findByText('Sprint completed.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('completes an ACTIVE sprint to NEXT_SPRINT with the selected target', async () => {
@@ -270,5 +270,101 @@ describe('SprintsPage — list and lifecycle', () => {
     expect(await screen.findByText('Only planned sprints can be started.')).toBeInTheDocument();
     expect(screen.queryByText(/stage 2/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/SPRINT_NOT_STARTABLE/)).not.toBeInTheDocument();
+  });
+
+  it('shows the view-only empty state with no button of any kind', async () => {
+    setPermissions(VIEWER);
+    mocks.listSprints.mockResolvedValue({ items: [], nextCursor: null });
+    render(<SprintsPage />);
+
+    expect(await screen.findByText('No sprints yet. A project manager can create one.')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('keeps the manager empty-state copy and create action', async () => {
+    mocks.listSprints.mockResolvedValue({ items: [], nextCursor: null });
+    render(<SprintsPage />);
+
+    expect(await screen.findByText('Create your first sprint to start planning work.')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Create sprint' }).length).toBeGreaterThan(0);
+  });
+
+  it('renders one status label per card and no duplicate Status row', async () => {
+    render(<SprintsPage />);
+
+    expect(await screen.findByText('Sprint Alpha')).toBeInTheDocument();
+    expect(screen.getAllByText('Planned')).toHaveLength(1);
+    expect(screen.queryByText(/Status:/)).not.toBeInTheDocument();
+  });
+
+  it('appends the next page with nextCursor without duplicating cards', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints
+      .mockResolvedValueOnce({ items: [sprint()], nextCursor: 'cursor-2' })
+      .mockResolvedValueOnce({
+        items: [
+          sprint(),
+          sprint({ id: 'sprint-2', name: 'Sprint Beta', status: 'ACTIVE' }),
+        ],
+        nextCursor: null,
+      });
+    render(<SprintsPage />);
+    await screen.findByText('Sprint Alpha');
+
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(await screen.findByText('Sprint Beta')).toBeInTheDocument();
+    expect(screen.getAllByText('Sprint Alpha')).toHaveLength(1);
+    expect(mocks.listSprints).toHaveBeenLastCalledWith('ws-1', 'project-1', { cursor: 'cursor-2' });
+    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+  });
+
+  it('shows a load-more error below the grid with an unknown code', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints
+      .mockResolvedValueOnce({ items: [sprint()], nextCursor: 'cursor-2' })
+      .mockRejectedValueOnce(new ApiRequestError('Backend page failed', 500, 'PAGE_FAILED'));
+    render(<SprintsPage />);
+    await screen.findByText('Sprint Alpha');
+
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(await screen.findByText('Backend page failed')).toBeInTheDocument();
+  });
+
+  it('keeps mapped dialog errors visible inside the open modal', async () => {
+    const user = userEvent.setup();
+    mocks.createSprint.mockRejectedValueOnce(new ApiRequestError(
+      'Stage 2 creation blocked',
+      409,
+      'SPRINTS_DISABLED_FOR_PROJECT',
+    ));
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Create sprint' }));
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/^Sprint name/), 'Sprint Beta');
+    await user.click(within(dialog).getByRole('button', { name: 'Create sprint' }));
+
+    expect(await within(dialog).findByText('Sprints are turned off for this project.')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(screen.queryByText('Stage 2 creation blocked')).not.toBeInTheDocument();
+  });
+
+  it('groups planned and active first with completed and archived in a collapsed History group', async () => {
+    mocks.listSprints.mockResolvedValue({
+      items: [
+        sprint({ id: 'done', name: 'Old Done', status: 'COMPLETED' }),
+        sprint({ id: 'live', name: 'Live Sprint', status: 'ACTIVE' }),
+        sprint({ id: 'next', name: 'Next Sprint', status: 'PLANNED' }),
+      ],
+      nextCursor: null,
+    });
+    render(<SprintsPage />);
+
+    await screen.findByText('Old Done');
+    const names = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
+    expect(names.indexOf('Next Sprint')).toBeLessThan(names.indexOf('Live Sprint'));
+    expect(names.indexOf('Live Sprint')).toBeLessThan(names.indexOf('Old Done'));
+    expect(screen.getByText('History').closest('details')).not.toHaveAttribute('open');
   });
 });

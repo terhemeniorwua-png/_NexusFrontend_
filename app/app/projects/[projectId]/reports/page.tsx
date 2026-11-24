@@ -21,6 +21,7 @@ import {
   type ProjectSummary,
 } from '@/services/projects';
 import { listTasks, type TaskStatus, type TaskSummary } from '@/services/tasks';
+import { formatTaskStatusLabel } from '@/lib/status-label';
 
 const REPORT_TASK_LIMIT = 100;
 
@@ -35,7 +36,7 @@ const STATUS_ORDER: TaskStatus[] = [
 ];
 
 function statusLabel(status: TaskStatus): string {
-  return status.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (character) => character.toUpperCase());
+  return formatTaskStatusLabel(status);
 }
 
 function dateLabel(value: string | null): string {

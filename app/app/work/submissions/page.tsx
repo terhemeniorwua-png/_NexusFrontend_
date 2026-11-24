@@ -1,6 +1,7 @@
 'use client';
 
 import { listMyTasks } from '@/lib/work-tasks';
+import { formatTaskStatusLabel } from '@/lib/status-label';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
@@ -15,7 +16,7 @@ import { listTasks } from '@/services/tasks';
 type TaskStatus = 'ASSIGNED' | 'AWAITING_CLARIFICATION' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED';
 
 function statusLabel(s: TaskStatus): string {
-  return s.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+  return formatTaskStatusLabel(s);
 }
 
 function priorityLabel(p: string): string {

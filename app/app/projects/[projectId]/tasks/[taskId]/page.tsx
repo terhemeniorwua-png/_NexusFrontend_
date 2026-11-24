@@ -20,6 +20,7 @@ import { Can } from '@/components/shared/Can';
 import { PageAccessState } from '@/components/shared/PageAccessState';
 import { PermissionButton } from '@/components/shared/PermissionButton';
 import { ApiRequestError } from '@/lib/api';
+import { formatTaskStatusLabel } from '@/lib/status-label';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
@@ -110,7 +111,7 @@ const commentSchema = z.object({
 // ---------------------------------------------------------------------------
 
 function statusLabel(s: TaskStatus): string {
-  return s.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+  return formatTaskStatusLabel(s);
 }
 
 function priorityLabel(p: TaskPriority): string {

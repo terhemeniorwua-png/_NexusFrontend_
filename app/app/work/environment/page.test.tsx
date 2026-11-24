@@ -59,4 +59,24 @@ describe('WorkEnvironmentPage', () => {
       expect(mocks.listMyTasks).toHaveBeenCalledWith('ws-1', 'user-1', { limit: 100 });
     });
   });
+
+  it('renders shared task status labels instead of raw enum values', async () => {
+    mocks.listMyTasks.mockResolvedValue({
+      items: [{
+        id: 'task-2',
+        key: 'ALP-2',
+        title: 'Review changes',
+        status: 'CHANGES_REQUESTED',
+        projectId: 'project-1',
+        projectName: 'Alpha',
+        dueDate: null,
+      }],
+    });
+
+    render(<WorkEnvironmentPage />);
+
+    expect(await screen.findByText('Review changes')).toBeInTheDocument();
+    expect(screen.getByText('Changes requested')).toBeInTheDocument();
+    expect(screen.queryByText('changes_requested')).not.toBeInTheDocument();
+  });
 });

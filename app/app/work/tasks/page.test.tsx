@@ -87,4 +87,24 @@ describe('WorkMyTasksPage create shortcut', () => {
     expect(await screen.findByText('No tasks found')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go to Projects' })).toHaveAttribute('href', '/app/projects');
   });
+
+  it('renders the shared status label in a task row', async () => {
+    mocks.listMyTasks.mockResolvedValue({
+      items: [{
+        id: 'task-1',
+        key: 'ALP-1',
+        title: 'Review requested changes',
+        status: 'CHANGES_REQUESTED',
+        projectId: 'project-1',
+        projectName: 'Alpha',
+        dueDate: null,
+      }],
+    });
+
+    render(<WorkMyTasksPage />);
+
+    expect(await screen.findByText('Review requested changes')).toBeInTheDocument();
+    expect(screen.getByText('Changes requested')).toBeInTheDocument();
+    expect(screen.queryByText('CHANGES_REQUESTED')).not.toBeInTheDocument();
+  });
 });

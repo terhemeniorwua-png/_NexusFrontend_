@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Alert } from '@/components/ui/Alert';
+import { formatTaskStatusLabel } from '@/lib/status-label';
 
 interface WorkloadCardProps {
   entries: Array<{
@@ -27,10 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function statusLabel(status: string): string {
-  return status
-    .replaceAll('_', ' ')
-    .toLowerCase()
-    .replace(/^\w/, (c) => c.toUpperCase());
+  return formatTaskStatusLabel(status);
 }
 
 export function WorkloadCard({

@@ -233,4 +233,19 @@ describe('TaskListPage', () => {
     view.rerender(<TaskListPage />);
     await waitFor(() => expect(screen.queryByText('Fix authentication bug')).not.toBeInTheDocument());
   });
+
+  it('renders the shared status label in the list view row', async () => {
+    const user = userEvent.setup();
+    mocks.listTasks.mockResolvedValue({
+      items: [{ ...task1, status: 'CHANGES_REQUESTED' }],
+      nextCursor: null,
+    });
+
+    render(<TaskListPage />);
+    await user.click(await screen.findByRole('tab', { name: 'list' }));
+
+    const row = (await screen.findByText('Fix authentication bug')).closest('tr');
+    expect(row).not.toBeNull();
+    expect(within(row!).getByText('Changes requested')).toBeInTheDocument();
+  });
 });

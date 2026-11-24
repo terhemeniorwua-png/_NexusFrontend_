@@ -51,6 +51,9 @@ const STATUS_ORDER: Record<SprintStatus, number> = {
   ARCHIVED: 3,
 };
 
+const PLANNED_TARGETS_LOAD_ERROR = 'Planned sprints could not be loaded. Choose Backlog or try again.';
+const LOAD_MORE_ERROR = 'More sprints could not be loaded.';
+
 function dateLabel(value: string | null): string {
   return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
 }
@@ -70,6 +73,7 @@ export default function SprintsPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);
@@ -118,6 +122,7 @@ export default function SprintsPage() {
       const data = await listSprints(activeWorkspace.id, projectId);
       setSprints(data.items);
       setNextCursor(data.nextCursor);
+      setHasLoaded(true);
     } catch (cause) {
       if (cause instanceof ApiRequestError && cause.status === 401) {
         setAccessStatus(401);
@@ -151,8 +156,8 @@ export default function SprintsPage() {
         return Array.from(byId.values());
       });
       setNextCursor(data.nextCursor);
-    } catch (cause) {
-      setLoadMoreError(sprintErrorMessage(cause, 'More sprints could not be loaded.'));
+    } catch {
+      setLoadMoreError(LOAD_MORE_ERROR);
     } finally {
       setLoadingMore(false);
     }
@@ -178,10 +183,10 @@ export default function SprintsPage() {
         if (cursor) seenCursors.add(cursor);
       } while (cursor);
       setPlannedTargets(all.filter((sprint) => sprint.id !== excludeSprintId));
-    } catch (cause) {
+    } catch {
       setPlannedTargets([]);
       setCompleteNextSprintId('');
-      setPlannedTargetsError(sprintErrorMessage(cause, 'Planned sprints could not be loaded.'));
+      setPlannedTargetsError(PLANNED_TARGETS_LOAD_ERROR);
     } finally {
       setPlannedTargetsLoading(false);
     }
@@ -320,6 +325,7 @@ export default function SprintsPage() {
     }
   }
 
+  const showEmptyState = hasLoaded && sprints.length === 0;
   const sortedSprints = [...sprints].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
   const currentSprints = sortedSprints.filter((s) => s.status === 'PLANNED' || s.status === 'ACTIVE');
   const historySprints = sortedSprints.filter((s) => s.status === 'COMPLETED' || s.status === 'ARCHIVED');
@@ -421,8 +427,6 @@ export default function SprintsPage() {
       />
     );
   }
-  if (error && !sprints.length) return <Alert variant="error">{error}</Alert>;
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -441,11 +445,21 @@ export default function SprintsPage() {
         </div>
       </div>
 
-      {error && <Alert variant="error">{error}</Alert>}
+      {error && (
+        <Alert variant="error">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button variant="secondary" size="sm" onClick={() => void load()}>
+              Retry
+            </Button>
+          </div>
+        </Alert>
+      )}
       {actionError && <Alert variant="error">{actionError}</Alert>}
+      {loadMoreError && <Alert variant="error">{loadMoreError}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}
 
-      {sprints.length === 0 ? (
+      {showEmptyState ? (
         can('project.update') ? (
           <EmptyState
             title="No sprints yet"
@@ -459,7 +473,7 @@ export default function SprintsPage() {
         ) : (
           <EmptyState title="No sprints yet. A project manager can create one." />
         )
-      ) : (
+      ) : sprints.length > 0 ? (
         <>
           {currentSprints.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -481,15 +495,10 @@ export default function SprintsPage() {
               <Button variant="secondary" onClick={() => void loadMore()} disabled={loadingMore || busy}>
                 {loadingMore ? 'Loading…' : 'Load more'}
               </Button>
-              {loadMoreError && (
-                <span role="alert" className="text-sm text-[var(--color-error)]">
-                  {loadMoreError}
-                </span>
-              )}
             </div>
           )}
         </>
-      )}
+      ) : null}
 
       {/* Create sprint modal */}
       {createOpen && (
@@ -644,19 +653,6 @@ export default function SprintsPage() {
               <p className="text-sm text-[var(--color-text-secondary)]">
                 Choose what happens to unfinished tasks (status not APPROVED).
               </p>
-              {plannedTargetsError && (
-                <div className="space-y-2">
-                  <Alert variant="error">{plannedTargetsError}</Alert>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void loadPlannedTargets(completeSprintId)}
-                    disabled={plannedTargetsLoading || busy}
-                  >
-                    Retry
-                  </Button>
-                </div>
-              )}
               {completeError && <Alert variant="error">{completeError}</Alert>}
               <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleConfirmComplete(); }}>
                 <Select
@@ -683,6 +679,19 @@ export default function SprintsPage() {
                     disabled={plannedTargetsLoading || Boolean(plannedTargetsError)}
                     helperText="The target sprint must be in the same project and have status Planned."
                   />
+                )}
+                {plannedTargetsError && (
+                  <div className="space-y-2">
+                    <Alert variant="error">{plannedTargetsError}</Alert>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void loadPlannedTargets(completeSprintId)}
+                      disabled={plannedTargetsLoading || busy}
+                    >
+                      Try again
+                    </Button>
+                  </div>
                 )}
               </form>
               <div className="mt-4 flex flex-wrap items-center justify-end gap-2">

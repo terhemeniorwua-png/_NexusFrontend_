@@ -24,6 +24,8 @@ export function sprintErrorCopy(code?: string | null): string | null {
   return SPRINT_ERROR_COPY[code] ?? null;
 }
 
+const warnedUnknownCodes = new Set<string>();
+
 /**
  * Resolve one user-facing message: mapped copy, then backend message, then
  * the caller's fallback. Never stacks multiple messages.
@@ -32,7 +34,13 @@ export function sprintErrorMessage(cause: unknown, fallback: string): string {
   if (cause instanceof ApiRequestError) {
     const mapped = sprintErrorCopy(cause.code);
     if (mapped) return mapped;
-    if (cause.message) return cause.message;
+    if (cause.message) {
+      if (process.env.NODE_ENV === 'development' && cause.code && !warnedUnknownCodes.has(cause.code)) {
+        warnedUnknownCodes.add(cause.code);
+        console.warn(`Unknown sprint error code: ${cause.code}`);
+      }
+      return cause.message;
+    }
   }
   return fallback;
 }

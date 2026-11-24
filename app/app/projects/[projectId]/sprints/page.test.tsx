@@ -300,6 +300,26 @@ describe('SprintsPage — list and lifecycle', () => {
     expect(screen.getAllByRole('button', { name: 'Create sprint' }).length).toBeGreaterThan(0);
   });
 
+  it('keeps the page shell on a first-load failure and retries without showing the empty state', async () => {
+    const user = userEvent.setup();
+    mocks.listSprints
+      .mockRejectedValueOnce(new ApiRequestError('Backend list failed', 500, 'LIST_FAILED'))
+      .mockResolvedValueOnce({ items: [sprint()], nextCursor: null });
+    render(<SprintsPage />);
+
+    expect(await screen.findByText('Backend list failed')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sprints' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create sprint' })).toBeInTheDocument();
+    expect(screen.queryByText('No sprints yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('Create your first sprint to start planning work.')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('Sprint Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Backend list failed')).not.toBeInTheDocument();
+    expect(mocks.listSprints).toHaveBeenCalledTimes(2);
+  });
+
   it('renders one status label per card and no duplicate Status row', async () => {
     render(<SprintsPage />);
 
@@ -330,7 +350,7 @@ describe('SprintsPage — list and lifecycle', () => {
     expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
   });
 
-  it('shows a load-more error below the grid with an unknown code', async () => {
+  it('shows a load-more error above the grid and keeps Load more available', async () => {
     const user = userEvent.setup();
     mocks.listSprints
       .mockResolvedValueOnce({ items: [sprint()], nextCursor: 'cursor-2' })
@@ -340,7 +360,11 @@ describe('SprintsPage — list and lifecycle', () => {
 
     await user.click(screen.getByRole('button', { name: 'Load more' }));
 
-    expect(await screen.findByText('Backend page failed')).toBeInTheDocument();
+    const alert = await screen.findByText('More sprints could not be loaded.');
+    expect(alert).toBeInTheDocument();
+    expect(alert.compareDocumentPosition(screen.getByText('Sprint Alpha')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('Backend page failed')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Load more' })).toBeInTheDocument();
   });
 
   it('keeps mapped dialog errors visible inside the open modal', async () => {
@@ -475,8 +499,9 @@ describe('SprintsPage — list and lifecycle', () => {
     ]);
   });
 
-  it('shows a mapped planned-target load error with Retry and keeps BACKLOG usable', async () => {
+  it('scopes a planned-target load failure under Target sprint and recovers with Try again', async () => {
     const user = userEvent.setup();
+    const errorCopy = 'Planned sprints could not be loaded. Choose Backlog or try again.';
     let plannedAttempts = 0;
     mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {
       if (query?.status === 'PLANNED') {
@@ -496,18 +521,21 @@ describe('SprintsPage — list and lifecycle', () => {
     await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
     const dialog = screen.getByRole('dialog');
 
-    expect(await within(dialog).findByText('Sprints are turned off for this project.')).toBeInTheDocument();
+    expect(await within(dialog).findByText(errorCopy)).toBeInTheDocument();
     expect(within(dialog).queryByText('No planned sprints are available in this project.')).not.toBeInTheDocument();
     expect(within(dialog).queryByText('Stage 2 planned sprints unavailable')).not.toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Complete sprint' })).toBeEnabled();
 
     await user.selectOptions(within(dialog).getByLabelText('Destination for unfinished tasks'), 'NEXT_SPRINT');
+    const targetSelect = within(dialog).getByLabelText('Target sprint');
+    expect(within(dialog).getByText(errorCopy).closest('form')).toBe(targetSelect.closest('form'));
+    expect(targetSelect).toBeDisabled();
     expect(within(dialog).getByRole('button', { name: 'Complete sprint' })).toBeDisabled();
 
-    await user.click(within(dialog).getByRole('button', { name: 'Retry' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Try again' }));
 
     expect(await within(dialog).findByRole('option', { name: 'Retry Target' })).toBeInTheDocument();
-    expect(within(dialog).queryByText('Sprints are turned off for this project.')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(errorCopy)).not.toBeInTheDocument();
     expect(within(dialog).queryByText('No planned sprints are available in this project.')).not.toBeInTheDocument();
     expect(plannedAttempts).toBe(2);
 

@@ -1,0 +1,419 @@
+'use client';
+
+import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert } from '@/components/ui/Alert';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { ApiRequestError } from '@/lib/api';
+import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
+import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
+import { usePermissions } from '@/providers/ProjectPermissionsProvider';
+import { PageAccessState } from '@/components/shared/PageAccessState';
+import { devActivityErrorMessage } from '@/services/dev-activity-errors';
+import {
+  listDevActivityCommits,
+  type DevActivityCommit,
+} from '@/services/dev-integrations';
+
+type CommitFilters = {
+  repositoryId: string;
+  authorLogin: string;
+  from: string;
+  to: string;
+};
+
+const EMPTY_FILTERS: CommitFilters = { repositoryId: '', authorLogin: '', from: '', to: '' };
+
+function localDateToIsoStart(date: string): string {
+  return new Date(`${date}T00:00:00`).toISOString();
+}
+
+function localDateToIsoEnd(date: string): string {
+  return new Date(`${date}T23:59:59.999`).toISOString();
+}
+
+function isoToLocalDateValue(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
+}
+
+function shortSha(sha: string): string {
+  return sha.slice(0, 7);
+}
+
+function firstMessageLine(message: string): string {
+  return message.split(/\r?\n/, 1)[0] ?? '';
+}
+
+function hasFullMessageDisclosure(message: string): boolean {
+  const first = firstMessageLine(message);
+  return message.includes('\n') || message.includes('\r') || first.length > 120;
+}
+
+function commitAuthorLabel(commit: DevActivityCommit): string {
+  const name = commit.authorUser?.name?.trim();
+  if (name) return name;
+  const authorName = commit.authorName?.trim();
+  if (authorName) return authorName;
+  const login = commit.authorLogin?.trim();
+  if (login) return `@${login}`;
+  return 'Unknown author';
+}
+
+function hasActiveCommitFilters(filters: CommitFilters): boolean {
+  return Boolean(filters.repositoryId || filters.authorLogin.trim() || filters.from || filters.to);
+}
+
+function buildCommitsParams(filters: CommitFilters, cursor?: string) {
+  return {
+    cursor,
+    limit: 20,
+    repositoryId: filters.repositoryId || undefined,
+    authorLogin: filters.authorLogin.trim() || undefined,
+    from: filters.from ? localDateToIsoStart(filters.from) : undefined,
+    to: filters.to ? localDateToIsoEnd(filters.to) : undefined,
+  };
+}
+
+function CommitRow({ commit }: { commit: DevActivityCommit }) {
+  const [expanded, setExpanded] = useState(false);
+  const firstLine = firstMessageLine(commit.message);
+  const showDisclosure = hasFullMessageDisclosure(commit.message);
+  const sha7 = shortSha(commit.sha);
+  const messageId = `commit-message-${commit.id}`;
+
+  return (
+    <li className="py-4">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {commit.url ? (
+              <a
+                href={commit.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Commit ${sha7} (opens in new tab)`}
+                className="font-mono text-[var(--color-primary)] underline underline-offset-2"
+              >
+                <code>{sha7}</code>
+              </a>
+            ) : (
+              <code className="font-mono text-[var(--color-text-secondary)]">{sha7}</code>
+            )}
+            <span className="min-w-0 break-words font-medium text-[var(--color-text-primary)]">
+              {firstLine || <span className="text-[var(--color-text-muted)]">No commit message</span>}
+            </span>
+          </div>
+
+          {showDisclosure && (
+            <div className="mt-1">
+              <button
+                type="button"
+                className="text-xs font-medium text-[var(--color-primary)] underline underline-offset-2"
+                aria-expanded={expanded}
+                aria-controls={messageId}
+                onClick={() => setExpanded((v) => !v)}
+              >
+                {expanded ? 'Hide full message' : 'Show full message'}
+              </button>
+              {expanded && (
+                <pre
+                  id={messageId}
+                  className="mt-2 whitespace-pre-wrap break-words rounded-[var(--radius-md)] bg-[var(--color-surface-secondary)] p-3 text-xs text-[var(--color-text-secondary)]"
+                >
+                  {commit.message}
+                </pre>
+              )}
+            </div>
+          )}
+
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            <span>{commit.repositoryFullName}</span>
+            {commit.branch ? <span> · {commit.branch}</span> : null}
+          </p>
+          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+            <span>{commitAuthorLabel(commit)}</span>
+            <span> · </span>
+            <time dateTime={commit.committedAt}>{formatDateTime(commit.committedAt)}</time>
+          </p>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function CommitsPanel({ workspaceId, projectId }: { workspaceId: string; projectId: string }) {
+  const [draftFilters, setDraftFilters] = useState<CommitFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<CommitFilters>(EMPTY_FILTERS);
+  const [dateError, setDateError] = useState<string | null>(null);
+  const [items, setItems] = useState<DevActivityCommit[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [repoOptions, setRepoOptions] = useState<Array<{ id: string; fullName: string }>>([]);
+  const requestRef = useRef(0);
+  const statusRef = useRef<HTMLParagraphElement | null>(null);
+
+  const mergeRepoOptions = useCallback((rows: DevActivityCommit[]) => {
+    setRepoOptions((current) => {
+      const map = new Map(current.map((r) => [r.id, r]));
+      for (const row of rows) {
+        if (!map.has(row.repositoryId)) {
+          map.set(row.repositoryId, { id: row.repositoryId, fullName: row.repositoryFullName });
+        }
+      }
+      return Array.from(map.values()).sort((a, b) => a.fullName.localeCompare(b.fullName));
+    });
+  }, []);
+
+  const loadPage = useCallback(
+    async (filters: CommitFilters, cursor?: string, append = false) => {
+      const reqId = ++requestRef.current;
+      if (append) {
+        setLoadingMore(true);
+        setLoadMoreError(null);
+      } else {
+        setLoading(true);
+        setError(null);
+        setLoadMoreError(null);
+      }
+      try {
+        const page = await listDevActivityCommits(workspaceId, projectId, buildCommitsParams(filters, cursor));
+        if (reqId !== requestRef.current) return;
+        mergeRepoOptions(page.items);
+        setNextCursor(page.nextCursor);
+        setItems((current) => {
+          if (!append) return page.items;
+          const seen = new Set(current.map((i) => i.id));
+          const merged = [...current];
+          for (const item of page.items) {
+            if (!seen.has(item.id)) {
+              seen.add(item.id);
+              merged.push(item);
+            }
+          }
+          return merged;
+        });
+        if (append && !page.nextCursor) {
+          queueMicrotask(() => statusRef.current?.focus());
+        }
+      } catch (cause) {
+        if (reqId !== requestRef.current) return;
+        const message = devActivityErrorMessage(cause, 'commits');
+        if (append) {
+          setLoadMoreError(message);
+        } else {
+          if (cause instanceof ApiRequestError && cause.status === 404) {
+            setDraftFilters((f) => ({ ...f, repositoryId: '' }));
+            setAppliedFilters((f) => ({ ...f, repositoryId: '' }));
+            setError(message);
+            setItems([]);
+            setNextCursor(null);
+          } else {
+            setError(message);
+            setItems([]);
+            setNextCursor(null);
+          }
+        }
+      } finally {
+        if (reqId === requestRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [mergeRepoOptions, projectId, workspaceId],
+  );
+
+  useEffect(() => {
+    void loadPage(EMPTY_FILTERS);
+  }, [loadPage]);
+
+  function applyFilters() {
+    if (draftFilters.from && draftFilters.to && draftFilters.from > draftFilters.to) {
+      setDateError('The start date must be before the end date.');
+      return;
+    }
+    setDateError(null);
+    const next = { ...draftFilters, authorLogin: draftFilters.authorLogin.trim() };
+    setAppliedFilters(next);
+    setItems([]);
+    setNextCursor(null);
+    void loadPage(next);
+  }
+
+  function clearFilters() {
+    setDateError(null);
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    setItems([]);
+    setNextCursor(null);
+    void loadPage(EMPTY_FILTERS);
+  }
+
+  const activeFilters = hasActiveCommitFilters(appliedFilters);
+
+  return (
+    <section aria-labelledby="dev-commits-heading" className="space-y-4">
+      <h2 id="dev-commits-heading" className="text-xl font-semibold">Commits</h2>
+
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+        Showing activity from the default branch of linked repositories you can read. History starts when the repository was connected.
+      </div>
+
+      <Card className="p-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">Repository</span>
+            <select
+              className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm"
+              value={draftFilters.repositoryId}
+              onChange={(e) => setDraftFilters((f) => ({ ...f, repositoryId: e.target.value }))}
+            >
+              <option value="">All repositories</option>
+              {repoOptions.map((repo) => (
+                <option key={repo.id} value={repo.id}>{repo.fullName}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">Author login</span>
+            <input
+              type="text"
+              className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm"
+              placeholder="e.g. octocat"
+              value={draftFilters.authorLogin}
+              onChange={(e) => setDraftFilters((f) => ({ ...f, authorLogin: e.target.value }))}
+            />
+          </label>
+
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">From</span>
+            <input
+              type="date"
+              className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm"
+              value={draftFilters.from}
+              onChange={(e) => setDraftFilters((f) => ({ ...f, from: e.target.value }))}
+            />
+          </label>
+
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">To</span>
+            <input
+              type="date"
+              className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm"
+              value={draftFilters.to}
+              onChange={(e) => setDraftFilters((f) => ({ ...f, to: e.target.value }))}
+            />
+          </label>
+
+          <div className="flex items-end gap-2">
+            <Button type="button" onClick={applyFilters}>Apply filters</Button>
+            {activeFilters && (
+              <Button type="button" variant="secondary" onClick={clearFilters}>Clear filters</Button>
+            )}
+          </div>
+        </div>
+        {dateError && <p className="mt-2 text-sm text-[var(--color-danger)]" role="alert">{dateError}</p>}
+      </Card>
+
+      <p ref={statusRef} tabIndex={-1} className="sr-only" role="status">
+        {!loading && !loadingMore && !nextCursor && items.length > 0 ? 'All commits loaded.' : ''}
+      </p>
+
+      {loading ? (
+        <div className="space-y-3" role="status" aria-label="Loading commits">
+          <p className="sr-only">Loading commits…</p>
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
+        </div>
+      ) : error ? (
+        <div className="space-y-3">
+          <Alert variant="error" title="Could not load commits" role="alert">{error}</Alert>
+          <div className="flex gap-2">
+            <Button type="button" variant="secondary" onClick={() => void loadPage(appliedFilters)}>Retry</Button>
+            <Button type="button" variant="ghost" onClick={clearFilters}>Clear filters</Button>
+          </div>
+        </div>
+      ) : items.length === 0 ? (
+        activeFilters ? (
+          <EmptyState
+            title="No commits match these filters."
+            description="Try changing or clearing filters."
+            action={<Button type="button" variant="secondary" onClick={clearFilters}>Clear filters</Button>}
+          />
+        ) : (
+          <EmptyState title="No commits have been recorded for this project yet." description="Commits will appear when linked repositories have default-branch activity." />
+        )
+      ) : (
+        <Card className="p-4">
+          <ul className="divide-y divide-[var(--color-border)]" aria-label="Commits">
+            {items.map((commit) => <CommitRow key={commit.id} commit={commit} />)}
+          </ul>
+
+          {loadMoreError && (
+            <div className="mt-4 space-y-2">
+              <Alert variant="error" role="alert">{loadMoreError}</Alert>
+              <Button type="button" variant="secondary" onClick={() => void loadPage(appliedFilters, nextCursor ?? undefined, true)}>
+                Try again
+              </Button>
+            </div>
+          )}
+
+          {nextCursor && !loadMoreError && (
+            <div className="mt-4 flex justify-center">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={loadingMore}
+                disabled={loadingMore}
+                onClick={() => void loadPage(appliedFilters, nextCursor, true)}
+              >
+                {loadingMore ? 'Loading more…' : 'Load more'}
+              </Button>
+            </div>
+          )}
+          {loadingMore && <p className="sr-only" role="status">Loading more commits…</p>}
+        </Card>
+      )}
+    </section>
+  );
+}
+
+
+export default function ProjectDevActivityPage() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
+  const { isLoading: permissionsLoading } = usePermissions();
+  useWorkspaceRedirect();
+
+  if (workspaceLoading || permissionsLoading) {
+    return <div role="status" className="text-sm text-[var(--color-text-secondary)]">Loading dev activity…</div>;
+  }
+
+  if (!activeWorkspace) return <PageAccessState status={401} />;
+
+  return (
+    <div className="space-y-8">
+      <h1 className="text-2xl font-semibold">Dev activity</h1>
+      <CommitsPanel workspaceId={activeWorkspace.id} projectId={projectId} />
+    </div>
+  );
+}

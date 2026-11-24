@@ -475,8 +475,9 @@ describe('SprintsPage — list and lifecycle', () => {
     ]);
   });
 
-  it('shows a mapped planned-target load error with Retry and keeps BACKLOG usable', async () => {
+  it('scopes a planned-target load failure under Target sprint and recovers with Try again', async () => {
     const user = userEvent.setup();
+    const errorCopy = 'Planned sprints could not be loaded. Choose Backlog or try again.';
     let plannedAttempts = 0;
     mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {
       if (query?.status === 'PLANNED') {
@@ -496,18 +497,21 @@ describe('SprintsPage — list and lifecycle', () => {
     await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
     const dialog = screen.getByRole('dialog');
 
-    expect(await within(dialog).findByText('Sprints are turned off for this project.')).toBeInTheDocument();
+    expect(await within(dialog).findByText(errorCopy)).toBeInTheDocument();
     expect(within(dialog).queryByText('No planned sprints are available in this project.')).not.toBeInTheDocument();
     expect(within(dialog).queryByText('Stage 2 planned sprints unavailable')).not.toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Complete sprint' })).toBeEnabled();
 
     await user.selectOptions(within(dialog).getByLabelText('Destination for unfinished tasks'), 'NEXT_SPRINT');
+    const targetSelect = within(dialog).getByLabelText('Target sprint');
+    expect(within(dialog).getByText(errorCopy).closest('form')).toBe(targetSelect.closest('form'));
+    expect(targetSelect).toBeDisabled();
     expect(within(dialog).getByRole('button', { name: 'Complete sprint' })).toBeDisabled();
 
-    await user.click(within(dialog).getByRole('button', { name: 'Retry' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Try again' }));
 
     expect(await within(dialog).findByRole('option', { name: 'Retry Target' })).toBeInTheDocument();
-    expect(within(dialog).queryByText('Sprints are turned off for this project.')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(errorCopy)).not.toBeInTheDocument();
     expect(within(dialog).queryByText('No planned sprints are available in this project.')).not.toBeInTheDocument();
     expect(plannedAttempts).toBe(2);
 

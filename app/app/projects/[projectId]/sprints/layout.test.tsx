@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiRequestError } from '@/lib/api';
 import SprintsLayout from './layout';
 import SprintsPage from './page';
 import SprintDetailPage from './[sprintId]/page';
@@ -122,6 +124,42 @@ describe('SprintsLayout — workflow guard', () => {
     expect(screen.getByRole('status', { name: 'Loading sprint workflow' })).toBeInTheDocument();
     expect(screen.queryByText('Sprint Alpha')).not.toBeInTheDocument();
     expect(mocks.listSprints).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on the list route, makes no sprint calls, and retries to SPRINTS', async () => {
+    const user = userEvent.setup();
+    mocks.getProject
+      .mockRejectedValueOnce(new ApiRequestError('Backend 403 message', 403, 'PERMISSION_DENIED'))
+      .mockResolvedValueOnce({ id: 'project-1', workflowMode: 'SPRINTS' });
+    render(<SprintsLayout><SprintsPage /></SprintsLayout>);
+
+    expect(await screen.findByText('Backend 403 message')).toBeInTheDocument();
+    expect(screen.queryByText('Sprint Alpha')).not.toBeInTheDocument();
+    expect(mocks.listSprints).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Sprint Alpha')).toBeInTheDocument();
+    expect(mocks.getProject).toHaveBeenCalledTimes(2);
+    expect(mocks.listSprints).toHaveBeenCalledWith('ws-1', 'project-1');
+  });
+
+  it('fails closed on the detail route, makes no sprint calls, and retries to SPRINTS', async () => {
+    const user = userEvent.setup();
+    mocks.getProject
+      .mockRejectedValueOnce(new Error('network failed'))
+      .mockResolvedValueOnce({ id: 'project-1', workflowMode: 'SPRINTS' });
+    render(<SprintsLayout><SprintDetailPage /></SprintsLayout>);
+
+    expect(await screen.findByText('Sprint workflow could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByText('Implement endpoint')).not.toBeInTheDocument();
+    expect(mocks.getSprintBoard).not.toHaveBeenCalled();
+    expect(mocks.getSprintReportSummary).not.toHaveBeenCalled();
+    expect(mocks.getSprintReportBurndown).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Implement endpoint')).toBeInTheDocument();
+    expect(mocks.getProject).toHaveBeenCalledTimes(2);
+    expect(mocks.getSprintBoard).toHaveBeenCalledWith('ws-1', 'project-1', 'sprint-1');
   });
 
   it('blocks a direct sprints list visit under BACKLOG_ONLY and makes no sprint calls', async () => {

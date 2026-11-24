@@ -15,6 +15,7 @@ import { AccessState } from '@/components/shared/AccessState';
 import { PageAccessState } from '@/components/shared/PageAccessState';
 import { Can } from '@/components/shared/Can';
 import { ApiRequestError } from '@/lib/api';
+import { sprintReportReasonCopy } from '@/lib/sprint-report-reasons';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
@@ -68,7 +69,19 @@ function sprintMembershipLabel(task: TaskSummary, currentSprintId: string): stri
       ? `In another sprint (${task.sprintName}), will be moved`
       : 'In another sprint, will be moved';
   }
-  return task.sprintId ? 'In sprint' : 'In backlog';
+  return 'In backlog';
+}
+
+function assignmentButtonLabel(selectedCount: number, moveCount: number): string {
+  const taskLabel = selectedCount === 1 ? 'task' : 'tasks';
+  if (selectedCount > 0 && moveCount === selectedCount) return `Move ${selectedCount} ${taskLabel}`;
+  const moveSuffix = moveCount > 0 ? ` — ${moveCount} will be moved` : '';
+  return `Add ${selectedCount} ${taskLabel}${moveSuffix}`;
+}
+
+function moveWarningText(moveCount: number): string {
+  const taskLabel = moveCount === 1 ? 'task' : 'tasks';
+  return `Warning: ${moveCount} selected ${taskLabel} will be moved from another sprint.`;
 }
 
 export default function SprintDetailPage() {
@@ -160,7 +173,7 @@ export default function SprintDetailPage() {
   async function handleAssign() {
     if (!activeWorkspace || selectedTaskIds.size === 0) return;
     setBusy(true);
-    setError(null);
+    setAssignError(null);
     try {
       await addTasksToSprint(activeWorkspace.id, projectId, sprintId, {
         taskIds: Array.from(selectedTaskIds),
@@ -170,7 +183,7 @@ export default function SprintDetailPage() {
       setNotice('Tasks added to sprint.');
       await loadAll();
     } catch (cause) {
-      setError(requestError(cause, 'Tasks could not be added to sprint.'));
+      setAssignError(requestError(cause, 'Tasks could not be added to sprint.'));
     } finally {
       setBusy(false);
     }
@@ -202,6 +215,10 @@ export default function SprintDetailPage() {
   const boardColumns = board?.columns ?? [];
   const totalTasks = board?.totals.taskCount ?? 0;
   const doneCount = board?.totals.doneCount ?? 0;
+  const progressNotReconstructable = summary?.scopeReconstructable === false;
+  const burndownNotReconstructable = burndown?.scopeReconstructable === false;
+  const progressReason = sprintReportReasonCopy(summary?.reason);
+  const burndownReason = sprintReportReasonCopy(burndown?.reason);
   const selectedMoveCount = assignTasks.filter(
     (task) => selectedTaskIds.has(task.id) && Boolean(task.sprintId) && task.sprintId !== sprintId,
   ).length;
@@ -256,32 +273,11 @@ export default function SprintDetailPage() {
 
       {/* Progress summary (R12) */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-          <span>Progress</span>
-          {summary && summary.scopeReconstructable === false && (
-            <span className="text-xs font-normal text-[var(--color-text-muted)]">— {summary.reason}</span>
-          )}
-        </h2>
-        {summary && summary.scopeReconstructable === false ? (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-center p-4 border rounded-[var(--radius-md)] bg-[var(--color-surface-secondary)]">
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">Total tasks</p>
-                <p className="text-xl font-mono">—</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">Done (APPROVED)</p>
-                <p className="text-xl font-mono">—</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">Remaining</p>
-                <p className="text-xl font-mono">—</p>
-              </div>
-            </div>
-            <p className="mt-2 text-sm text-[var(--color-text-error)]">
-              Sprint scope cannot be reconstructed: {summary.reason}
-            </p>
-          </>
+        <h2 className="text-sm font-semibold mb-3">Progress</h2>
+        {progressNotReconstructable ? (
+          <Alert variant="info">
+            {progressReason ?? 'This sprint has no recorded scope history.'}
+          </Alert>
         ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-center p-4 border rounded-[var(--radius-md)] bg-[var(--color-surface-secondary)]">
@@ -305,31 +301,29 @@ export default function SprintDetailPage() {
             )}
           </>
         )}
+        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+          Metric: task count (done = APPROVED)
+        </p>
       </Card>
 
       {/* Burndown (R13) */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-          Burndown
-          {burndown && burndown.scopeReconstructable === false && (
-            <span className="text-xs font-normal text-[var(--color-text-muted)]">— {burndown.reason}</span>
-          )}
-        </h2>
-        {burndown && burndown.scopeReconstructable === false ? (
-          <>
-            <div className="p-6 border rounded-[var(--radius-md)] bg-[var(--color-surface-secondary)] text-center">
-              <p className="text-sm text-[var(--color-text-error)]">
-                Burndown unavailable: {burndown.reason}
-              </p>
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                Metric: task count (done = APPROVED). Scope reconstruction requires audit trail data recorded when the sprint was completed.
-              </p>
-            </div>
-          </>
+        <h2 className="text-sm font-semibold mb-3">Burndown</h2>
+        {burndownNotReconstructable ? (
+          <Alert variant="info">
+            {burndownReason ?? 'This sprint has no recorded scope history.'}
+          </Alert>
+        ) : burndown?.series.length === 0 ? (
+          <div className="p-6 border rounded-[var(--radius-md)] bg-[var(--color-surface-secondary)] text-center text-sm text-[var(--color-text-secondary)]">
+            No burndown data yet. This sprint has not started.
+          </div>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
+                <caption className="sr-only">
+                  Burndown by UTC day: Remaining, Ideal, Scope and Completed task counts (done = APPROVED)
+                </caption>
                 <thead>
                   <tr className="border-b border-[var(--color-border)]">
                     <th className="pb-2 text-[var(--color-text-muted)] font-medium">Date</th>
@@ -349,22 +343,22 @@ export default function SprintDetailPage() {
                       <td className="py-2">{point.completed}</td>
                     </tr>
                   ))}
-                  {burndown?.series.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="py-4 text-center text-xs text-[var(--color-text-muted)]">
-                        No burndown data (planned sprint or scope not reconstructable)
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Metric: task count (done = APPROVED). Initial scope: {burndown?.totals?.initialScope ?? 0},{' '}
-              completed: {burndown?.totals?.completed ?? 0}, remaining: {burndown?.totals?.remaining ?? 0}
+            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+              Scroll horizontally to view the full table.
             </p>
+            {burndown?.totals && (
+              <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                Initial scope: {burndown.totals.initialScope}, completed: {burndown.totals.completed}, remaining: {burndown.totals.remaining}
+              </p>
+            )}
           </>
         )}
+        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+          Metric: task count (done = APPROVED)
+        </p>
       </Card>
 
       {/* Board (R11) */}
@@ -471,19 +465,25 @@ export default function SprintDetailPage() {
                 />
               </div>
             </div>
+            {assignError && <Alert variant="error">{assignError}</Alert>}
+            {selectedMoveCount > 0 && (
+              <Alert variant="warning">
+                <span aria-hidden="true" className="mr-2">⚠</span>
+                <span>{moveWarningText(selectedMoveCount)}</span>
+              </Alert>
+            )}
             {assignHasMore && (
               <p className="text-xs text-[var(--color-text-muted)]">
-                Showing the first 100 tasks. Narrow with status or search to find others.
+                Showing a partial list. Narrow with status or search to find others.
               </p>
             )}
-            {assignError && <Alert variant="error">{assignError}</Alert>}
             {assignLoading ? (
               <div className="h-32 flex items-center justify-center">
                 <Skeleton className="h-8 w-32 rounded-lg" />
               </div>
             ) : (
               <div className="max-h-96 overflow-y-auto border rounded-[var(--radius-md)]">
-                {assignTasks.length === 0 ? (
+                {assignError ? null : assignTasks.length === 0 ? (
                   <div className="p-4 text-center text-xs text-[var(--color-text-muted)]">
                     No tasks available here. Try another status or search term.
                   </div>
@@ -498,7 +498,7 @@ export default function SprintDetailPage() {
                               {task.status.replaceAll('_', ' ')}
                             </Badge>
                           </div>
-                          <div className="mt-1 text-sm font-medium truncate">{task.title}</div>
+                          <div className="mt-1 text-sm font-medium line-clamp-2">{task.title}</div>
                           <div className="mt-1 text-xs text-[var(--color-text-muted)]">
                             {sprintMembershipLabel(task, sprintId)}
                           </div>
@@ -530,8 +530,7 @@ export default function SprintDetailPage() {
                 onClick={() => void handleAssign()}
                 disabled={busy || selectedTaskIds.size === 0}
               >
-                Add {selectedTaskIds.size} task{selectedTaskIds.size !== 1 ? 's' : ''}
-                {selectedMoveCount > 0 ? ` — ${selectedMoveCount} will be moved` : ''}
+                {assignmentButtonLabel(selectedTaskIds.size, selectedMoveCount)}
               </Button>
             </div>
           </div>

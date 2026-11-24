@@ -121,7 +121,11 @@ describe('SprintDetailPage — board and reports', () => {
     expect(screen.getByText('IN PROGRESS')).toBeInTheDocument();
     expect(screen.getByText('Total tasks')).toBeInTheDocument();
     expect(screen.getByText('Done (APPROVED)')).toBeInTheDocument();
-    expect(screen.getByText(/Metric: task count \(done = APPROVED\)/)).toBeInTheDocument();
+    expect(screen.getAllByText('Metric: task count (done = APPROVED)')).toHaveLength(2);
+    expect(screen.getByText(
+      'Burndown by UTC day: Remaining, Ideal, Scope and Completed task counts (done = APPROVED)',
+    )).toBeInTheDocument();
+    expect(screen.getByText('Scroll horizontally to view the full table.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove from sprint' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Assign tasks' })).not.toBeInTheDocument();
   });
@@ -169,24 +173,92 @@ describe('SprintDetailPage — board and reports', () => {
 
     await waitFor(() => expect(mocks.addTasksToSprint).toHaveBeenCalledWith('ws-1', 'project-1', 'sprint-1', { taskIds: ['task-3'] }));
     expect(JSON.stringify(mocks.addTasksToSprint.mock.calls)).not.toContain('sprintPosition');
+    expect(within(dialog).queryByText('In sprint')).not.toBeInTheDocument();
   });
 
-  it('shows the reason and an empty state when scope is not reconstructable', async () => {
+  it('shows load errors inside the assign dialog', async () => {
+    const user = userEvent.setup();
+    mocks.listTasks.mockRejectedValueOnce(new ApiRequestError('Backend load message', 403, 'PERMISSION_DENIED'));
+    render(<SprintDetailPage />);
+    await user.click(await screen.findByRole('button', { name: 'Assign tasks' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(await within(dialog).findByText('Backend load message')).toBeInTheDocument();
+    expect(within(dialog).queryByText('No tasks available here. Try another status or search term.')).not.toBeInTheDocument();
+  });
+
+  it('clamps long candidate titles to two lines', async () => {
+    const user = userEvent.setup();
+    const title = 'A deliberately long task title that should wrap over more than one line when the picker is narrow';
+    mocks.listTasks.mockResolvedValue({
+      items: [{ id: 'task-long', key: 'NX-L', title, status: 'ASSIGNED', sprintId: null }],
+      nextCursor: null,
+    });
+    render(<SprintDetailPage />);
+    await user.click(await screen.findByRole('button', { name: 'Assign tasks' }));
+    const dialog = screen.getByRole('dialog');
+
+    const titleNode = await within(dialog).findByText(title);
+    expect(titleNode).toHaveClass('line-clamp-2');
+    expect(titleNode).not.toHaveClass('truncate');
+  });
+
+  it('shows a neutral mapped reason once per card when scope is not reconstructable', async () => {
+    const reason = 'This sprint was created before scope history was recorded.';
     mocks.getSprintReportSummary.mockResolvedValue({
-      sprint, scopeReconstructable: false, reason: 'Sprint predates audit trail', summary: null,
+      sprint,
+      scopeReconstructable: false,
+      reason: 'SPRINT_CREATED_BEFORE_AUDIT_TRAIL_EPOCH',
+      summary: null,
       generatedAt: '2026-11-10T00:00:00.000Z',
     });
     mocks.getSprintReportBurndown.mockResolvedValue({
-      sprint, scopeReconstructable: false, reason: 'Sprint predates audit trail', series: [],
+      sprint,
+      scopeReconstructable: false,
+      reason: 'SPRINT_CREATED_BEFORE_AUDIT_TRAIL_EPOCH',
+      series: [],
       generatedAt: '2026-11-10T00:00:00.000Z',
     });
 
     render(<SprintDetailPage />);
-    expect(await screen.findByText(/Sprint scope cannot be reconstructed: Sprint predates audit trail/)).toBeInTheDocument();
-    expect(screen.getByText(/Burndown unavailable: Sprint predates audit trail/)).toBeInTheDocument();
+    const progressCard = (await screen.findByRole('heading', { name: 'Progress' })).parentElement as HTMLElement;
+    const burndownCard = (await screen.findByRole('heading', { name: 'Burndown' })).parentElement as HTMLElement;
+
+    expect(await within(progressCard).findByText(reason)).toBeInTheDocument();
+    expect(within(progressCard).getAllByText(reason)).toHaveLength(1);
+    expect(within(burndownCard).getAllByText(reason)).toHaveLength(1);
+    expect(screen.queryByText('SPRINT_CREATED_BEFORE_AUDIT_TRAIL_EPOCH')).not.toBeInTheDocument();
+    expect(within(progressCard).getAllByText('Metric: task count (done = APPROVED)')).toHaveLength(1);
+    expect(within(burndownCard).getAllByText('Metric: task count (done = APPROVED)')).toHaveLength(1);
+
+    const alert = within(progressCard).getByText(reason).closest('[role="alert"]');
+    expect(alert?.className).toContain('--color-info');
+    expect(alert?.className).not.toContain('--color-error');
+
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByText('Completion rate:')).not.toBeInTheDocument();
-    expect(screen.queryByText('Initial scope: 0')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Initial scope:/)).not.toBeInTheDocument();
+    expect(within(progressCard).queryByText('—')).not.toBeInTheDocument();
+    expect(within(progressCard).queryByText('0')).not.toBeInTheDocument();
+    expect(within(burndownCard).queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('shows the not-started copy for a reconstructable sprint with no burndown series', async () => {
+    mocks.getSprintReportBurndown.mockResolvedValue({
+      sprint,
+      scopeReconstructable: true,
+      metric: 'TASK_COUNT',
+      startAt: '2026-11-01T00:00:00.000Z',
+      endAt: '2026-11-14T00:00:00.000Z',
+      series: [],
+      totals: { initialScope: 0, completed: 0, remaining: 0 },
+      generatedAt: '2026-11-10T00:00:00.000Z',
+    });
+
+    render(<SprintDetailPage />);
+    expect(await screen.findByText('No burndown data yet. This sprint has not started.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Metric: task count (done = APPROVED)')).toHaveLength(2);
   });
 
   it.each([
@@ -211,7 +283,7 @@ describe('SprintDetailPage — board and reports', () => {
     expect(await screen.findByText(message)).toBeInTheDocument();
   });
 
-  it.each(BACKEND_ERRORS)('shows the backend message on %i when assigning', async (status, code, message) => {
+  it.each(BACKEND_ERRORS)('shows the backend message inside the dialog on %i when assigning', async (status, code, message) => {
     const user = userEvent.setup();
     mocks.addTasksToSprint.mockRejectedValueOnce(new ApiRequestError(message, status, code));
     render(<SprintDetailPage />);
@@ -221,7 +293,8 @@ describe('SprintDetailPage — board and reports', () => {
     await user.click(within(dialog).getByRole('checkbox'));
     await user.click(within(dialog).getByRole('button', { name: /Add 1 task/ }));
 
-    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(await within(dialog).findByText(message)).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
   });
 
   it('shows the first-page hint when the response has a next-page cursor', async () => {
@@ -235,7 +308,7 @@ describe('SprintDetailPage — board and reports', () => {
     const dialog = screen.getByRole('dialog');
 
     expect(await within(dialog).findByText(
-      'Showing the first 100 tasks. Narrow with status or search to find others.',
+      'Showing a partial list. Narrow with status or search to find others.',
     )).toBeInTheDocument();
   });
 
@@ -256,8 +329,18 @@ describe('SprintDetailPage — board and reports', () => {
     const dialog = screen.getByRole('dialog');
 
     expect(await within(dialog).findByText(
-      'Showing the first 100 tasks. Narrow with status or search to find others.',
+      'Showing a partial list. Narrow with status or search to find others.',
     )).toBeInTheDocument();
+  });
+
+  it('does not show the partial-list hint without a cursor or 100 items', async () => {
+    const user = userEvent.setup();
+    render(<SprintDetailPage />);
+    await user.click(await screen.findByRole('button', { name: 'Assign tasks' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(await within(dialog).findByText('Backlog candidate')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Showing a partial list/)).not.toBeInTheDocument();
   });
 
   it('shows an actionable empty state when no candidates remain', async () => {
@@ -276,7 +359,7 @@ describe('SprintDetailPage — board and reports', () => {
     expect(within(dialog).queryByText('No tasks available to assign.')).not.toBeInTheDocument();
   });
 
-  it('labels another-sprint tasks and states how many will be moved', async () => {
+  it('labels another-sprint tasks and shows a Move label with an explicit warning when all selections move', async () => {
     const user = userEvent.setup();
     mocks.listTasks.mockResolvedValue({
       items: [
@@ -293,11 +376,33 @@ describe('SprintDetailPage — board and reports', () => {
     expect(within(dialog).getByText('In another sprint, will be moved')).toBeInTheDocument();
 
     await user.click(within(dialog).getAllByRole('checkbox')[0]);
-    expect(within(dialog).getByRole('button', { name: 'Add 1 task — 1 will be moved' })).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: 'Add 1 task — 1 will be moved' }));
+    expect(within(dialog).getByText('⚠')).toBeInTheDocument();
+    expect(within(dialog).getByText('Warning: 1 selected task will be moved from another sprint.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Move 1 task' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Move 1 task' }));
 
     await waitFor(() => expect(mocks.addTasksToSprint).toHaveBeenCalledWith(
       'ws-1', 'project-1', 'sprint-1', { taskIds: ['task-9'] },
     ));
+  });
+
+  it('keeps the Add label with a move count when only some selections move', async () => {
+    const user = userEvent.setup();
+    mocks.listTasks.mockResolvedValue({
+      items: [
+        { id: 'task-9', key: 'NX-9', title: 'Named sprint task', status: 'ASSIGNED', sprintId: 'sprint-2', sprintName: 'Sprint Beta' },
+        { id: 'task-11', key: 'NX-11', title: 'Backlog candidate', status: 'ASSIGNED', sprintId: null },
+      ],
+      nextCursor: null,
+    });
+    render(<SprintDetailPage />);
+    await user.click(await screen.findByRole('button', { name: 'Assign tasks' }));
+    const dialog = screen.getByRole('dialog');
+
+    await user.click(within(dialog).getAllByRole('checkbox')[0]);
+    await user.click(within(dialog).getAllByRole('checkbox')[1]);
+
+    expect(within(dialog).getByText('Warning: 1 selected task will be moved from another sprint.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Add 2 tasks — 1 will be moved' })).toBeInTheDocument();
   });
 });

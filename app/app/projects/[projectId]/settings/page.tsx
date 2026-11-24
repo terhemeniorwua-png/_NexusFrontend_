@@ -114,6 +114,13 @@ function workflowRequestError(cause: unknown, fallback: string): string {
   return requestError(cause, fallback);
 }
 
+function workflowConfirmDescription(openTaskCount: number | null): string {
+  const completionSentence = 'Confirming will complete it and move its unfinished tasks to the backlog.';
+  if (typeof openTaskCount !== 'number' || openTaskCount <= 0) return completionSentence;
+  const taskLabel = openTaskCount === 1 ? 'task' : 'tasks';
+  return `This project has an active sprint with ${openTaskCount} unfinished ${taskLabel}. ${completionSentence}`;
+}
+
 export default function ProjectSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { activeWorkspace } = useWorkspaceContext();
@@ -143,8 +150,7 @@ export default function ProjectSettingsPage() {
   const [workflowMode, setWorkflowMode] = useState<'SPRINTS' | 'BACKLOG_ONLY'>('SPRINTS');
   const [pendingWorkflowMode, setPendingWorkflowMode] = useState<'SPRINTS' | 'BACKLOG_ONLY'>('SPRINTS');
   const [workflowConfirmOpen, setWorkflowConfirmOpen] = useState(false);
-  const [workflowOpenTaskCount, setWorkflowOpenTaskCount] = useState(0);
-  const [workflowBackendMessage, setWorkflowBackendMessage] = useState<string | null>(null);
+  const [workflowOpenTaskCount, setWorkflowOpenTaskCount] = useState<number | null>(null);
 
   // Visibility change confirmation
   const [pendingVisibility, setPendingVisibility] = useState<ProjectVisibility | null>(null);
@@ -411,14 +417,21 @@ export default function ProjectSettingsPage() {
     } catch (cause) {
       if (cause instanceof ApiRequestError && cause.status === 409 && cause.code === 'ACTIVE_SPRINT_EXISTS') {
         const details = cause.details as { sprintId?: string; openTaskCount?: number } | undefined;
-        setWorkflowOpenTaskCount(details?.openTaskCount ?? 0);
-        setWorkflowBackendMessage(cause.message);
+        setWorkflowOpenTaskCount(typeof details?.openTaskCount === 'number' ? details.openTaskCount : null);
+        setError(null);
         setWorkflowConfirmOpen(true);
       } else {
         setPendingWorkflowMode(workflowMode);
         setError(workflowRequestError(cause, 'Workflow mode could not be changed.'));
       }
     }
+  }
+
+  function cancelWorkflowModeChange() {
+    setError(null);
+    setWorkflowOpenTaskCount(null);
+    setWorkflowConfirmOpen(false);
+    setPendingWorkflowMode(workflowMode);
   }
 
   async function confirmWorkflowModeChange() {
@@ -436,6 +449,7 @@ export default function ProjectSettingsPage() {
       setError(workflowRequestError(cause, 'Workflow mode could not be changed.'));
     } finally {
       setWorkflowConfirmOpen(false);
+      setWorkflowOpenTaskCount(null);
       setPendingWorkflowMode(workflowMode);
       setBusy(false);
     }
@@ -649,7 +663,7 @@ export default function ProjectSettingsPage() {
                 ]}
                 helperText={
                   workflowMode === 'SPRINTS'
-                    ? 'Sprints are enabled for this project. Switching to backlog only with an active sprint requires completing that sprint first.'
+                    ? 'Switching to backlog only completes the active sprint and moves its unfinished tasks to the backlog.'
                     : 'Sprints are disabled. All tasks live in the backlog. Switching to sprints does not start any sprint.'
                 }
                 disabled={busy}
@@ -1050,14 +1064,10 @@ export default function ProjectSettingsPage() {
       {/* Workflow mode change confirmation (409 active sprint exists) */}
       <ConfirmDialog
         open={workflowConfirmOpen}
-        onClose={() => setWorkflowConfirmOpen(false)}
+        onClose={cancelWorkflowModeChange}
         onConfirm={() => void confirmWorkflowModeChange()}
         title="Confirm workflow mode change?"
-        description={
-          `${pendingWorkflowMode === 'BACKLOG_ONLY'
-            ? `This project has an active sprint with ${workflowOpenTaskCount} unfinished task${workflowOpenTaskCount !== 1 ? 's' : ''}. Confirming will complete the active sprint and move its unfinished tasks to the backlog.`
-            : `Switching to ${pendingWorkflowMode === 'SPRINTS' ? 'sprints' : 'backlog only'} mode.`}${workflowBackendMessage ? ` ${workflowBackendMessage}` : ''}`
-        }
+        description={workflowConfirmDescription(workflowOpenTaskCount)}
         confirmLabel="Confirm"
         loading={busy}
       />

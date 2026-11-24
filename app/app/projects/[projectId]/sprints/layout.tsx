@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiRequestError } from '@/lib/api';
+import { sprintErrorMessage } from '@/services/sprint-errors';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { getProject } from '@/services/projects';
 
@@ -15,7 +16,7 @@ type SprintWorkflowMode = 'SPRINTS' | 'BACKLOG_ONLY';
 
 function workflowLoadError(cause: unknown): string {
   if (cause instanceof ApiRequestError && [403, 404, 409].includes(cause.status)) {
-    return cause.message;
+    return sprintErrorMessage(cause, 'Sprint workflow could not be loaded.');
   }
   return 'Sprint workflow could not be loaded.';
 }

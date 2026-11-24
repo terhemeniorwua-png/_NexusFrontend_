@@ -12,7 +12,7 @@ import { ApiRequestError } from '@/lib/api';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import { usePermissions } from '@/providers/ProjectPermissionsProvider';
-import { PageAccessState } from '@/components/shared/PageAccessState';
+import { AccessState } from '@/components/shared/AccessState';
 import { devActivityErrorMessage } from '@/services/dev-activity-errors';
 import {
   listDevActivityCommits,
@@ -247,7 +247,7 @@ function CommitsPanel({ workspaceId, projectId }: { workspaceId: string; project
   );
 
   useEffect(() => {
-    void loadPage(EMPTY_FILTERS);
+    void Promise.resolve().then(() => loadPage(EMPTY_FILTERS));
   }, [loadPage]);
 
   function applyFilters() {
@@ -349,7 +349,7 @@ function CommitsPanel({ workspaceId, projectId }: { workspaceId: string; project
         </div>
       ) : error ? (
         <div className="space-y-3">
-          <Alert variant="error" title="Could not load commits" role="alert">{error}</Alert>
+          <Alert variant="error" title="Could not load commits">{error}</Alert>
           <div className="flex gap-2">
             <Button type="button" variant="secondary" onClick={() => void loadPage(appliedFilters)}>Retry</Button>
             <Button type="button" variant="ghost" onClick={clearFilters}>Clear filters</Button>
@@ -373,7 +373,7 @@ function CommitsPanel({ workspaceId, projectId }: { workspaceId: string; project
 
           {loadMoreError && (
             <div className="mt-4 space-y-2">
-              <Alert variant="error" role="alert">{loadMoreError}</Alert>
+              <Alert variant="error">{loadMoreError}</Alert>
               <Button type="button" variant="secondary" onClick={() => void loadPage(appliedFilters, nextCursor ?? undefined, true)}>
                 Try again
               </Button>
@@ -480,7 +480,7 @@ function DeveloperReportPanel({ workspaceId, projectId }: { workspaceId: string;
   }, [projectId, workspaceId]);
 
   useEffect(() => {
-    void load(defaults);
+    void Promise.resolve().then(() => load(defaults));
   }, [defaults, load]);
 
   function applyRange() {
@@ -525,7 +525,7 @@ function DeveloperReportPanel({ workspaceId, projectId }: { workspaceId: string;
     return (
       <section aria-labelledby="dev-developers-heading" className="space-y-4">
         <h2 id="dev-developers-heading" className="text-xl font-semibold">Developer activity</h2>
-        <Alert variant="error" role="alert">You do not have access to this report.</Alert>
+        <Alert variant="error">You do not have access to this report.</Alert>
       </section>
     );
   }
@@ -591,7 +591,7 @@ function DeveloperReportPanel({ workspaceId, projectId }: { workspaceId: string;
         </div>
       ) : error ? (
         <div className="space-y-3">
-          <Alert variant="error" role="alert">{error}</Alert>
+          <Alert variant="error">{error}</Alert>
           <Button type="button" variant="secondary" onClick={() => void load(applied)}>Retry</Button>
         </div>
       ) : sortedDevelopers.length === 0 ? (
@@ -701,7 +701,7 @@ export default function ProjectDevActivityPage() {
     return <div role="status" className="text-sm text-[var(--color-text-secondary)]">Loading dev activity…</div>;
   }
 
-  if (!activeWorkspace) return <PageAccessState status={401} />;
+  if (!activeWorkspace) return <AccessState status={401} />;
 
   const canViewDevelopers = can('project.update');
 

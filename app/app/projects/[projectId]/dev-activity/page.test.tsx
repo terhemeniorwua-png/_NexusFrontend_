@@ -1,12 +1,12 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiRequestError } from '@/lib/api';
 import ProjectDevActivityPage from './page';
 
 const mocks = vi.hoisted(() => ({
-  activeWorkspace: { id: 'ws-1', name: 'WS', type: 'COMPANY', role: 'OWNER', organizationRole: null } as any,
-  permissionState: null as any,
+  activeWorkspace: { id: 'ws-1', name: 'WS', type: 'COMPANY', role: 'OWNER', organizationRole: null } as null | { id: string; name: string; type: string; role: string; organizationRole: null },
+  permissionState: null as unknown,
   listDevActivityCommits: vi.fn(),
   listDevActivityDevelopers: vi.fn(),
 }));
@@ -42,7 +42,7 @@ vi.mock('@/services/dev-integrations', async () => {
   };
 });
 
-const commit = (overrides: Partial<any> = {}) => ({
+const commit = (overrides: Record<string, unknown> = {}) => ({
   id: 'c1',
   repositoryId: 'repo-1',
   repositoryFullName: 'acme/api',
@@ -57,7 +57,7 @@ const commit = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
-const devReport = (overrides: Partial<any> = {}) => ({
+const devReport = (overrides: Record<string, unknown> = {}) => ({
   range: { from: '2026-10-25T00:00:00.000Z', to: '2026-11-24T23:59:59.999Z' },
   coverageStartedAt: '2026-10-01T00:00:00.000Z',
   developers: [
@@ -132,7 +132,7 @@ describe('ProjectDevActivityPage', () => {
 
   it('filters reset cursor, ignore stale responses, and load more dedupes', async () => {
     const user = userEvent.setup();
-    let resolveFirst: any;
+    let resolveFirst: (value: { items: unknown[]; nextCursor: string | null }) => void;
     mocks.listDevActivityCommits
       .mockImplementationOnce(() => new Promise((r) => { resolveFirst = r; }))
       .mockResolvedValueOnce({ items: [commit({ id: 'c2', repositoryId: 'repo-2', repositoryFullName: 'acme/web' })], nextCursor: null });

@@ -121,7 +121,11 @@ describe('SprintDetailPage — board and reports', () => {
     expect(screen.getByText('IN PROGRESS')).toBeInTheDocument();
     expect(screen.getByText('Total tasks')).toBeInTheDocument();
     expect(screen.getByText('Done (APPROVED)')).toBeInTheDocument();
-    expect(screen.getByText(/Metric: task count \(done = APPROVED\)/)).toBeInTheDocument();
+    expect(screen.getAllByText('Metric: task count (done = APPROVED)')).toHaveLength(2);
+    expect(screen.getByText(
+      'Burndown by UTC day: Remaining, Ideal, Scope and Completed task counts (done = APPROVED)',
+    )).toBeInTheDocument();
+    expect(screen.getByText('Scroll horizontally to view the full table.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove from sprint' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Assign tasks' })).not.toBeInTheDocument();
   });
@@ -199,22 +203,62 @@ describe('SprintDetailPage — board and reports', () => {
     expect(titleNode).not.toHaveClass('truncate');
   });
 
-  it('shows the reason and an empty state when scope is not reconstructable', async () => {
+  it('shows a neutral mapped reason once per card when scope is not reconstructable', async () => {
+    const reason = 'This sprint was created before scope history was recorded.';
     mocks.getSprintReportSummary.mockResolvedValue({
-      sprint, scopeReconstructable: false, reason: 'Sprint predates audit trail', summary: null,
+      sprint,
+      scopeReconstructable: false,
+      reason: 'SPRINT_CREATED_BEFORE_AUDIT_TRAIL_EPOCH',
+      summary: null,
       generatedAt: '2026-11-10T00:00:00.000Z',
     });
     mocks.getSprintReportBurndown.mockResolvedValue({
-      sprint, scopeReconstructable: false, reason: 'Sprint predates audit trail', series: [],
+      sprint,
+      scopeReconstructable: false,
+      reason: 'SPRINT_CREATED_BEFORE_AUDIT_TRAIL_EPOCH',
+      series: [],
       generatedAt: '2026-11-10T00:00:00.000Z',
     });
 
     render(<SprintDetailPage />);
-    expect(await screen.findByText(/Sprint scope cannot be reconstructed: Sprint predates audit trail/)).toBeInTheDocument();
-    expect(screen.getByText(/Burndown unavailable: Sprint predates audit trail/)).toBeInTheDocument();
+    const progressCard = (await screen.findByRole('heading', { name: 'Progress' })).parentElement as HTMLElement;
+    const burndownCard = (await screen.findByRole('heading', { name: 'Burndown' })).parentElement as HTMLElement;
+
+    expect(await within(progressCard).findByText(reason)).toBeInTheDocument();
+    expect(within(progressCard).getAllByText(reason)).toHaveLength(1);
+    expect(within(burndownCard).getAllByText(reason)).toHaveLength(1);
+    expect(screen.queryByText('SPRINT_CREATED_BEFORE_AUDIT_TRAIL_EPOCH')).not.toBeInTheDocument();
+    expect(within(progressCard).getAllByText('Metric: task count (done = APPROVED)')).toHaveLength(1);
+    expect(within(burndownCard).getAllByText('Metric: task count (done = APPROVED)')).toHaveLength(1);
+
+    const alert = within(progressCard).getByText(reason).closest('[role="alert"]');
+    expect(alert?.className).toContain('--color-info');
+    expect(alert?.className).not.toContain('--color-error');
+
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByText('Completion rate:')).not.toBeInTheDocument();
-    expect(screen.queryByText('Initial scope: 0')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Initial scope:/)).not.toBeInTheDocument();
+    expect(within(progressCard).queryByText('—')).not.toBeInTheDocument();
+    expect(within(progressCard).queryByText('0')).not.toBeInTheDocument();
+    expect(within(burndownCard).queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('shows the not-started copy for a reconstructable sprint with no burndown series', async () => {
+    mocks.getSprintReportBurndown.mockResolvedValue({
+      sprint,
+      scopeReconstructable: true,
+      metric: 'TASK_COUNT',
+      startAt: '2026-11-01T00:00:00.000Z',
+      endAt: '2026-11-14T00:00:00.000Z',
+      series: [],
+      totals: { initialScope: 0, completed: 0, remaining: 0 },
+      generatedAt: '2026-11-10T00:00:00.000Z',
+    });
+
+    render(<SprintDetailPage />);
+    expect(await screen.findByText('No burndown data yet. This sprint has not started.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Metric: task count (done = APPROVED)')).toHaveLength(2);
   });
 
   it.each([

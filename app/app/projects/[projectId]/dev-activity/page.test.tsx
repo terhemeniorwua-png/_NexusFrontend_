@@ -132,7 +132,7 @@ describe('ProjectDevActivityPage', () => {
 
   it('filters reset cursor, ignore stale responses, and load more dedupes', async () => {
     const user = userEvent.setup();
-    let resolveFirst: (value: { items: unknown[]; nextCursor: string | null }) => void;
+    let resolveFirst!: (value: { items: unknown[]; nextCursor: string | null }) => void;
     mocks.listDevActivityCommits
       .mockImplementationOnce(() => new Promise((r) => { resolveFirst = r; }))
       .mockResolvedValueOnce({ items: [commit({ id: 'c2', repositoryId: 'repo-2', repositoryFullName: 'acme/web' })], nextCursor: null });

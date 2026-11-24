@@ -59,6 +59,7 @@ function ProjectLayoutContent({
     { href: `/app/projects/${encodeURIComponent(projectId)}/reviews`, label: 'Reviews', visible: can('project.view') },
     { href: `/app/projects/${encodeURIComponent(projectId)}/milestones`, label: 'Milestones', visible: can('project.view') },
     { href: `/app/projects/${encodeURIComponent(projectId)}/code`, label: 'Code', visible: can('project.view') },
+    { href: `/app/projects/${encodeURIComponent(projectId)}/dev-activity`, label: 'Dev activity', visible: can('project.view') },
     { href: `/app/projects/${encodeURIComponent(projectId)}/activity`, label: 'Activity', visible: can('project.view') },
     { href: `/app/projects/${encodeURIComponent(projectId)}/reports`, label: 'Reports', visible: can('project.report.view') },
     { href: `/app/projects/${encodeURIComponent(projectId)}/settings`, label: 'Settings', visible: can('project.settings.manage') },

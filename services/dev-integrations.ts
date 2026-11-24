@@ -392,3 +392,122 @@ export async function removeRepositoryMemberOverride(
     { method: 'DELETE' },
   );
 }
+
+// ─── Dev activity (stored GitHub mirrors, read-only) ─────────────────────────
+
+export interface DevActivityCommitAuthorUser {
+  id: string;
+  name: string | null;
+}
+
+export interface DevActivityCommit {
+  id: string;
+  repositoryId: string;
+  repositoryFullName: string;
+  sha: string;
+  message: string;
+  authorName: string | null;
+  authorLogin: string | null;
+  authorUser: DevActivityCommitAuthorUser | null;
+  committedAt: string;
+  url: string | null;
+  branch: string | null;
+}
+
+export interface DevActivityCommitsPage {
+  items: DevActivityCommit[];
+  nextCursor: string | null;
+}
+
+export interface DevActivityCommitsParams {
+  cursor?: string;
+  limit?: number;
+  repositoryId?: string;
+  authorLogin?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface DevActivityDeveloperUser {
+  id: string;
+  name: string | null;
+}
+
+export type DevActivityDeveloperType = 'workspace_user' | 'unmapped';
+
+export interface DevActivityDeveloper {
+  type: DevActivityDeveloperType;
+  user: DevActivityDeveloperUser | null;
+  providerLogin: string | null;
+  displayName: string;
+  commits: number;
+  pullRequestsOpened: number;
+  pullRequestsMerged: number;
+  reviewsGiven: number;
+}
+
+export interface DevActivityDevelopersReport {
+  range: { from: string; to: string };
+  coverageStartedAt: string | null;
+  developers: DevActivityDeveloper[];
+}
+
+export interface DevActivityDevelopersParams {
+  from: string;
+  to: string;
+  repositoryId?: string;
+}
+
+function appendDevActivityParam(query: URLSearchParams, key: string, value: string | number | undefined): void {
+  if (value === undefined) return;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    query.set(key, trimmed);
+    return;
+  }
+  query.set(key, String(value));
+}
+
+export function buildDevActivityCommitsQuery(params: DevActivityCommitsParams = {}): string {
+  const query = new URLSearchParams();
+  appendDevActivityParam(query, 'cursor', params.cursor);
+  if (params.limit !== undefined) query.set('limit', String(params.limit));
+  appendDevActivityParam(query, 'repositoryId', params.repositoryId);
+  appendDevActivityParam(query, 'authorLogin', params.authorLogin);
+  appendDevActivityParam(query, 'from', params.from);
+  appendDevActivityParam(query, 'to', params.to);
+  const qs = query.toString();
+  return qs ? `?${qs}` : '';
+}
+
+export function buildDevActivityDevelopersQuery(params: DevActivityDevelopersParams): string {
+  const query = new URLSearchParams();
+  appendDevActivityParam(query, 'from', params.from);
+  appendDevActivityParam(query, 'to', params.to);
+  appendDevActivityParam(query, 'repositoryId', params.repositoryId);
+  const qs = query.toString();
+  return qs ? `?${qs}` : '';
+}
+
+export async function listDevActivityCommits(
+  workspaceId: string,
+  projectId: string,
+  params: DevActivityCommitsParams = {},
+): Promise<DevActivityCommitsPage> {
+  const qs = buildDevActivityCommitsQuery(params);
+  return authed<DevActivityCommitsPage>(
+    `/workspaces/${workspaceId}/projects/${projectId}/dev-activity/commits${qs}`,
+  );
+}
+
+export async function listDevActivityDevelopers(
+  workspaceId: string,
+  projectId: string,
+  params: DevActivityDevelopersParams,
+): Promise<DevActivityDevelopersReport> {
+  const qs = buildDevActivityDevelopersQuery(params);
+  return authed<DevActivityDevelopersReport>(
+    `/workspaces/${workspaceId}/projects/${projectId}/dev-activity/developers${qs}`,
+  );
+}

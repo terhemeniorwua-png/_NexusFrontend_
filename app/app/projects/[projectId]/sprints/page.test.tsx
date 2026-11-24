@@ -475,6 +475,46 @@ describe('SprintsPage — list and lifecycle', () => {
     ]);
   });
 
+  it('shows a mapped planned-target load error with Retry and keeps BACKLOG usable', async () => {
+    const user = userEvent.setup();
+    let plannedAttempts = 0;
+    mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {
+      if (query?.status === 'PLANNED') {
+        plannedAttempts += 1;
+        if (plannedAttempts === 1) {
+          throw new ApiRequestError(
+            'Stage 2 planned sprints unavailable',
+            409,
+            'SPRINTS_DISABLED_FOR_PROJECT',
+          );
+        }
+        return { items: [sprint({ id: 'retry-target', name: 'Retry Target' })], nextCursor: null };
+      }
+      return { items: [sprint({ status: 'ACTIVE' })], nextCursor: null };
+    });
+    render(<SprintsPage />);
+    await user.click(await screen.findByRole('button', { name: 'Complete sprint' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(await within(dialog).findByText('Sprints are turned off for this project.')).toBeInTheDocument();
+    expect(within(dialog).queryByText('No planned sprints are available in this project.')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('Stage 2 planned sprints unavailable')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Complete sprint' })).toBeEnabled();
+
+    await user.selectOptions(within(dialog).getByLabelText('Destination for unfinished tasks'), 'NEXT_SPRINT');
+    expect(within(dialog).getByRole('button', { name: 'Complete sprint' })).toBeDisabled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Retry' }));
+
+    expect(await within(dialog).findByRole('option', { name: 'Retry Target' })).toBeInTheDocument();
+    expect(within(dialog).queryByText('Sprints are turned off for this project.')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('No planned sprints are available in this project.')).not.toBeInTheDocument();
+    expect(plannedAttempts).toBe(2);
+
+    await user.selectOptions(within(dialog).getByLabelText('Target sprint'), 'retry-target');
+    expect(within(dialog).getByRole('button', { name: 'Complete sprint' })).toBeEnabled();
+  });
+
   it('allows BACKLOG but blocks NEXT_SPRINT when there are no planned targets', async () => {
     const user = userEvent.setup();
     mocks.listSprints.mockImplementation(async (_workspaceId, _projectId, query) => {

@@ -103,6 +103,7 @@ export default function SprintsPage() {
   const [completeError, setCompleteError] = useState<string | null>(null);
   const [plannedTargets, setPlannedTargets] = useState<Sprint[]>([]);
   const [plannedTargetsLoading, setPlannedTargetsLoading] = useState(false);
+  const [plannedTargetsError, setPlannedTargetsError] = useState<string | null>(null);
   const [completeResult, setCompleteResult] = useState<CompleteResultView | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -161,6 +162,7 @@ export default function SprintsPage() {
     if (!activeWorkspace) return;
     setPlannedTargetsLoading(true);
     setCompleteError(null);
+    setPlannedTargetsError(null);
     try {
       const all: Sprint[] = [];
       const seenCursors = new Set<string>();
@@ -178,7 +180,8 @@ export default function SprintsPage() {
       setPlannedTargets(all.filter((sprint) => sprint.id !== excludeSprintId));
     } catch (cause) {
       setPlannedTargets([]);
-      setCompleteError(sprintErrorMessage(cause, 'Planned sprints could not be loaded.'));
+      setCompleteNextSprintId('');
+      setPlannedTargetsError(sprintErrorMessage(cause, 'Planned sprints could not be loaded.'));
     } finally {
       setPlannedTargetsLoading(false);
     }
@@ -320,7 +323,7 @@ export default function SprintsPage() {
   const sortedSprints = [...sprints].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
   const currentSprints = sortedSprints.filter((s) => s.status === 'PLANNED' || s.status === 'ACTIVE');
   const historySprints = sortedSprints.filter((s) => s.status === 'COMPLETED' || s.status === 'ARCHIVED');
-  const noPlannedTargets = plannedTargets.length === 0;
+  const noPlannedTargets = plannedTargets.length === 0 && !plannedTargetsError;
 
   const sprintCard = (sprint: Sprint) => (
     <Card key={sprint.id} className="p-4">
@@ -641,6 +644,19 @@ export default function SprintsPage() {
               <p className="text-sm text-[var(--color-text-secondary)]">
                 Choose what happens to unfinished tasks (status not APPROVED).
               </p>
+              {plannedTargetsError && (
+                <div className="space-y-2">
+                  <Alert variant="error">{plannedTargetsError}</Alert>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void loadPlannedTargets(completeSprintId)}
+                    disabled={plannedTargetsLoading || busy}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              )}
               {completeError && <Alert variant="error">{completeError}</Alert>}
               <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleConfirmComplete(); }}>
                 <Select
@@ -664,7 +680,7 @@ export default function SprintsPage() {
                       .map((sprint) => ({ value: sprint.id, label: sprint.name }))
                     }
                     placeholder={plannedTargetsLoading ? 'Loading planned sprints…' : 'Select a planned sprint…'}
-                    disabled={plannedTargetsLoading}
+                    disabled={plannedTargetsLoading || Boolean(plannedTargetsError)}
                     helperText="The target sprint must be in the same project and have status Planned."
                   />
                 )}
@@ -681,7 +697,7 @@ export default function SprintsPage() {
                 <Button
                   variant="destructive"
                   onClick={() => void handleConfirmComplete()}
-                  disabled={busy || (completeTarget === 'NEXT_SPRINT' && (!completeNextSprintId || noPlannedTargets))}
+                  disabled={busy || (completeTarget === 'NEXT_SPRINT' && (!completeNextSprintId || noPlannedTargets || Boolean(plannedTargetsError)))}
                 >
                   Complete sprint
                 </Button>

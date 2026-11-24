@@ -51,6 +51,8 @@ const STATUS_ORDER: Record<SprintStatus, number> = {
   ARCHIVED: 3,
 };
 
+const PLANNED_TARGETS_LOAD_ERROR = 'Planned sprints could not be loaded. Choose Backlog or try again.';
+
 function dateLabel(value: string | null): string {
   return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
 }
@@ -178,10 +180,10 @@ export default function SprintsPage() {
         if (cursor) seenCursors.add(cursor);
       } while (cursor);
       setPlannedTargets(all.filter((sprint) => sprint.id !== excludeSprintId));
-    } catch (cause) {
+    } catch {
       setPlannedTargets([]);
       setCompleteNextSprintId('');
-      setPlannedTargetsError(sprintErrorMessage(cause, 'Planned sprints could not be loaded.'));
+      setPlannedTargetsError(PLANNED_TARGETS_LOAD_ERROR);
     } finally {
       setPlannedTargetsLoading(false);
     }
@@ -644,19 +646,6 @@ export default function SprintsPage() {
               <p className="text-sm text-[var(--color-text-secondary)]">
                 Choose what happens to unfinished tasks (status not APPROVED).
               </p>
-              {plannedTargetsError && (
-                <div className="space-y-2">
-                  <Alert variant="error">{plannedTargetsError}</Alert>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void loadPlannedTargets(completeSprintId)}
-                    disabled={plannedTargetsLoading || busy}
-                  >
-                    Retry
-                  </Button>
-                </div>
-              )}
               {completeError && <Alert variant="error">{completeError}</Alert>}
               <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleConfirmComplete(); }}>
                 <Select
@@ -683,6 +672,19 @@ export default function SprintsPage() {
                     disabled={plannedTargetsLoading || Boolean(plannedTargetsError)}
                     helperText="The target sprint must be in the same project and have status Planned."
                   />
+                )}
+                {plannedTargetsError && (
+                  <div className="space-y-2">
+                    <Alert variant="error">{plannedTargetsError}</Alert>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void loadPlannedTargets(completeSprintId)}
+                      disabled={plannedTargetsLoading || busy}
+                    >
+                      Try again
+                    </Button>
+                  </div>
                 )}
               </form>
               <div className="mt-4 flex flex-wrap items-center justify-end gap-2">

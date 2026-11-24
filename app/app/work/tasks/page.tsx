@@ -13,11 +13,12 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { listProjects, type ProjectSummary } from '@/services/projects';
 import { type TaskPriority } from '@/services/tasks';
+import { formatTaskStatusLabel } from '@/lib/status-label';
 
 type TaskStatus = 'ASSIGNED' | 'AWAITING_CLARIFICATION' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED';
 
 function statusLabel(s: TaskStatus): string {
-  return s.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+  return formatTaskStatusLabel(s);
 }
 
 function priorityLabel(p: string): string {

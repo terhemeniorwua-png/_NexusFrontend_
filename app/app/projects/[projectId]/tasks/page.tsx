@@ -24,6 +24,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { CustomFieldInput, formatCustomFieldValue } from '@/components/tasks/CustomFieldInputs';
 import { TaskGanttView } from '@/components/tasks/TaskGanttView';
 import { ApiRequestError } from '@/lib/api';
+import { formatTaskStatusLabel } from '@/lib/status-label';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
@@ -94,7 +95,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [{ value: '', label: 
 const SORT_BY_OPTIONS: { value: TaskSortBy; label: string }[] = [{ value: 'position', label: 'Position' }, { value: 'dueDate', label: 'Due date' }, { value: 'priority', label: 'Priority' }, { value: 'createdAt', label: 'Created' }];
 const SORT_ORDER_OPTIONS: { value: TaskSortOrder; label: string }[] = [{ value: 'asc', label: 'Ascending' }, { value: 'desc', label: 'Descending' }];
 
-function statusLabel(s: TaskStatus): string { return s.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase()); }
+function statusLabel(s: TaskStatus): string { return formatTaskStatusLabel(s); }
 function priorityLabel(p: TaskPriority): string { return p.charAt(0) + p.slice(1).toLowerCase(); }
 function dateLabel(value: string | null): string { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—'; }
 function shortDate(value: string | null): string { return value ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(value)) : ''; }

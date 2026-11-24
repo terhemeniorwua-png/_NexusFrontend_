@@ -1,5 +1,6 @@
 'use client';
 
+import { Alert } from './Alert';
 import { Modal } from './Modal';
 import { Button } from './Button';
 
@@ -18,6 +19,8 @@ interface ConfirmDialogProps {
   destructive?: boolean;
   /** Disable the confirm button while an async action is in progress */
   loading?: boolean;
+  /** Optional action error rendered inside the dialog */
+  error?: string;
 }
 
 /**
@@ -36,6 +39,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   destructive = false,
   loading = false,
+  error,
 }: ConfirmDialogProps) {
   return (
     <Modal
@@ -59,9 +63,8 @@ export function ConfirmDialog({
         </>
       }
     >
-      {/* Body is empty by default — description appears in the header.
-          Pass children for additional content (e.g. typing a resource name). */}
-      <span />
+      {/* Description appears in the header; action errors stay inside the dialog. */}
+      {error ? <Alert variant="error">{error}</Alert> : <span />}
     </Modal>
   );
 }

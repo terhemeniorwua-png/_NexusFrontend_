@@ -91,7 +91,7 @@ const VIEWER = ['project.view', 'task.view'];
 const BACKEND_ERRORS = [
   [403, 'PERMISSION_DENIED', 'Backend 403 message'],
   [404, 'SPRINT_NOT_FOUND', 'Backend 404 message'],
-  [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Backend 409 message'],
+  [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Sprints are turned off for this project.'],
 ] as const;
 
 describe('SprintDetailPage — board and reports', () => {
@@ -264,8 +264,8 @@ describe('SprintDetailPage — board and reports', () => {
   it.each([
     [403, 'PERMISSION_DENIED', 'No sprint access'],
     [404, 'SPRINT_NOT_FOUND', 'Sprint not found'],
-    [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Sprints are disabled'],
-  ])('shows the backend message on %i (%s)', async (status, code, message) => {
+    [409, 'SPRINTS_DISABLED_FOR_PROJECT', 'Sprints are turned off for this project.'],
+  ])('shows the user-facing copy on %i (%s)', async (status, code, message) => {
     mocks.getSprintBoard.mockRejectedValueOnce(new ApiRequestError(message, status, code));
     render(<SprintDetailPage />);
     expect(await screen.findByText(message)).toBeInTheDocument();
@@ -404,5 +404,103 @@ describe('SprintDetailPage — board and reports', () => {
 
     expect(within(dialog).getByText('Warning: 1 selected task will be moved from another sprint.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Add 2 tasks — 1 will be moved' })).toBeInTheDocument();
+  });
+
+  it('renders mapped copy without a raw code for sprint action errors', async () => {
+    const user = userEvent.setup();
+    mocks.removeTaskFromSprint.mockRejectedValueOnce(new ApiRequestError(
+      'Stage 2 task is gone (TASK_NOT_IN_SPRINT)',
+      404,
+      'TASK_NOT_IN_SPRINT',
+    ));
+    render(<SprintDetailPage />);
+    await screen.findByRole('link', { name: 'Implement endpoint' });
+    await user.click(screen.getAllByRole('button', { name: 'Remove from sprint' })[0]);
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    expect(await within(dialog).findByText('That task is no longer in this sprint.')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(screen.queryByText(/TASK_NOT_IN_SPRINT/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/stage 2/i)).not.toBeInTheDocument();
+  });
+
+  it('uses a title link and a sibling Remove button with no nested interactive elements', async () => {
+    render(<SprintDetailPage />);
+    const link = await screen.findByRole('link', { name: 'Implement endpoint' });
+    const remove = screen.getAllByRole('button', { name: 'Remove from sprint' })[0];
+
+    expect(link.closest('button')).toBeNull();
+    expect(link.closest('[role="button"]')).toBeNull();
+    expect(remove.closest('a')).toBeNull();
+    expect(remove.closest('[role="button"]')).toBeNull();
+  });
+
+  it('reaches the link then Remove with Tab and follows the link with Enter', async () => {
+    const user = userEvent.setup();
+    render(<SprintDetailPage />);
+    const link = await screen.findByRole('link', { name: 'Implement endpoint' });
+    const remove = screen.getAllByRole('button', { name: 'Remove from sprint' })[0];
+
+    link.focus();
+    await user.tab();
+    expect(remove).toHaveFocus();
+
+    link.focus();
+    await user.keyboard('{Enter}');
+    expect(push).toHaveBeenCalledWith('/app/projects/project-1/tasks/task-1');
+  });
+
+  it('activates Remove with Space', async () => {
+    const user = userEvent.setup();
+    render(<SprintDetailPage />);
+    const remove = (await screen.findAllByRole('button', { name: 'Remove from sprint' }))[0];
+
+    remove.focus();
+    await user.keyboard(' ');
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByText(/Remove "Implement endpoint" from this sprint/)).toBeInTheDocument();
+  });
+
+  it('activates Remove with Enter', async () => {
+    const user = userEvent.setup();
+    render(<SprintDetailPage />);
+    const remove = (await screen.findAllByRole('button', { name: 'Remove from sprint' }))[0];
+
+    remove.focus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('labels the CHANGES_REQUESTED column with a space', async () => {
+    const currentBoard = board();
+    mocks.getSprintBoard.mockResolvedValue({
+      ...currentBoard,
+      columns: [...currentBoard.columns, { status: 'CHANGES_REQUESTED', count: 0, tasks: [] }],
+      totals: { ...currentBoard.totals, taskCount: 2 },
+    });
+    render(<SprintDetailPage />);
+
+    expect(await screen.findByText('CHANGES REQUESTED')).toBeInTheDocument();
+    expect(screen.queryByText('CHANGES_REQUESTED')).not.toBeInTheDocument();
+  });
+
+  it('keeps remove-confirm errors inside the ConfirmDialog', async () => {
+    const user = userEvent.setup();
+    mocks.removeTaskFromSprint.mockRejectedValueOnce(new ApiRequestError(
+      'Stage 2 remove blocked',
+      409,
+      'TASK_NOT_IN_SPRINT',
+    ));
+    render(<SprintDetailPage />);
+    await user.click((await screen.findAllByRole('button', { name: 'Remove from sprint' }))[0]);
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    expect(await within(dialog).findByText('That task is no longer in this sprint.')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(within(dialog).queryByText(/stage 2/i)).not.toBeInTheDocument();
   });
 });

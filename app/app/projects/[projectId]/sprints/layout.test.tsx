@@ -143,6 +143,20 @@ describe('SprintsLayout — workflow guard', () => {
     expect(mocks.listSprints).toHaveBeenCalledWith('ws-1', 'project-1');
   });
 
+  it('maps SPRINTS_DISABLED_FOR_PROJECT and keeps sprint children hidden', async () => {
+    mocks.getProject.mockRejectedValueOnce(new ApiRequestError(
+      'Stage 2 sprints disabled for this project',
+      409,
+      'SPRINTS_DISABLED_FOR_PROJECT',
+    ));
+    render(<SprintsLayout><SprintsPage /></SprintsLayout>);
+
+    expect(await screen.findByText('Sprints are turned off for this project.')).toBeInTheDocument();
+    expect(screen.queryByText('Stage 2 sprints disabled for this project')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sprint Alpha')).not.toBeInTheDocument();
+    expect(mocks.listSprints).not.toHaveBeenCalled();
+  });
+
   it('fails closed on the detail route, makes no sprint calls, and retries to SPRINTS', async () => {
     const user = userEvent.setup();
     mocks.getProject

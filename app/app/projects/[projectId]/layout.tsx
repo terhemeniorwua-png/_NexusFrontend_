@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { ProjectUnavailableState } from '@/components/shared/PageAccessState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { orderTabsForType, type ProjectTabKey } from '@/lib/project-type';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import {
   ProjectPermissionsProvider,
@@ -13,6 +14,7 @@ import {
 import { getProject } from '@/services/projects';
 
 interface ProjectTab {
+  key: ProjectTabKey | 'dev-activity';
   href: string;
   label: string;
   exact?: boolean;
@@ -31,14 +33,18 @@ function ProjectLayoutContent({
   const { can, isLoading, accessStatus } = usePermissions();
   const { activeWorkspace } = useWorkspaceContext();
   const [workflowMode, setWorkflowMode] = useState<'SPRINTS' | 'BACKLOG_ONLY' | null>(null);
+  const [projectType, setProjectType] = useState<unknown>(null);
 
   const loadProject = useCallback(async () => {
     if (!activeWorkspace) return;
     try {
       const data = await getProject(activeWorkspace.id, projectId);
       setWorkflowMode(data.workflowMode);
+      setProjectType(data.type);
     } catch {
       // Workflow mode is only used to hide the Sprints tab; fail silently.
+      // A failed lookup also drops the type so today's order is used.
+      setProjectType(null);
     }
   }, [activeWorkspace, projectId]);
 
@@ -50,20 +56,20 @@ function ProjectLayoutContent({
 
   const sprintsEnabled = workflowMode === 'SPRINTS';
 
-  const tabs: ProjectTab[] = [
-    { href: `/app/projects/${encodeURIComponent(projectId)}`, label: 'Overview', exact: true, visible: true },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/tasks`, label: 'Tasks', visible: can('task.view') },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/sprints`, label: 'Sprints', visible: can('project.view') && sprintsEnabled },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/members`, label: 'Members', visible: can('project.view') },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/checklists`, label: 'Checklists', visible: can('project.view') },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/reviews`, label: 'Reviews', visible: can('project.view') },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/milestones`, label: 'Milestones', visible: can('project.view') },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/code`, label: 'Code', visible: can('project.view') },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/dev-activity`, label: 'Dev activity', visible: can('project.view') },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/activity`, label: 'Activity', visible: can('project.view') },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/reports`, label: 'Reports', visible: can('project.report.view') },
-    { href: `/app/projects/${encodeURIComponent(projectId)}/settings`, label: 'Settings', visible: can('project.settings.manage') },
-  ];
+  const tabs: ProjectTab[] = orderTabsForType([
+    { key: 'overview', href: `/app/projects/${encodeURIComponent(projectId)}`, label: 'Overview', exact: true, visible: true },
+    { key: 'tasks', href: `/app/projects/${encodeURIComponent(projectId)}/tasks`, label: 'Tasks', visible: can('task.view') },
+    { key: 'sprints', href: `/app/projects/${encodeURIComponent(projectId)}/sprints`, label: 'Sprints', visible: can('project.view') && sprintsEnabled },
+    { key: 'members', href: `/app/projects/${encodeURIComponent(projectId)}/members`, label: 'Members', visible: can('project.view') },
+    { key: 'checklists', href: `/app/projects/${encodeURIComponent(projectId)}/checklists`, label: 'Checklists', visible: can('project.view') },
+    { key: 'reviews', href: `/app/projects/${encodeURIComponent(projectId)}/reviews`, label: 'Reviews', visible: can('project.view') },
+    { key: 'milestones', href: `/app/projects/${encodeURIComponent(projectId)}/milestones`, label: 'Milestones', visible: can('project.view') },
+    { key: 'code', href: `/app/projects/${encodeURIComponent(projectId)}/code`, label: 'Code', visible: can('project.view') },
+    { key: 'dev-activity', href: `/app/projects/${encodeURIComponent(projectId)}/dev-activity`, label: 'Dev activity', visible: can('project.view') },
+    { key: 'activity', href: `/app/projects/${encodeURIComponent(projectId)}/activity`, label: 'Activity', visible: can('project.view') },
+    { key: 'reports', href: `/app/projects/${encodeURIComponent(projectId)}/reports`, label: 'Reports', visible: can('project.report.view') },
+    { key: 'settings', href: `/app/projects/${encodeURIComponent(projectId)}/settings`, label: 'Settings', visible: can('project.settings.manage') },
+  ], projectType);
 
   if (accessStatus) {
     return <ProjectUnavailableState status={accessStatus} />;

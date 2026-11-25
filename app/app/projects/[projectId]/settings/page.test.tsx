@@ -142,6 +142,7 @@ describe('ProjectSettingsPage — organizational access', () => {
 
     const typeSelect = await screen.findByLabelText('Type');
     expect(typeSelect).toHaveValue('GENERAL');
+    expect(screen.getByText('Classification only. It does not grant access or change permissions. Changing it never deletes or hides work. Project sections are listed in the order that suits the selected type.')).toBeInTheDocument();
     await user.selectOptions(typeSelect, 'DESIGN');
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
 

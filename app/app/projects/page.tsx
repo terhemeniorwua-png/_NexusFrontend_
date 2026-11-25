@@ -504,7 +504,7 @@ export default function ProjectsPage() {
               value={createType}
               onChange={(event) => setCreateType(event.target.value as ProjectType)}
               options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
-              helperText="Classification only. It selects the project environment and does not grant access."
+              helperText="Classification only. It does not grant access or change permissions. Changing it never deletes or hides work. Project sections are listed in the order that suits the selected type."
             />
           )}
           {createVisibility === 'DEPARTMENT_TEAM' && (

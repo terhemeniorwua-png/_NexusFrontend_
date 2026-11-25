@@ -606,7 +606,7 @@ export default function ProjectSettingsPage() {
                 value={type}
                 onChange={(event) => setType(event.target.value as ProjectType)}
                 options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
-                helperText="Classification only. It does not grant access or change permissions. Changing it never deletes or hides work."
+                helperText="Classification only. It does not grant access or change permissions. Changing it never deletes or hides work. Project sections are listed in the order that suits the selected type."
               />
             </div>
           )}

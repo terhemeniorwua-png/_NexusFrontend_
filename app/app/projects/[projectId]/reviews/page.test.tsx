@@ -371,4 +371,66 @@ describe('ProjectReviewsPage', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
     expect(screen.getByText('Unknown user')).toBeInTheDocument();
   });
+
+  it('renders a task review with safe artwork and decisions', async () => {
+    const user = userEvent.setup();
+    const taskReview = makeReview({
+      resource: { kind: 'task', id: 'task-1' },
+      taskId: 'task-1',
+      artworkUrl: 'https://example.com/art.png',
+      decisions: ['Approve hero', 'Check spacing'],
+    });
+    mocks.listReviews.mockResolvedValue({ items: [taskReview], nextCursor: null });
+    mocks.getReview.mockResolvedValue({ review: taskReview });
+
+    await renderPage();
+    await openFirstReview(user);
+
+    expect(screen.getByRole('heading', { name: /Task · Round 2/ })).toBeInTheDocument();
+    expect(screen.getByText('Task ID')).toBeInTheDocument();
+    expect(screen.getByText('task-1')).toBeInTheDocument();
+    const artwork = screen.getByRole('link', { name: 'https://example.com/art.png' });
+    expect(artwork).toHaveAttribute('href', 'https://example.com/art.png');
+    expect(artwork).toHaveAttribute('target', '_blank');
+    expect(artwork).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText('Approve hero')).toBeInTheDocument();
+    expect(screen.getByText('Check spacing')).toBeInTheDocument();
+  });
+
+  it('does not render an unsafe artwork URL as a link', async () => {
+    const user = userEvent.setup();
+    const taskReview = makeReview({
+      resource: { kind: 'task', id: 'task-2' },
+      taskId: 'task-2',
+      artworkUrl: 'javascript:alert(1)',
+      decisions: ['Review copy'],
+    });
+    mocks.listReviews.mockResolvedValue({ items: [taskReview], nextCursor: null });
+    mocks.getReview.mockResolvedValue({ review: taskReview });
+
+    await renderPage();
+    await openFirstReview(user);
+
+    expect(screen.queryByRole('link', { name: /javascript:alert/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Review copy')).toBeInTheDocument();
+  });
+
+  it('renders checklist reviews exactly as before', async () => {
+    const user = userEvent.setup();
+    const checklistReview = makeReview({
+      resource: { kind: 'checklist', id: 'checklist-1', revision: 4 },
+      checklistRevision: 4,
+    });
+    mocks.listReviews.mockResolvedValue({ items: [checklistReview], nextCursor: null });
+    mocks.getReview.mockResolvedValue({ review: checklistReview });
+
+    await renderPage();
+    await openFirstReview(user);
+
+    expect(screen.getByRole('heading', { name: /Checklist · Round 2/ })).toBeInTheDocument();
+    expect(screen.getByText('Target ID')).toBeInTheDocument();
+    expect(screen.getByText('checklist-1')).toBeInTheDocument();
+    expect(screen.queryByText('Task ID')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /example.com/ })).not.toBeInTheDocument();
+  });
 });

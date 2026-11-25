@@ -14,12 +14,14 @@ export type ReviewStatus =
   | 'APPROVED'
   | 'CHANGES_REQUESTED';
 
-export type ReviewTargetKind = 'attachmentVersion' | 'checklist';
+export type ReviewTargetKind = 'attachmentVersion' | 'checklist' | 'task';
+
+export type NormalizedReviewTargetKind = ReviewTargetKind | 'unknown';
 
 export type ReviewDecisionType = 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
 
 export interface ReviewResource {
-  kind: ReviewTargetKind;
+  kind: NormalizedReviewTargetKind;
   id: string;
   /** Only present for checklist targets. */
   revision?: number;
@@ -49,6 +51,9 @@ export interface ReviewView {
   /** Only the most recent decision is exposed by the backend. */
   lastDecision?: ReviewDecisionView | null;
   stale?: boolean;
+  taskId?: string | null;
+  artworkUrl?: string | null;
+  decisions?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -174,17 +179,51 @@ function normaliseDecision(value: unknown): ReviewDecisionView | null {
   };
 }
 
+function normaliseReviewDecisions(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (typeof entry === 'string') {
+      const text = entry.trim();
+      return text.length > 0 ? [text] : [];
+    }
+    if (!isRecord(entry)) return [];
+    const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+    return text.length > 0 ? [text] : [];
+  });
+}
+
 function normaliseReview(value: unknown): ReviewView {
   const data = isRecord(value) ? value : {};
   const resourceValue = isRecord(data.resource) ? data.resource : {};
-  const kind: ReviewTargetKind = resourceValue.kind === 'checklist' ? 'checklist' : 'attachmentVersion';
-  const resource: ReviewResource = {
-    kind,
-    id: asString(resourceValue.id, asString(data.resourceId)),
-  };
+  const taskId = asNullableString(data.taskId) ?? asNullableString(resourceValue.taskId);
+  const attachmentVersionId = asNullableString(data.attachmentVersionId)
+    ?? (resourceValue.kind === 'attachmentVersion' ? asNullableString(resourceValue.id) : null);
+  const checklistId = asNullableString(data.checklistId)
+    ?? (resourceValue.kind === 'checklist' ? asNullableString(resourceValue.id) : null);
+
+  let kind: NormalizedReviewTargetKind = 'unknown';
+  if (taskId || resourceValue.kind === 'task') {
+    kind = 'task';
+  } else if (checklistId || resourceValue.kind === 'checklist') {
+    kind = 'checklist';
+  } else if (attachmentVersionId || resourceValue.kind === 'attachmentVersion') {
+    kind = 'attachmentVersion';
+  }
+
+  const resourceId = kind === 'task'
+    ? (taskId ?? asString(resourceValue.id, asString(data.resourceId)))
+    : kind === 'checklist'
+      ? (checklistId ?? asString(resourceValue.id, asString(data.resourceId)))
+      : kind === 'attachmentVersion'
+        ? (attachmentVersionId ?? asString(resourceValue.id, asString(data.resourceId)))
+        : asString(resourceValue.id, asString(data.resourceId));
+
+  const resource: ReviewResource = { kind, id: resourceId };
   if (kind === 'checklist' && typeof resourceValue.revision === 'number') {
     resource.revision = resourceValue.revision;
   }
+
+  const decisions = normaliseReviewDecisions(data.decisions);
 
   return {
     id: asString(data.id),
@@ -199,6 +238,9 @@ function normaliseReview(value: unknown): ReviewView {
     checklistRevision: asNullableNumber(data.checklistRevision),
     lastDecision: normaliseDecision(data.lastDecision),
     stale: asBoolean(data.stale),
+    taskId: kind === 'task' ? (taskId ?? (resourceId || null)) : null,
+    artworkUrl: kind === 'task' ? asNullableString(data.artworkUrl) : null,
+    decisions,
     createdAt: asString(data.createdAt),
     updatedAt: asString(data.updatedAt),
   };

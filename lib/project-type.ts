@@ -31,6 +31,7 @@ export type ProjectTabKey =
   | 'reviews'
   | 'milestones'
   | 'code'
+  | 'dev-activity'
   | 'activity'
   | 'reports'
   | 'settings';
@@ -45,6 +46,7 @@ export const DEFAULT_PROJECT_TAB_ORDER: readonly ProjectTabKey[] = [
   'reviews',
   'milestones',
   'code',
+  'dev-activity',
   'activity',
   'reports',
   'settings',
@@ -56,24 +58,24 @@ export const DEFAULT_PROJECT_TAB_ORDER: readonly ProjectTabKey[] = [
  */
 export const PROJECT_TYPE_TAB_ORDER: Partial<Record<ProjectType, readonly ProjectTabKey[]>> = {
   ENGINEERING: [
-    'overview', 'tasks', 'sprints', 'code', 'reviews', 'checklists',
+    'overview', 'tasks', 'sprints', 'code', 'dev-activity', 'reviews', 'checklists',
     'milestones', 'members', 'activity', 'reports', 'settings',
   ],
   DESIGN: [
     'overview', 'tasks', 'reviews', 'checklists', 'sprints', 'milestones',
-    'code', 'members', 'activity', 'reports', 'settings',
+    'code', 'dev-activity', 'members', 'activity', 'reports', 'settings',
   ],
   OPERATIONS: [
     'overview', 'tasks', 'checklists', 'milestones', 'members', 'activity',
-    'code', 'reviews', 'reports', 'settings',
+    'code', 'dev-activity', 'reviews', 'reports', 'settings',
   ],
   MARKETING: [
     'overview', 'tasks', 'milestones', 'checklists', 'reviews', 'members',
-    'activity', 'code', 'reports', 'settings',
+    'activity', 'code', 'dev-activity', 'reports', 'settings',
   ],
   HR: [
     'overview', 'tasks', 'checklists', 'members', 'reviews', 'milestones',
-    'activity', 'code', 'reports', 'settings',
+    'activity', 'code', 'dev-activity', 'reports', 'settings',
   ],
 };
 

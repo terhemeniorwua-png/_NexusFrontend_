@@ -42,27 +42,27 @@ describe('orderTabsForType', () => {
   it.each([
     ['GENERAL', [
       'overview', 'tasks', 'sprints', 'members', 'checklists', 'reviews',
-      'milestones', 'code', 'activity', 'reports', 'settings',
+      'milestones', 'code', 'dev-activity', 'activity', 'reports', 'settings',
     ]],
     ['ENGINEERING', [
-      'overview', 'tasks', 'sprints', 'code', 'reviews', 'checklists',
+      'overview', 'tasks', 'sprints', 'code', 'dev-activity', 'reviews', 'checklists',
       'milestones', 'members', 'activity', 'reports', 'settings',
     ]],
     ['DESIGN', [
       'overview', 'tasks', 'reviews', 'checklists', 'sprints', 'milestones',
-      'code', 'members', 'activity', 'reports', 'settings',
+      'code', 'dev-activity', 'members', 'activity', 'reports', 'settings',
     ]],
     ['OPERATIONS', [
       'overview', 'tasks', 'checklists', 'milestones', 'members', 'activity',
-      'code', 'reviews', 'reports', 'settings', 'sprints',
+      'code', 'dev-activity', 'reviews', 'reports', 'settings', 'sprints',
     ]],
     ['MARKETING', [
       'overview', 'tasks', 'milestones', 'checklists', 'reviews', 'members',
-      'activity', 'code', 'reports', 'settings', 'sprints',
+      'activity', 'code', 'dev-activity', 'reports', 'settings', 'sprints',
     ]],
     ['HR', [
       'overview', 'tasks', 'checklists', 'members', 'reviews', 'milestones',
-      'activity', 'code', 'reports', 'settings', 'sprints',
+      'activity', 'code', 'dev-activity', 'reports', 'settings', 'sprints',
     ]],
   ] as const)('orders every tab for %s', (type, expected) => {
     expect(keys(orderTabsForType(allTabs, type))).toEqual(expected);
@@ -72,6 +72,18 @@ describe('orderTabsForType', () => {
     const ordered = orderTabsForType(allTabs, type);
     expect(ordered).toHaveLength(allTabs.length);
     expect([...keys(ordered)].sort()).toEqual([...keys(allTabs)].sort());
+  });
+
+  it.each(PROJECT_TYPES.filter((type) => type !== 'GENERAL'))(
+    'places dev-activity immediately after code for %s',
+    (type) => {
+      const ordered = keys(orderTabsForType(allTabs, type));
+      expect(ordered[ordered.indexOf('code') + 1]).toBe('dev-activity');
+    },
+  );
+
+  it('keeps dev-activity in today\'s order for GENERAL', () => {
+    expect(keys(orderTabsForType(allTabs, 'GENERAL'))).toEqual(DEFAULT_PROJECT_TAB_ORDER);
   });
 
   it('falls back to today\'s order for missing or unknown types', () => {

@@ -33,6 +33,7 @@ import {
   createProject,
   listProjects,
   restoreProject,
+  updateProject,
   type ProjectStatus,
   type ProjectSummary,
   type ProjectVisibility,
@@ -112,6 +113,7 @@ export default function ProjectsPage() {
   const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [workflowWarningProjectId, setWorkflowWarningProjectId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Filters
@@ -228,9 +230,9 @@ export default function ProjectsPage() {
       setCreateErrors(errors);
       return;
     }
-    setBusy(true); setError(null); setCreateErrors({});
+    setBusy(true); setError(null); setCreateErrors({}); setWorkflowWarningProjectId(null);
     try {
-      await createProject(activeWorkspace.id, {
+      const project = await createProject(activeWorkspace.id, {
         name: parsed.data.name, key: parsed.data.key,
         description: parsed.data.description ?? null,
         visibility: parsed.data.visibility,
@@ -239,8 +241,15 @@ export default function ProjectsPage() {
         ...(parsed.data.visibility === 'DEPARTMENT_TEAM' && createDepartmentId ? { departmentId: createDepartmentId } : {}),
       });
       setShowCreate(false);
-      setCreateName(''); setCreateKey(''); setCreateDescription(''); setCreateVisibility('WORKSPACE'); setCreateType(DEFAULT_PROJECT_TYPE); setCreateTeamId(''); setCreateDepartmentId('');
+      setCreateName(''); setCreateKey(''); setCreateDescription(''); setCreateVisibility('WORKSPACE'); setCreateType(DEFAULT_PROJECT_TYPE); setCreateStarters([]); setCreateTeamId(''); setCreateDepartmentId('');
       setNotice('Project created.');
+      if (parsed.data.type === 'ENGINEERING') {
+        try {
+          await updateProject(activeWorkspace.id, project.id, { workflowMode: 'SPRINTS' });
+        } catch {
+          setWorkflowWarningProjectId(project.id);
+        }
+      }
       await load();
     } catch (cause) {
       setError(requestError(cause, 'Project could not be created.'));
@@ -316,6 +325,17 @@ export default function ProjectsPage() {
 
       {error && <Alert variant="error" title="Could not complete request">{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}
+      {workflowWarningProjectId && (
+        <Alert variant="warning">
+          The project was created, but sprints could not be turned on. You can change this in{' '}
+          <Link
+            href={`/app/projects/${encodeURIComponent(workflowWarningProjectId)}/settings`}
+            className="underline"
+          >
+            project settings
+          </Link>.
+        </Alert>
+      )}
       {accessStatus && <AccessState status={accessStatus} onRetry={() => void load()} />}
 
       {/* Filters */}

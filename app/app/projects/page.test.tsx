@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   activeWorkspace: null as null | { id: string; name: string; type: string; role: string; organizationRole: null },
   listProjects: vi.fn(),
   createProject: vi.fn(),
+  updateProject: vi.fn(),
   archiveProject: vi.fn(),
   restoreProject: vi.fn(),
 }));
@@ -22,6 +23,7 @@ vi.mock('@/services/projects', () => ({
   },
   listProjects: mocks.listProjects,
   createProject: mocks.createProject,
+  updateProject: mocks.updateProject,
   archiveProject: mocks.archiveProject,
   restoreProject: mocks.restoreProject,
 }));
@@ -279,5 +281,73 @@ describe('ProjectsPage — starting setup', () => {
     await user.selectOptions(screen.getByLabelText('Type'), 'GENERAL');
     expect(screen.getByText(helperBase)).toBeInTheDocument();
     expect(screen.queryByText(`${helperBase} General`)).not.toBeInTheDocument();
+  });
+});
+
+describe('ProjectsPage — workflow default', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
+    mocks.listProjects.mockResolvedValue({ items: [projectA], nextCursor: null });
+  });
+
+  async function submitCreate(type: string, name: string) {
+    const user = userEvent.setup();
+    render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    await screen.findByRole('dialog');
+    if (type !== 'GENERAL') {
+      await user.selectOptions(screen.getByLabelText('Type'), type);
+    }
+    await user.type(screen.getByLabelText(/Project name/), name);
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+    return user;
+  }
+
+  it('turns on sprints for Engineering after the project is created', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-eng', type: 'ENGINEERING' });
+    mocks.updateProject.mockResolvedValue({ ...projectA, id: 'project-eng', type: 'ENGINEERING', workflowMode: 'SPRINTS' });
+
+    await submitCreate('ENGINEERING', 'Engineering Project');
+
+    await waitFor(() => expect(mocks.updateProject).toHaveBeenCalledWith(
+      'ws-1',
+      'project-eng',
+      { workflowMode: 'SPRINTS' },
+    ));
+    expect(mocks.createProject).toHaveBeenCalledWith(
+      'ws-1',
+      expect.objectContaining({ name: 'Engineering Project', type: 'ENGINEERING' }),
+    );
+    expect(await screen.findByText('Project created.')).toBeInTheDocument();
+  });
+
+  it.each(['GENERAL', 'DESIGN', 'OPERATIONS', 'MARKETING', 'HR'])(
+    'does not patch the workflow for %s',
+    async (type) => {
+      mocks.createProject.mockResolvedValue({ ...projectA, id: `project-${type.toLowerCase()}`, type });
+
+      await submitCreate(type, `${type} Project`);
+
+      await waitFor(() => expect(mocks.createProject).toHaveBeenCalled());
+      expect(await screen.findByText('Project created.')).toBeInTheDocument();
+      expect(mocks.updateProject).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps the project and shows a settings link when the workflow patch fails', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-eng', type: 'ENGINEERING' });
+    mocks.updateProject.mockRejectedValue(new Error('patch failed'));
+
+    await submitCreate('ENGINEERING', 'Engineering Project');
+
+    await waitFor(() => expect(mocks.updateProject).toHaveBeenCalled());
+    expect(await screen.findByText(/The project was created, but sprints could not be turned on/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'project settings' })).toHaveAttribute(
+      'href',
+      '/app/projects/project-eng/settings',
+    );
+    expect(screen.getByText('Project created.')).toBeInTheDocument();
   });
 });

@@ -42,27 +42,32 @@ describe('orderTabsForType', () => {
   it.each([
     ['GENERAL', [
       'overview', 'tasks', 'sprints', 'members', 'checklists', 'reviews',
-      'milestones', 'code', 'dev-activity', 'activity', 'reports', 'settings',
+      'milestones', 'code', 'dev-activity', 'dev-activity-developers',
+      'activity', 'reports', 'settings',
     ]],
     ['ENGINEERING', [
-      'overview', 'tasks', 'sprints', 'code', 'dev-activity', 'reviews', 'checklists',
-      'milestones', 'members', 'activity', 'reports', 'settings',
+      'overview', 'tasks', 'sprints', 'code', 'dev-activity', 'dev-activity-developers',
+      'reviews', 'checklists', 'milestones', 'members', 'activity', 'reports', 'settings',
     ]],
     ['DESIGN', [
       'overview', 'tasks', 'reviews', 'checklists', 'sprints', 'milestones',
-      'code', 'dev-activity', 'members', 'activity', 'reports', 'settings',
+      'code', 'dev-activity', 'dev-activity-developers', 'members', 'activity',
+      'reports', 'settings',
     ]],
     ['OPERATIONS', [
       'overview', 'tasks', 'checklists', 'milestones', 'members', 'activity',
-      'code', 'dev-activity', 'reviews', 'reports', 'settings', 'sprints',
+      'code', 'dev-activity', 'dev-activity-developers', 'reviews', 'reports',
+      'settings', 'sprints',
     ]],
     ['MARKETING', [
       'overview', 'tasks', 'milestones', 'checklists', 'reviews', 'members',
-      'activity', 'code', 'dev-activity', 'reports', 'settings', 'sprints',
+      'activity', 'code', 'dev-activity', 'dev-activity-developers', 'reports',
+      'settings', 'sprints',
     ]],
     ['HR', [
       'overview', 'tasks', 'checklists', 'members', 'reviews', 'milestones',
-      'activity', 'code', 'dev-activity', 'reports', 'settings', 'sprints',
+      'activity', 'code', 'dev-activity', 'dev-activity-developers', 'reports',
+      'settings', 'sprints',
     ]],
   ] as const)('orders every tab for %s', (type, expected) => {
     expect(keys(orderTabsForType(allTabs, type))).toEqual(expected);
@@ -74,11 +79,14 @@ describe('orderTabsForType', () => {
     expect([...keys(ordered)].sort()).toEqual([...keys(allTabs)].sort());
   });
 
-  it.each(PROJECT_TYPES.filter((type) => type !== 'GENERAL'))(
-    'places dev-activity immediately after code for %s',
+  it.each(PROJECT_TYPES)(
+    'places dev-activity-developers after dev-activity after code for %s',
     (type) => {
-      const ordered = keys(orderTabsForType(allTabs, type));
+      const input = [...allTabs].reverse();
+      const ordered = keys(orderTabsForType(input, type));
       expect(ordered[ordered.indexOf('code') + 1]).toBe('dev-activity');
+      expect(ordered[ordered.indexOf('dev-activity') + 1]).toBe('dev-activity-developers');
+      expect([...ordered].sort()).toEqual([...keys(input)].sort());
     },
   );
 

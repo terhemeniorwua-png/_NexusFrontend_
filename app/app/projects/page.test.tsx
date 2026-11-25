@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   listProjects: vi.fn(),
   createProject: vi.fn(),
   updateProject: vi.fn(),
+  createTaskTemplate: vi.fn(),
+  createChecklist: vi.fn(),
+  createChecklistItem: vi.fn(),
   archiveProject: vi.fn(),
   restoreProject: vi.fn(),
 }));
@@ -26,6 +29,13 @@ vi.mock('@/services/projects', () => ({
   updateProject: mocks.updateProject,
   archiveProject: mocks.archiveProject,
   restoreProject: mocks.restoreProject,
+}));
+vi.mock('@/services/tasks', () => ({
+  createTaskTemplate: mocks.createTaskTemplate,
+}));
+vi.mock('@/services/checklists', () => ({
+  createChecklist: mocks.createChecklist,
+  createChecklistItem: mocks.createChecklistItem,
 }));
 
 const projectA = {
@@ -349,5 +359,144 @@ describe('ProjectsPage — workflow default', () => {
       '/app/projects/project-eng/settings',
     );
     expect(screen.getByText('Project created.')).toBeInTheDocument();
+  });
+});
+
+describe('ProjectsPage — starter suggestions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
+    mocks.listProjects.mockResolvedValue({ items: [projectA], nextCursor: null });
+    mocks.createTaskTemplate.mockResolvedValue({ id: 'template-1' });
+    mocks.createChecklist.mockResolvedValue({ checklist: { id: 'checklist-1', title: 'Critique checklist' } });
+    mocks.createChecklistItem.mockImplementation(async (_workspaceId, _projectId, _checklistId, input: { text: string }) => ({
+      item: { id: `item-${input.text}`, text: input.text },
+      revision: 1,
+    }));
+  });
+
+  async function openAndSelect(type: string, names: string[], projectName: string) {
+    const user = userEvent.setup();
+    render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    await screen.findByRole('dialog');
+    if (type !== 'GENERAL') {
+      await user.selectOptions(screen.getByLabelText('Type'), type);
+    }
+    for (const name of names) {
+      await user.click(screen.getByRole('checkbox', { name }));
+    }
+    await user.type(screen.getByLabelText(/Project name/), projectName);
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+    return user;
+  }
+
+  it('creates ticked Design suggestions in order without patching the workflow', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-design', type: 'DESIGN' });
+
+    await openAndSelect(
+      'DESIGN',
+      ['Design review', 'Design iteration', 'Critique checklist'],
+      'Design Project',
+    );
+
+    await waitFor(() => expect(mocks.createChecklistItem).toHaveBeenCalledTimes(5));
+    expect(await screen.findByText('Project created.')).toBeInTheDocument();
+    expect(mocks.updateProject).not.toHaveBeenCalled();
+
+    expect(mocks.createTaskTemplate.mock.calls.map((call) => call[2].name)).toEqual([
+      'Design review',
+      'Design iteration',
+    ]);
+    expect(mocks.createTaskTemplate).toHaveBeenNthCalledWith(1, 'ws-1', 'project-design', {
+      name: 'Design review',
+      description: 'Link the latest artwork and list the decisions needed.',
+      data: {
+        version: 1,
+        title: 'Design review',
+        description: 'Link the latest artwork and list the decisions needed.',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'Design',
+        labels: ['design', 'review'],
+      },
+    });
+    expect(mocks.createTaskTemplate).toHaveBeenNthCalledWith(2, 'ws-1', 'project-design', {
+      name: 'Design iteration',
+      data: {
+        version: 1,
+        title: 'Design iteration',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'Design',
+        labels: ['design', 'iteration'],
+      },
+    });
+    expect(mocks.createChecklist).toHaveBeenCalledWith(
+      'ws-1',
+      'project-design',
+      { title: 'Critique checklist' },
+    );
+    expect(mocks.createChecklistItem.mock.calls.map((call) => call[3].text)).toEqual([
+      'Brief and goals confirmed',
+      'Latest files linked',
+      'Accessibility and contrast checked',
+      'Stakeholder feedback captured',
+      'Final version approved',
+    ]);
+    expect(mocks.createTaskTemplate.mock.invocationCallOrder[1]).toBeLessThan(
+      mocks.createChecklist.mock.invocationCallOrder[0],
+    );
+    expect(mocks.createChecklist.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.createChecklistItem.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not create unticked suggestions', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-hr', type: 'HR' });
+
+    await openAndSelect('HR', ['Policy review'], 'HR Project');
+
+    await waitFor(() => expect(mocks.createTaskTemplate).toHaveBeenCalledTimes(1));
+    expect(mocks.createTaskTemplate).toHaveBeenCalledWith(
+      'ws-1',
+      'project-hr',
+      expect.objectContaining({ name: 'Policy review' }),
+    );
+    expect(mocks.createChecklist).not.toHaveBeenCalled();
+    expect(mocks.createChecklistItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the project, counts one failed suggestion and does not retry it', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-design', type: 'DESIGN' });
+    mocks.createTaskTemplate
+      .mockResolvedValueOnce({ id: 'template-1' })
+      .mockRejectedValueOnce(new Error('template failed'));
+
+    await openAndSelect(
+      'DESIGN',
+      ['Design review', 'Design iteration', 'Critique checklist'],
+      'Design Project',
+    );
+
+    expect(await screen.findByText('The project was created. 1 of 3 suggested items could not be added. You can add them from the project.')).toBeInTheDocument();
+    expect(mocks.createProject).toHaveBeenCalledTimes(1);
+    expect(mocks.createTaskTemplate).toHaveBeenCalledTimes(2);
+    expect(mocks.createChecklist).toHaveBeenCalledTimes(1);
+    expect(mocks.createChecklistItem).toHaveBeenCalledTimes(5);
+    expect(mocks.updateProject).not.toHaveBeenCalled();
+  });
+
+  it('creates no suggestions for a General project', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-general', type: 'GENERAL' });
+
+    await openAndSelect('GENERAL', [], 'General Project');
+
+    expect(await screen.findByText('Project created.')).toBeInTheDocument();
+    expect(mocks.createTaskTemplate).not.toHaveBeenCalled();
+    expect(mocks.createChecklist).not.toHaveBeenCalled();
+    expect(mocks.createChecklistItem).not.toHaveBeenCalled();
+    expect(mocks.updateProject).not.toHaveBeenCalled();
   });
 });

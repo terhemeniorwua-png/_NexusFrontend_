@@ -25,6 +25,8 @@ import {
   PROJECT_TYPE_STARTERS,
   PROJECT_TYPES,
   PROJECT_TYPE_LABELS,
+  type ProjectStarterChecklist,
+  type ProjectStarterTaskTemplate,
   type ProjectType,
 } from '@/lib/project-type';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
@@ -38,6 +40,8 @@ import {
   type ProjectSummary,
   type ProjectVisibility,
 } from '@/services/projects';
+import { createChecklist, createChecklistItem } from '@/services/checklists';
+import { createTaskTemplate } from '@/services/tasks';
 import { listDepartments, listTeams, type Department, type Team } from '@/services/organization-structure';
 
 // --- Validation schema (Zod) ---
@@ -104,6 +108,62 @@ function starterKey(kind: 'template' | 'checklist', name: string): string {
   return `${kind}:${name}`;
 }
 
+interface StarterSuggestionResult {
+  failed: number;
+  total: number;
+}
+
+async function createStarterSuggestions(
+  workspaceId: string,
+  projectId: string,
+  templates: readonly ProjectStarterTaskTemplate[],
+  checklist: ProjectStarterChecklist | null,
+): Promise<StarterSuggestionResult> {
+  const total = templates.length + (checklist ? 1 : 0);
+  let failed = 0;
+
+  for (const template of templates) {
+    try {
+      await createTaskTemplate(workspaceId, projectId, {
+        name: template.name,
+        ...(template.description ? { description: template.description } : {}),
+        data: {
+          version: 1,
+          title: template.name,
+          ...(template.description ? { description: template.description } : {}),
+          status: template.status,
+          priority: template.priority,
+          category: template.category,
+          labels: [...template.labels],
+        },
+      });
+    } catch {
+      failed += 1;
+    }
+  }
+
+  if (checklist) {
+    let checklistFailed = false;
+    try {
+      const created = await createChecklist(workspaceId, projectId, { title: checklist.name });
+      const checklistId = created.checklist.id;
+      if (!checklistId) throw new Error('Checklist creation returned no id.');
+      for (const text of checklist.items) {
+        try {
+          await createChecklistItem(workspaceId, projectId, checklistId, { text });
+        } catch {
+          checklistFailed = true;
+        }
+      }
+    } catch {
+      checklistFailed = true;
+    }
+    if (checklistFailed) failed += 1;
+  }
+
+  return { failed, total };
+}
+
 export default function ProjectsPage() {
   const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -114,6 +174,7 @@ export default function ProjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [workflowWarningProjectId, setWorkflowWarningProjectId] = useState<string | null>(null);
+  const [suggestionWarning, setSuggestionWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Filters
@@ -230,7 +291,16 @@ export default function ProjectsPage() {
       setCreateErrors(errors);
       return;
     }
-    setBusy(true); setError(null); setCreateErrors({}); setWorkflowWarningProjectId(null);
+    const typeStarters = PROJECT_TYPE_STARTERS[parsed.data.type];
+    const typeChecklist = typeStarters.checklist;
+    const chosenStarters = new Set(createStarters);
+    const selectedTemplates = typeStarters.taskTemplates.filter((template) =>
+      chosenStarters.has(starterKey('template', template.name)));
+    const selectedChecklist = typeChecklist && chosenStarters.has(starterKey('checklist', typeChecklist.name))
+      ? typeChecklist
+      : null;
+
+    setBusy(true); setError(null); setCreateErrors({}); setWorkflowWarningProjectId(null); setSuggestionWarning(null);
     try {
       const project = await createProject(activeWorkspace.id, {
         name: parsed.data.name, key: parsed.data.key,
@@ -249,6 +319,17 @@ export default function ProjectsPage() {
         } catch {
           setWorkflowWarningProjectId(project.id);
         }
+      }
+      const suggestionResult = await createStarterSuggestions(
+        activeWorkspace.id,
+        project.id,
+        selectedTemplates,
+        selectedChecklist,
+      );
+      if (suggestionResult.failed > 0) {
+        setSuggestionWarning(
+          `The project was created. ${suggestionResult.failed} of ${suggestionResult.total} suggested items could not be added. You can add them from the project.`,
+        );
       }
       await load();
     } catch (cause) {
@@ -336,6 +417,7 @@ export default function ProjectsPage() {
           </Link>.
         </Alert>
       )}
+      {suggestionWarning && <Alert variant="warning">{suggestionWarning}</Alert>}
       {accessStatus && <AccessState status={accessStatus} onRetry={() => void load()} />}
 
       {/* Filters */}

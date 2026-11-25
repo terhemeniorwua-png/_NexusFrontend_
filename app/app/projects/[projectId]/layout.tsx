@@ -14,7 +14,7 @@ import {
 import { getProject } from '@/services/projects';
 
 interface ProjectTab {
-  key: ProjectTabKey | 'dev-activity';
+  key: ProjectTabKey;
   href: string;
   label: string;
   exact?: boolean;

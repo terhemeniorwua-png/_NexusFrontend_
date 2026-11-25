@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ApiRequestError } from '@/lib/api';
 import { devActivityErrorMessage } from '../dev-activity-errors';
 import {

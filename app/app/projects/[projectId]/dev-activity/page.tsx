@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
@@ -344,7 +344,7 @@ function CommitsPanel({ workspaceId, projectId }: { workspaceId: string; project
       </p>
 
       {loading ? (
-        <div className="space-y-3" role="status" aria-label="Loading commits">
+        <div className="space-y-3" role="status" aria-label="Loading commits…">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
         </div>
       ) : error ? (
@@ -428,7 +428,9 @@ function developerRowKey(dev: DevActivityDeveloper): string {
 
 function developerLabel(dev: DevActivityDeveloper): string {
   if (dev.type === 'workspace_user') return dev.user?.name?.trim() || dev.displayName;
-  return `@${dev.providerLogin ?? dev.displayName ?? 'Unknown developer'}`;
+  const login = dev.providerLogin?.trim();
+  if (login) return `@${login}`;
+  return dev.displayName?.trim() || 'Unknown developer';
 }
 
 function defaultDeveloperRange(): { from: string; to: string } {
@@ -693,6 +695,7 @@ function DeveloperReportPanel({ workspaceId, projectId }: { workspaceId: string;
 
 export default function ProjectDevActivityPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const pathname = usePathname();
   const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
   const { can, isLoading: permissionsLoading } = usePermissions();
   useWorkspaceRedirect();
@@ -703,13 +706,16 @@ export default function ProjectDevActivityPage() {
 
   if (!activeWorkspace) return <AccessState status={401} />;
 
+  const developerOnlyRoute = pathname.endsWith('/dev-activity/developers');
   const canViewDevelopers = can('project.update');
+
+  if (developerOnlyRoute && !canViewDevelopers) return <AccessState status={403} />;
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">Dev activity</h1>
-      <CommitsPanel workspaceId={activeWorkspace.id} projectId={projectId} />
-      {canViewDevelopers ? <DeveloperReportPanel workspaceId={activeWorkspace.id} projectId={projectId} /> : null}
+      <h1 className="text-2xl font-semibold">{developerOnlyRoute ? 'Developer activity' : 'Dev activity'}</h1>
+      {!developerOnlyRoute && <CommitsPanel workspaceId={activeWorkspace.id} projectId={projectId} />}
+      {canViewDevelopers && <DeveloperReportPanel workspaceId={activeWorkspace.id} projectId={projectId} />}
     </div>
   );
 }

@@ -81,6 +81,182 @@ export const PROJECT_TYPE_TAB_ORDER: Partial<Record<ProjectType, readonly Projec
   ],
 };
 
+export type ProjectStarterPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface ProjectStarterTaskTemplate {
+  name: string;
+  description?: string;
+  status: 'ASSIGNED';
+  priority: ProjectStarterPriority;
+  category: string;
+  labels: readonly string[];
+}
+
+export interface ProjectStarterChecklist {
+  name: string;
+  items: readonly string[];
+}
+
+export interface ProjectTypeStarter {
+  workflowMode: 'SPRINTS' | 'BACKLOG_ONLY';
+  taskTemplates: readonly ProjectStarterTaskTemplate[];
+  checklist: ProjectStarterChecklist | null;
+}
+
+/** Optional, type-specific setup suggestions offered when creating a project. */
+export const PROJECT_TYPE_STARTERS: Record<ProjectType, ProjectTypeStarter> = {
+  GENERAL: {
+    workflowMode: 'BACKLOG_ONLY',
+    taskTemplates: [],
+    checklist: null,
+  },
+  ENGINEERING: {
+    workflowMode: 'SPRINTS',
+    taskTemplates: [
+      {
+        name: 'Bug triage',
+        description: 'Reproduce, confirm severity, assign an owner.',
+        status: 'ASSIGNED',
+        priority: 'HIGH',
+        category: 'Engineering',
+        labels: ['bug', 'triage'],
+      },
+      {
+        name: 'Feature implementation',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'Engineering',
+        labels: ['feature'],
+      },
+    ],
+    checklist: {
+      name: 'Definition of done',
+      items: [
+        'Requirements confirmed',
+        'Implementation complete',
+        'Tests added or updated',
+        'Review approved',
+        'Merged to default branch',
+      ],
+    },
+  },
+  DESIGN: {
+    workflowMode: 'BACKLOG_ONLY',
+    taskTemplates: [
+      {
+        name: 'Design review',
+        description: 'Link the latest artwork and list the decisions needed.',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'Design',
+        labels: ['design', 'review'],
+      },
+      {
+        name: 'Design iteration',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'Design',
+        labels: ['design', 'iteration'],
+      },
+    ],
+    checklist: {
+      name: 'Critique checklist',
+      items: [
+        'Brief and goals confirmed',
+        'Latest files linked',
+        'Accessibility and contrast checked',
+        'Stakeholder feedback captured',
+        'Final version approved',
+      ],
+    },
+  },
+  OPERATIONS: {
+    workflowMode: 'BACKLOG_ONLY',
+    taskTemplates: [
+      {
+        name: 'Operational request',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'Operations',
+        labels: ['ops', 'request'],
+      },
+      {
+        name: 'Process update',
+        status: 'ASSIGNED',
+        priority: 'LOW',
+        category: 'Operations',
+        labels: ['ops', 'process'],
+      },
+    ],
+    checklist: {
+      name: 'Process runbook',
+      items: [
+        'Owner assigned',
+        'Current process documented',
+        'Exceptions and escalation noted',
+        'Review date set',
+      ],
+    },
+  },
+  MARKETING: {
+    workflowMode: 'BACKLOG_ONLY',
+    taskTemplates: [
+      {
+        name: 'Campaign asset',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'Marketing',
+        labels: ['campaign', 'asset'],
+      },
+      {
+        name: 'Campaign launch check',
+        status: 'ASSIGNED',
+        priority: 'HIGH',
+        category: 'Marketing',
+        labels: ['campaign', 'launch'],
+      },
+    ],
+    checklist: {
+      name: 'Campaign launch',
+      items: [
+        'Audience and channel confirmed',
+        'Copy approved',
+        'Assets finalised',
+        'Tracking links verified',
+        'Launch date confirmed',
+      ],
+    },
+  },
+  HR: {
+    workflowMode: 'BACKLOG_ONLY',
+    taskTemplates: [
+      {
+        name: 'Onboarding task',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'HR',
+        labels: ['people', 'onboarding'],
+      },
+      {
+        name: 'Policy review',
+        status: 'ASSIGNED',
+        priority: 'LOW',
+        category: 'HR',
+        labels: ['people', 'policy'],
+      },
+    ],
+    checklist: {
+      name: 'Onboarding checklist',
+      items: [
+        'Access request submitted',
+        'Workspace and team membership confirmed',
+        'Policies acknowledged',
+        'Manager check-in scheduled',
+      ],
+    },
+  },
+};
+
 /** Fall back to GENERAL for missing or unknown values from older backends. */
 export function normaliseProjectType(value: unknown): ProjectType {
   return typeof value === 'string' && (PROJECT_TYPES as readonly string[]).includes(value)

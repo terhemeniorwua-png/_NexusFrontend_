@@ -7,6 +7,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
@@ -21,6 +22,7 @@ import { workspaceCan } from '@/lib/permissions';
 import {
   DEFAULT_PROJECT_TYPE,
   projectTypeLabel,
+  PROJECT_TYPE_STARTERS,
   PROJECT_TYPES,
   PROJECT_TYPE_LABELS,
   type ProjectType,
@@ -88,6 +90,19 @@ const VISIBILITY_CONSEQUENCES: Record<ProjectVisibility, string> = {
   PRIVATE: 'Only explicitly added project members can see this project.',
 };
 
+const TYPE_HELPER_BASE = 'Classification only. It does not grant access or change permissions. Changing it never deletes or hides work. Project sections are listed in the order that suits the selected type.';
+const TYPE_SETUP_SUFFIX: Partial<Record<ProjectType, string>> = {
+  ENGINEERING: 'Engineering starts in sprints.',
+  DESIGN: 'Design starts in backlog only.',
+  OPERATIONS: 'Operations starts in backlog only.',
+  MARKETING: 'Marketing starts in backlog only.',
+  HR: 'HR starts in backlog only.',
+};
+
+function starterKey(kind: 'template' | 'checklist', name: string): string {
+  return `${kind}:${name}`;
+}
+
 export default function ProjectsPage() {
   const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -112,6 +127,7 @@ export default function ProjectsPage() {
   const [createDescription, setCreateDescription] = useState('');
   const [createVisibility, setCreateVisibility] = useState<ProjectVisibility>('WORKSPACE');
   const [createType, setCreateType] = useState<ProjectType>(DEFAULT_PROJECT_TYPE);
+  const [createStarters, setCreateStarters] = useState<string[]>([]);
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
 
   // Organizational access options for DEPARTMENT_TEAM visibility
@@ -119,6 +135,21 @@ export default function ProjectsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [createTeamId, setCreateTeamId] = useState('');
   const [createDepartmentId, setCreateDepartmentId] = useState('');
+
+  const starterConfig = PROJECT_TYPE_STARTERS[createType];
+  const starterChecklist = starterConfig.checklist;
+  const starterChoices = [
+    ...starterConfig.taskTemplates.map((template) => ({
+      key: starterKey('template', template.name),
+      label: template.name,
+    })),
+    ...(starterChecklist
+      ? [{ key: starterKey('checklist', starterChecklist.name), label: starterChecklist.name }]
+      : []),
+  ];
+  const typeHelperText = TYPE_SETUP_SUFFIX[createType]
+    ? `${TYPE_HELPER_BASE} ${TYPE_SETUP_SUFFIX[createType]}`
+    : TYPE_HELPER_BASE;
 
   // Archive/restore
   const [archiveTarget, setArchiveTarget] = useState<ProjectSummary | null>(null);
@@ -246,6 +277,17 @@ export default function ProjectsPage() {
     }
   }
 
+  function openCreate() {
+    setCreateStarters([]);
+    setShowCreate(true);
+  }
+
+  function toggleStarter(key: string, checked: boolean) {
+    setCreateStarters((current) => checked
+      ? [...current, key]
+      : current.filter((entry) => entry !== key));
+  }
+
   if (workspaceLoading) {
     return <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8"><p role="status" className="text-sm text-[var(--color-text-secondary)]">Loading workspace…</p></div>;
   }
@@ -268,7 +310,7 @@ export default function ProjectsPage() {
         title="Projects"
         description={`Projects in ${activeWorkspace.name}. Visibility determines who can see each project. The backend enforces access on every request.`}
         actions={
-          <Button onClick={() => setShowCreate(true)}>New project</Button>
+          <Button onClick={openCreate}>New project</Button>
         }
       />
 
@@ -356,7 +398,7 @@ export default function ProjectsPage() {
               description={search || statusFilter || visibilityFilter ? 'No projects match the current filters.' : 'Create your first project to get started.'}
               action={
                 !search && !statusFilter && !visibilityFilter
-                  ? <Button onClick={() => setShowCreate(true)}>Create project</Button>
+                  ? <Button onClick={openCreate}>Create project</Button>
                   : undefined
               }
             />
@@ -498,14 +540,33 @@ export default function ProjectsPage() {
             </p>
           </div>
           {workspaceCan(activeWorkspace, 'workspace:update') && (
-            <Select
-              id="create-project-type"
-              label="Type"
-              value={createType}
-              onChange={(event) => setCreateType(event.target.value as ProjectType)}
-              options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
-              helperText="Classification only. It does not grant access or change permissions. Changing it never deletes or hides work. Project sections are listed in the order that suits the selected type."
-            />
+            <>
+              <Select
+                id="create-project-type"
+                label="Type"
+                value={createType}
+                onChange={(event) => {
+                  setCreateType(event.target.value as ProjectType);
+                  setCreateStarters([]);
+                }}
+                options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
+                helperText={typeHelperText}
+              />
+              {createType !== 'GENERAL' && starterChoices.length > 0 && (
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium text-[var(--color-text-primary)]">Starting setup</legend>
+                  {starterChoices.map((choice) => (
+                    <Checkbox
+                      key={choice.key}
+                      id={`create-starter-${choice.key.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`}
+                      label={choice.label}
+                      checked={createStarters.includes(choice.key)}
+                      onChange={(event) => toggleStarter(choice.key, event.target.checked)}
+                    />
+                  ))}
+                </fieldset>
+              )}
+            </>
           )}
           {createVisibility === 'DEPARTMENT_TEAM' && (
             <div className="space-y-4 rounded-lg border border-[var(--color-border)] p-4">

@@ -192,3 +192,92 @@ describe('ProjectsPage', () => {
     expect(await screen.findByRole('button', { name: 'Load more' })).toBeInTheDocument();
   });
 });
+
+describe('ProjectsPage — starting setup', () => {
+  const helperBase = 'Classification only. It does not grant access or change permissions. Changing it never deletes or hides work. Project sections are listed in the order that suits the selected type.';
+  const starterNames: Record<string, string[]> = {
+    ENGINEERING: ['Bug triage', 'Feature implementation', 'Definition of done'],
+    DESIGN: ['Design review', 'Design iteration', 'Critique checklist'],
+    OPERATIONS: ['Operational request', 'Process update', 'Process runbook'],
+    MARKETING: ['Campaign asset', 'Campaign launch check', 'Campaign launch'],
+    HR: ['Onboarding task', 'Policy review', 'Onboarding checklist'],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
+    mocks.listProjects.mockResolvedValue({ items: [projectA], nextCursor: null });
+  });
+
+  async function openCreateDialog() {
+    const user = userEvent.setup();
+    render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    await screen.findByRole('dialog');
+    return user;
+  }
+
+  it('shows unchecked starter checkboxes only for non-General types', async () => {
+    const user = await openCreateDialog();
+
+    expect(screen.queryByText('Starting setup')).not.toBeInTheDocument();
+
+    for (const [type, names] of Object.entries(starterNames)) {
+      await user.selectOptions(screen.getByLabelText('Type'), type);
+      expect(screen.getByText('Starting setup')).toBeInTheDocument();
+      for (const name of names) {
+        expect(screen.getByRole('checkbox', { name })).not.toBeChecked();
+      }
+    }
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'GENERAL');
+    expect(screen.queryByText('Starting setup')).not.toBeInTheDocument();
+  });
+
+  it('resets starter ticks when the type changes', async () => {
+    const user = await openCreateDialog();
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'ENGINEERING');
+    const bugTriage = screen.getByRole('checkbox', { name: 'Bug triage' });
+    await user.click(bugTriage);
+    expect(bugTriage).toBeChecked();
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'DESIGN');
+    expect(screen.queryByRole('checkbox', { name: 'Bug triage' })).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Design review' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Critique checklist' })).not.toBeChecked();
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'ENGINEERING');
+    expect(screen.getByRole('checkbox', { name: 'Bug triage' })).not.toBeChecked();
+  });
+
+  it('does not render starting setup outside the workspace update gate', async () => {
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'VIEWER', organizationRole: null };
+    await openCreateDialog();
+
+    expect(screen.queryByLabelText('Type')).not.toBeInTheDocument();
+    expect(screen.queryByText('Starting setup')).not.toBeInTheDocument();
+  });
+
+  it('shows the unchanged helper sentence plus the type-specific suffix', async () => {
+    const user = await openCreateDialog();
+    const expectedSuffixes: Record<string, string> = {
+      ENGINEERING: 'Engineering starts in sprints.',
+      DESIGN: 'Design starts in backlog only.',
+      OPERATIONS: 'Operations starts in backlog only.',
+      MARKETING: 'Marketing starts in backlog only.',
+      HR: 'HR starts in backlog only.',
+    };
+
+    expect(screen.getByText(helperBase)).toBeInTheDocument();
+    for (const [type, suffix] of Object.entries(expectedSuffixes)) {
+      await user.selectOptions(screen.getByLabelText('Type'), type);
+      expect(screen.getByText(`${helperBase} ${suffix}`)).toBeInTheDocument();
+    }
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'GENERAL');
+    expect(screen.getByText(helperBase)).toBeInTheDocument();
+    expect(screen.queryByText(`${helperBase} General`)).not.toBeInTheDocument();
+  });
+});

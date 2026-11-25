@@ -4,6 +4,7 @@ import {
   DEFAULT_PROJECT_TAB_ORDER,
   normaliseProjectType,
   orderTabsForType,
+  PROJECT_TYPE_STARTERS,
   PROJECT_TYPES,
   PROJECT_TYPE_LABELS,
   projectTypeLabel,
@@ -32,6 +33,27 @@ describe('project type contract', () => {
     expect(normaliseProjectType(null)).toBe('GENERAL');
     expect(normaliseProjectType(42)).toBe('GENERAL');
     expect(projectTypeLabel('LEGACY_TYPE')).toBe('General');
+  });
+});
+
+describe('PROJECT_TYPE_STARTERS', () => {
+  it('defaults Engineering to sprints and every other type to backlog only', () => {
+    expect(PROJECT_TYPE_STARTERS.ENGINEERING.workflowMode).toBe('SPRINTS');
+    for (const type of PROJECT_TYPES.filter((entry) => entry !== 'ENGINEERING')) {
+      expect(PROJECT_TYPE_STARTERS[type].workflowMode).toBe('BACKLOG_ONLY');
+    }
+  });
+
+  it('leaves General without suggestions and marks every template ASSIGNED', () => {
+    expect(PROJECT_TYPE_STARTERS.GENERAL.taskTemplates).toEqual([]);
+    expect(PROJECT_TYPE_STARTERS.GENERAL.checklist).toBeNull();
+    for (const type of PROJECT_TYPES.filter((entry) => entry !== 'GENERAL')) {
+      expect(PROJECT_TYPE_STARTERS[type].taskTemplates).toHaveLength(2);
+      expect(PROJECT_TYPE_STARTERS[type].checklist).not.toBeNull();
+      for (const template of PROJECT_TYPE_STARTERS[type].taskTemplates) {
+        expect(template.status).toBe('ASSIGNED');
+      }
+    }
   });
 });
 

@@ -68,11 +68,11 @@ describe('ProjectLayout — section order by project type', () => {
   const fullPermissions = ['project.view', 'task.view', 'project.report.view', 'project.settings.manage'];
   const generalOrder = [
     'Overview', 'Tasks', 'Sprints', 'Members', 'Checklists', 'Reviews',
-    'Milestones', 'Code', 'Activity', 'Reports', 'Settings', 'Dev activity',
+    'Milestones', 'Code', 'Dev activity', 'Activity', 'Reports', 'Settings',
   ];
   const designOrder = [
     'Overview', 'Tasks', 'Reviews', 'Checklists', 'Sprints', 'Milestones',
-    'Code', 'Members', 'Activity', 'Reports', 'Settings', 'Dev activity',
+    'Code', 'Dev activity', 'Members', 'Activity', 'Reports', 'Settings',
   ];
   const visibleLabels = () => screen.getAllByRole('link').map((link) => link.textContent);
 
@@ -86,21 +86,21 @@ describe('ProjectLayout — section order by project type', () => {
   it.each([
     ['GENERAL', generalOrder],
     ['ENGINEERING', [
-      'Overview', 'Tasks', 'Sprints', 'Code', 'Reviews', 'Checklists',
-      'Milestones', 'Members', 'Activity', 'Reports', 'Settings', 'Dev activity',
+      'Overview', 'Tasks', 'Sprints', 'Code', 'Dev activity', 'Reviews', 'Checklists',
+      'Milestones', 'Members', 'Activity', 'Reports', 'Settings',
     ]],
     ['DESIGN', designOrder],
     ['OPERATIONS', [
       'Overview', 'Tasks', 'Checklists', 'Milestones', 'Members', 'Activity',
-      'Code', 'Reviews', 'Reports', 'Settings', 'Sprints', 'Dev activity',
+      'Code', 'Dev activity', 'Reviews', 'Reports', 'Settings', 'Sprints',
     ]],
     ['MARKETING', [
       'Overview', 'Tasks', 'Milestones', 'Checklists', 'Reviews', 'Members',
-      'Activity', 'Code', 'Reports', 'Settings', 'Sprints', 'Dev activity',
+      'Activity', 'Code', 'Dev activity', 'Reports', 'Settings', 'Sprints',
     ]],
     ['HR', [
       'Overview', 'Tasks', 'Checklists', 'Members', 'Reviews', 'Milestones',
-      'Activity', 'Code', 'Reports', 'Settings', 'Sprints', 'Dev activity',
+      'Activity', 'Code', 'Dev activity', 'Reports', 'Settings', 'Sprints',
     ]],
   ] as const)('orders the existing sections for %s', async (type, expected) => {
     mocks.getProject.mockResolvedValue({ id: 'project-1', type, workflowMode: 'SPRINTS' });
@@ -115,10 +115,21 @@ describe('ProjectLayout — section order by project type', () => {
     await waitFor(() => expect(mocks.getProject).toHaveBeenCalledWith('ws-1', 'project-1'));
     expect(screen.queryByRole('link', { name: 'Sprints' })).not.toBeInTheDocument();
     await waitFor(() => expect(visibleLabels()).toEqual([
-      'Overview', 'Tasks', 'Code', 'Reviews', 'Checklists', 'Milestones',
-      'Members', 'Activity', 'Reports', 'Settings', 'Dev activity',
+      'Overview', 'Tasks', 'Code', 'Dev activity', 'Reviews', 'Checklists', 'Milestones',
+      'Members', 'Activity', 'Reports', 'Settings',
     ]));
   });
+
+  it.each(['ENGINEERING', 'DESIGN'] as const)(
+    'a BACKLOG_ONLY project shows no Sprints tab even for %s',
+    async (type) => {
+      mocks.getProject.mockResolvedValue({ id: 'project-1', type, workflowMode: 'BACKLOG_ONLY' });
+      render(<ProjectLayout><div>Page content</div></ProjectLayout>);
+      await waitFor(() => expect(mocks.getProject).toHaveBeenCalledWith('ws-1', 'project-1'));
+      await waitFor(() => expect(screen.queryByRole('link', { name: 'Sprints' })).not.toBeInTheDocument());
+      expect(visibleLabels()).not.toContain('Sprints');
+    },
+  );
 
   it('still limits a viewer to the existing permission rules', async () => {
     setPermissions(['project.view']);
@@ -148,7 +159,7 @@ describe('ProjectLayout — section order by project type', () => {
     await waitFor(() => expect(mocks.getProject).toHaveBeenCalledWith('ws-1', 'project-1'));
     await waitFor(() => expect(visibleLabels()).toEqual([
       'Overview', 'Tasks', 'Members', 'Checklists', 'Reviews', 'Milestones',
-      'Code', 'Activity', 'Reports', 'Settings', 'Dev activity',
+      'Code', 'Dev activity', 'Activity', 'Reports', 'Settings',
     ]));
   });
 });

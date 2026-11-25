@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   activeWorkspace: null as null | { id: string; name: string; type: string; role: string; organizationRole: null },
   listProjects: vi.fn(),
   createProject: vi.fn(),
+  updateProject: vi.fn(),
+  createTaskTemplate: vi.fn(),
+  createChecklist: vi.fn(),
+  createChecklistItem: vi.fn(),
   archiveProject: vi.fn(),
   restoreProject: vi.fn(),
 }));
@@ -22,8 +26,16 @@ vi.mock('@/services/projects', () => ({
   },
   listProjects: mocks.listProjects,
   createProject: mocks.createProject,
+  updateProject: mocks.updateProject,
   archiveProject: mocks.archiveProject,
   restoreProject: mocks.restoreProject,
+}));
+vi.mock('@/services/tasks', () => ({
+  createTaskTemplate: mocks.createTaskTemplate,
+}));
+vi.mock('@/services/checklists', () => ({
+  createChecklist: mocks.createChecklist,
+  createChecklistItem: mocks.createChecklistItem,
 }));
 
 const projectA = {
@@ -190,5 +202,301 @@ describe('ProjectsPage', () => {
     mocks.listProjects.mockResolvedValue({ items: [projectA], nextCursor: 'cursor-abc' });
     render(<ProjectsPage />);
     expect(await screen.findByRole('button', { name: 'Load more' })).toBeInTheDocument();
+  });
+});
+
+describe('ProjectsPage — starting setup', () => {
+  const helperBase = 'Classification only. It does not grant access or change permissions. Changing it never deletes or hides work. Project sections are listed in the order that suits the selected type.';
+  const starterNames: Record<string, string[]> = {
+    ENGINEERING: ['Bug triage', 'Feature implementation', 'Definition of done'],
+    DESIGN: ['Design review', 'Design iteration', 'Critique checklist'],
+    OPERATIONS: ['Operational request', 'Process update', 'Process runbook'],
+    MARKETING: ['Campaign asset', 'Campaign launch check', 'Campaign launch'],
+    HR: ['Onboarding task', 'Policy review', 'Onboarding checklist'],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
+    mocks.listProjects.mockResolvedValue({ items: [projectA], nextCursor: null });
+  });
+
+  async function openCreateDialog() {
+    const user = userEvent.setup();
+    render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    await screen.findByRole('dialog');
+    return user;
+  }
+
+  it('shows unchecked starter checkboxes only for non-General types', async () => {
+    const user = await openCreateDialog();
+
+    expect(screen.queryByText('Starting setup')).not.toBeInTheDocument();
+
+    for (const [type, names] of Object.entries(starterNames)) {
+      await user.selectOptions(screen.getByLabelText('Type'), type);
+      expect(screen.getByText('Starting setup')).toBeInTheDocument();
+      for (const name of names) {
+        expect(screen.getByRole('checkbox', { name })).not.toBeChecked();
+      }
+    }
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'GENERAL');
+    expect(screen.queryByText('Starting setup')).not.toBeInTheDocument();
+  });
+
+  it('resets starter ticks when the type changes', async () => {
+    const user = await openCreateDialog();
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'ENGINEERING');
+    const bugTriage = screen.getByRole('checkbox', { name: 'Bug triage' });
+    await user.click(bugTriage);
+    expect(bugTriage).toBeChecked();
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'DESIGN');
+    expect(screen.queryByRole('checkbox', { name: 'Bug triage' })).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Design review' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Critique checklist' })).not.toBeChecked();
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'ENGINEERING');
+    expect(screen.getByRole('checkbox', { name: 'Bug triage' })).not.toBeChecked();
+  });
+
+  it('does not render starting setup outside the workspace update gate', async () => {
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'VIEWER', organizationRole: null };
+    await openCreateDialog();
+
+    expect(screen.queryByLabelText('Type')).not.toBeInTheDocument();
+    expect(screen.queryByText('Starting setup')).not.toBeInTheDocument();
+  });
+
+  it('shows the unchanged helper sentence plus the type-specific suffix', async () => {
+    const user = await openCreateDialog();
+    const expectedSuffixes: Record<string, string> = {
+      ENGINEERING: 'Engineering starts in sprints.',
+      DESIGN: 'Design starts in backlog only.',
+      OPERATIONS: 'Operations starts in backlog only.',
+      MARKETING: 'Marketing starts in backlog only.',
+      HR: 'HR starts in backlog only.',
+    };
+
+    expect(screen.getByText(helperBase)).toBeInTheDocument();
+    for (const [type, suffix] of Object.entries(expectedSuffixes)) {
+      await user.selectOptions(screen.getByLabelText('Type'), type);
+      expect(screen.getByText(`${helperBase} ${suffix}`)).toBeInTheDocument();
+    }
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'GENERAL');
+    expect(screen.getByText(helperBase)).toBeInTheDocument();
+    expect(screen.queryByText(`${helperBase} General`)).not.toBeInTheDocument();
+  });
+});
+
+describe('ProjectsPage — workflow default', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
+    mocks.listProjects.mockResolvedValue({ items: [projectA], nextCursor: null });
+  });
+
+  async function submitCreate(type: string, name: string) {
+    const user = userEvent.setup();
+    render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    await screen.findByRole('dialog');
+    if (type !== 'GENERAL') {
+      await user.selectOptions(screen.getByLabelText('Type'), type);
+    }
+    await user.type(screen.getByLabelText(/Project name/), name);
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+    return user;
+  }
+
+  it('turns on sprints for Engineering after the project is created', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-eng', type: 'ENGINEERING' });
+    mocks.updateProject.mockResolvedValue({ ...projectA, id: 'project-eng', type: 'ENGINEERING', workflowMode: 'SPRINTS' });
+
+    await submitCreate('ENGINEERING', 'Engineering Project');
+
+    await waitFor(() => expect(mocks.updateProject).toHaveBeenCalledWith(
+      'ws-1',
+      'project-eng',
+      { workflowMode: 'SPRINTS' },
+    ));
+    expect(mocks.createProject).toHaveBeenCalledWith(
+      'ws-1',
+      expect.objectContaining({ name: 'Engineering Project', type: 'ENGINEERING' }),
+    );
+    expect(await screen.findByText('Project created.')).toBeInTheDocument();
+  });
+
+  it.each(['GENERAL', 'DESIGN', 'OPERATIONS', 'MARKETING', 'HR'])(
+    'does not patch the workflow for %s',
+    async (type) => {
+      mocks.createProject.mockResolvedValue({ ...projectA, id: `project-${type.toLowerCase()}`, type });
+
+      await submitCreate(type, `${type} Project`);
+
+      await waitFor(() => expect(mocks.createProject).toHaveBeenCalled());
+      expect(await screen.findByText('Project created.')).toBeInTheDocument();
+      expect(mocks.updateProject).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps the project and shows a settings link when the workflow patch fails', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-eng', type: 'ENGINEERING' });
+    mocks.updateProject.mockRejectedValue(new Error('patch failed'));
+
+    await submitCreate('ENGINEERING', 'Engineering Project');
+
+    await waitFor(() => expect(mocks.updateProject).toHaveBeenCalled());
+    expect(await screen.findByText(/The project was created, but sprints could not be turned on/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'project settings' })).toHaveAttribute(
+      'href',
+      '/app/projects/project-eng/settings',
+    );
+    expect(screen.getByText('Project created.')).toBeInTheDocument();
+  });
+});
+
+describe('ProjectsPage — starter suggestions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.activeWorkspace = { id: 'ws-1', name: 'Test Workspace', type: 'COMPANY', role: 'OWNER', organizationRole: null };
+    mocks.listProjects.mockResolvedValue({ items: [projectA], nextCursor: null });
+    mocks.createTaskTemplate.mockResolvedValue({ id: 'template-1' });
+    mocks.createChecklist.mockResolvedValue({ checklist: { id: 'checklist-1', title: 'Critique checklist' } });
+    mocks.createChecklistItem.mockImplementation(async (_workspaceId, _projectId, _checklistId, input: { text: string }) => ({
+      item: { id: `item-${input.text}`, text: input.text },
+      revision: 1,
+    }));
+  });
+
+  async function openAndSelect(type: string, names: string[], projectName: string) {
+    const user = userEvent.setup();
+    render(<ProjectsPage />);
+    await waitFor(() => screen.getByRole('button', { name: 'New project' }));
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    await screen.findByRole('dialog');
+    if (type !== 'GENERAL') {
+      await user.selectOptions(screen.getByLabelText('Type'), type);
+    }
+    for (const name of names) {
+      await user.click(screen.getByRole('checkbox', { name }));
+    }
+    await user.type(screen.getByLabelText(/Project name/), projectName);
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+    return user;
+  }
+
+  it('creates ticked Design suggestions in order without patching the workflow', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-design', type: 'DESIGN' });
+
+    await openAndSelect(
+      'DESIGN',
+      ['Design review', 'Design iteration', 'Critique checklist'],
+      'Design Project',
+    );
+
+    await waitFor(() => expect(mocks.createChecklistItem).toHaveBeenCalledTimes(5));
+    expect(await screen.findByText('Project created.')).toBeInTheDocument();
+    expect(mocks.updateProject).not.toHaveBeenCalled();
+
+    expect(mocks.createTaskTemplate.mock.calls.map((call) => call[2].name)).toEqual([
+      'Design review',
+      'Design iteration',
+    ]);
+    expect(mocks.createTaskTemplate).toHaveBeenNthCalledWith(1, 'ws-1', 'project-design', {
+      name: 'Design review',
+      description: 'Link the latest artwork and list the decisions needed.',
+      data: {
+        version: 1,
+        title: 'Design review',
+        description: 'Link the latest artwork and list the decisions needed.',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'Design',
+        labels: ['design', 'review'],
+      },
+    });
+    expect(mocks.createTaskTemplate).toHaveBeenNthCalledWith(2, 'ws-1', 'project-design', {
+      name: 'Design iteration',
+      data: {
+        version: 1,
+        title: 'Design iteration',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        category: 'Design',
+        labels: ['design', 'iteration'],
+      },
+    });
+    expect(mocks.createChecklist).toHaveBeenCalledWith(
+      'ws-1',
+      'project-design',
+      { title: 'Critique checklist' },
+    );
+    expect(mocks.createChecklistItem.mock.calls.map((call) => call[3].text)).toEqual([
+      'Brief and goals confirmed',
+      'Latest files linked',
+      'Accessibility and contrast checked',
+      'Stakeholder feedback captured',
+      'Final version approved',
+    ]);
+    expect(mocks.createTaskTemplate.mock.invocationCallOrder[1]).toBeLessThan(
+      mocks.createChecklist.mock.invocationCallOrder[0],
+    );
+    expect(mocks.createChecklist.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.createChecklistItem.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not create unticked suggestions', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-hr', type: 'HR' });
+
+    await openAndSelect('HR', ['Policy review'], 'HR Project');
+
+    await waitFor(() => expect(mocks.createTaskTemplate).toHaveBeenCalledTimes(1));
+    expect(mocks.createTaskTemplate).toHaveBeenCalledWith(
+      'ws-1',
+      'project-hr',
+      expect.objectContaining({ name: 'Policy review' }),
+    );
+    expect(mocks.createChecklist).not.toHaveBeenCalled();
+    expect(mocks.createChecklistItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the project, counts one failed suggestion and does not retry it', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-design', type: 'DESIGN' });
+    mocks.createTaskTemplate
+      .mockResolvedValueOnce({ id: 'template-1' })
+      .mockRejectedValueOnce(new Error('template failed'));
+
+    await openAndSelect(
+      'DESIGN',
+      ['Design review', 'Design iteration', 'Critique checklist'],
+      'Design Project',
+    );
+
+    expect(await screen.findByText('The project was created. 1 of 3 suggested items could not be added. You can add them from the project.')).toBeInTheDocument();
+    expect(mocks.createProject).toHaveBeenCalledTimes(1);
+    expect(mocks.createTaskTemplate).toHaveBeenCalledTimes(2);
+    expect(mocks.createChecklist).toHaveBeenCalledTimes(1);
+    expect(mocks.createChecklistItem).toHaveBeenCalledTimes(5);
+    expect(mocks.updateProject).not.toHaveBeenCalled();
+  });
+
+  it('creates no suggestions for a General project', async () => {
+    mocks.createProject.mockResolvedValue({ ...projectA, id: 'project-general', type: 'GENERAL' });
+
+    await openAndSelect('GENERAL', [], 'General Project');
+
+    expect(await screen.findByText('Project created.')).toBeInTheDocument();
+    expect(mocks.createTaskTemplate).not.toHaveBeenCalled();
+    expect(mocks.createChecklist).not.toHaveBeenCalled();
+    expect(mocks.createChecklistItem).not.toHaveBeenCalled();
+    expect(mocks.updateProject).not.toHaveBeenCalled();
   });
 });

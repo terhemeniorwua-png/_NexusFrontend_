@@ -7,6 +7,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
@@ -21,8 +22,11 @@ import { workspaceCan } from '@/lib/permissions';
 import {
   DEFAULT_PROJECT_TYPE,
   projectTypeLabel,
+  PROJECT_TYPE_STARTERS,
   PROJECT_TYPES,
   PROJECT_TYPE_LABELS,
+  type ProjectStarterChecklist,
+  type ProjectStarterTaskTemplate,
   type ProjectType,
 } from '@/lib/project-type';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
@@ -31,10 +35,13 @@ import {
   createProject,
   listProjects,
   restoreProject,
+  updateProject,
   type ProjectStatus,
   type ProjectSummary,
   type ProjectVisibility,
 } from '@/services/projects';
+import { createChecklist, createChecklistItem } from '@/services/checklists';
+import { createTaskTemplate } from '@/services/tasks';
 import { listDepartments, listTeams, type Department, type Team } from '@/services/organization-structure';
 
 // --- Validation schema (Zod) ---
@@ -88,6 +95,75 @@ const VISIBILITY_CONSEQUENCES: Record<ProjectVisibility, string> = {
   PRIVATE: 'Only explicitly added project members can see this project.',
 };
 
+const TYPE_HELPER_BASE = 'Classification only. It does not grant access or change permissions. Changing it never deletes or hides work. Project sections are listed in the order that suits the selected type.';
+const TYPE_SETUP_SUFFIX: Partial<Record<ProjectType, string>> = {
+  ENGINEERING: 'Engineering starts in sprints.',
+  DESIGN: 'Design starts in backlog only.',
+  OPERATIONS: 'Operations starts in backlog only.',
+  MARKETING: 'Marketing starts in backlog only.',
+  HR: 'HR starts in backlog only.',
+};
+
+function starterKey(kind: 'template' | 'checklist', name: string): string {
+  return `${kind}:${name}`;
+}
+
+interface StarterSuggestionResult {
+  failed: number;
+  total: number;
+}
+
+async function createStarterSuggestions(
+  workspaceId: string,
+  projectId: string,
+  templates: readonly ProjectStarterTaskTemplate[],
+  checklist: ProjectStarterChecklist | null,
+): Promise<StarterSuggestionResult> {
+  const total = templates.length + (checklist ? 1 : 0);
+  let failed = 0;
+
+  for (const template of templates) {
+    try {
+      await createTaskTemplate(workspaceId, projectId, {
+        name: template.name,
+        ...(template.description ? { description: template.description } : {}),
+        data: {
+          version: 1,
+          title: template.name,
+          ...(template.description ? { description: template.description } : {}),
+          status: template.status,
+          priority: template.priority,
+          category: template.category,
+          labels: [...template.labels],
+        },
+      });
+    } catch {
+      failed += 1;
+    }
+  }
+
+  if (checklist) {
+    let checklistFailed = false;
+    try {
+      const created = await createChecklist(workspaceId, projectId, { title: checklist.name });
+      const checklistId = created.checklist.id;
+      if (!checklistId) throw new Error('Checklist creation returned no id.');
+      for (const text of checklist.items) {
+        try {
+          await createChecklistItem(workspaceId, projectId, checklistId, { text });
+        } catch {
+          checklistFailed = true;
+        }
+      }
+    } catch {
+      checklistFailed = true;
+    }
+    if (checklistFailed) failed += 1;
+  }
+
+  return { failed, total };
+}
+
 export default function ProjectsPage() {
   const { activeWorkspace, loading: workspaceLoading } = useWorkspaceContext();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -97,6 +173,8 @@ export default function ProjectsPage() {
   const [accessStatus, setAccessStatus] = useState<null | 401 | 403>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [workflowWarningProjectId, setWorkflowWarningProjectId] = useState<string | null>(null);
+  const [suggestionWarning, setSuggestionWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Filters
@@ -112,6 +190,7 @@ export default function ProjectsPage() {
   const [createDescription, setCreateDescription] = useState('');
   const [createVisibility, setCreateVisibility] = useState<ProjectVisibility>('WORKSPACE');
   const [createType, setCreateType] = useState<ProjectType>(DEFAULT_PROJECT_TYPE);
+  const [createStarters, setCreateStarters] = useState<string[]>([]);
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
 
   // Organizational access options for DEPARTMENT_TEAM visibility
@@ -119,6 +198,21 @@ export default function ProjectsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [createTeamId, setCreateTeamId] = useState('');
   const [createDepartmentId, setCreateDepartmentId] = useState('');
+
+  const starterConfig = PROJECT_TYPE_STARTERS[createType];
+  const starterChecklist = starterConfig.checklist;
+  const starterChoices = [
+    ...starterConfig.taskTemplates.map((template) => ({
+      key: starterKey('template', template.name),
+      label: template.name,
+    })),
+    ...(starterChecklist
+      ? [{ key: starterKey('checklist', starterChecklist.name), label: starterChecklist.name }]
+      : []),
+  ];
+  const typeHelperText = TYPE_SETUP_SUFFIX[createType]
+    ? `${TYPE_HELPER_BASE} ${TYPE_SETUP_SUFFIX[createType]}`
+    : TYPE_HELPER_BASE;
 
   // Archive/restore
   const [archiveTarget, setArchiveTarget] = useState<ProjectSummary | null>(null);
@@ -197,9 +291,18 @@ export default function ProjectsPage() {
       setCreateErrors(errors);
       return;
     }
-    setBusy(true); setError(null); setCreateErrors({});
+    const typeStarters = PROJECT_TYPE_STARTERS[parsed.data.type];
+    const typeChecklist = typeStarters.checklist;
+    const chosenStarters = new Set(createStarters);
+    const selectedTemplates = typeStarters.taskTemplates.filter((template) =>
+      chosenStarters.has(starterKey('template', template.name)));
+    const selectedChecklist = typeChecklist && chosenStarters.has(starterKey('checklist', typeChecklist.name))
+      ? typeChecklist
+      : null;
+
+    setBusy(true); setError(null); setCreateErrors({}); setWorkflowWarningProjectId(null); setSuggestionWarning(null);
     try {
-      await createProject(activeWorkspace.id, {
+      const project = await createProject(activeWorkspace.id, {
         name: parsed.data.name, key: parsed.data.key,
         description: parsed.data.description ?? null,
         visibility: parsed.data.visibility,
@@ -208,8 +311,26 @@ export default function ProjectsPage() {
         ...(parsed.data.visibility === 'DEPARTMENT_TEAM' && createDepartmentId ? { departmentId: createDepartmentId } : {}),
       });
       setShowCreate(false);
-      setCreateName(''); setCreateKey(''); setCreateDescription(''); setCreateVisibility('WORKSPACE'); setCreateType(DEFAULT_PROJECT_TYPE); setCreateTeamId(''); setCreateDepartmentId('');
+      setCreateName(''); setCreateKey(''); setCreateDescription(''); setCreateVisibility('WORKSPACE'); setCreateType(DEFAULT_PROJECT_TYPE); setCreateStarters([]); setCreateTeamId(''); setCreateDepartmentId('');
       setNotice('Project created.');
+      if (parsed.data.type === 'ENGINEERING') {
+        try {
+          await updateProject(activeWorkspace.id, project.id, { workflowMode: 'SPRINTS' });
+        } catch {
+          setWorkflowWarningProjectId(project.id);
+        }
+      }
+      const suggestionResult = await createStarterSuggestions(
+        activeWorkspace.id,
+        project.id,
+        selectedTemplates,
+        selectedChecklist,
+      );
+      if (suggestionResult.failed > 0) {
+        setSuggestionWarning(
+          `The project was created. ${suggestionResult.failed} of ${suggestionResult.total} suggested items could not be added. You can add them from the project.`,
+        );
+      }
       await load();
     } catch (cause) {
       setError(requestError(cause, 'Project could not be created.'));
@@ -246,6 +367,17 @@ export default function ProjectsPage() {
     }
   }
 
+  function openCreate() {
+    setCreateStarters([]);
+    setShowCreate(true);
+  }
+
+  function toggleStarter(key: string, checked: boolean) {
+    setCreateStarters((current) => checked
+      ? [...current, key]
+      : current.filter((entry) => entry !== key));
+  }
+
   if (workspaceLoading) {
     return <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8"><p role="status" className="text-sm text-[var(--color-text-secondary)]">Loading workspace…</p></div>;
   }
@@ -268,12 +400,24 @@ export default function ProjectsPage() {
         title="Projects"
         description={`Projects in ${activeWorkspace.name}. Visibility determines who can see each project. The backend enforces access on every request.`}
         actions={
-          <Button onClick={() => setShowCreate(true)}>New project</Button>
+          <Button onClick={openCreate}>New project</Button>
         }
       />
 
       {error && <Alert variant="error" title="Could not complete request">{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}
+      {workflowWarningProjectId && (
+        <Alert variant="warning">
+          The project was created, but sprints could not be turned on. You can change this in{' '}
+          <Link
+            href={`/app/projects/${encodeURIComponent(workflowWarningProjectId)}/settings`}
+            className="underline"
+          >
+            project settings
+          </Link>.
+        </Alert>
+      )}
+      {suggestionWarning && <Alert variant="warning">{suggestionWarning}</Alert>}
       {accessStatus && <AccessState status={accessStatus} onRetry={() => void load()} />}
 
       {/* Filters */}
@@ -356,7 +500,7 @@ export default function ProjectsPage() {
               description={search || statusFilter || visibilityFilter ? 'No projects match the current filters.' : 'Create your first project to get started.'}
               action={
                 !search && !statusFilter && !visibilityFilter
-                  ? <Button onClick={() => setShowCreate(true)}>Create project</Button>
+                  ? <Button onClick={openCreate}>Create project</Button>
                   : undefined
               }
             />
@@ -498,14 +642,33 @@ export default function ProjectsPage() {
             </p>
           </div>
           {workspaceCan(activeWorkspace, 'workspace:update') && (
-            <Select
-              id="create-project-type"
-              label="Type"
-              value={createType}
-              onChange={(event) => setCreateType(event.target.value as ProjectType)}
-              options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
-              helperText="Classification only. It does not grant access or change permissions. Changing it never deletes or hides work. Project sections are listed in the order that suits the selected type."
-            />
+            <>
+              <Select
+                id="create-project-type"
+                label="Type"
+                value={createType}
+                onChange={(event) => {
+                  setCreateType(event.target.value as ProjectType);
+                  setCreateStarters([]);
+                }}
+                options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
+                helperText={typeHelperText}
+              />
+              {createType !== 'GENERAL' && starterChoices.length > 0 && (
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium text-[var(--color-text-primary)]">Starting setup</legend>
+                  {starterChoices.map((choice) => (
+                    <Checkbox
+                      key={choice.key}
+                      id={`create-starter-${choice.key.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`}
+                      label={choice.label}
+                      checked={createStarters.includes(choice.key)}
+                      onChange={(event) => toggleStarter(choice.key, event.target.checked)}
+                    />
+                  ))}
+                </fieldset>
+              )}
+            </>
           )}
           {createVisibility === 'DEPARTMENT_TEAM' && (
             <div className="space-y-4 rounded-lg border border-[var(--color-border)] p-4">

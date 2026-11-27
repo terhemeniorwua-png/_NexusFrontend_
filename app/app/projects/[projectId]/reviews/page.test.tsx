@@ -117,10 +117,15 @@ async function renderPage(): Promise<void> {
   expect(await screen.findByRole('list', { name: 'Submission reviews' })).toBeInTheDocument();
 }
 
-async function openFirstReview(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+async function openFirstReview(
+  user: ReturnType<typeof userEvent.setup>,
+  expectedLabel = 'Attachment version',
+): Promise<void> {
   const list = screen.getByRole('list', { name: 'Submission reviews' });
   await user.click(within(list).getAllByRole('button')[0]);
-  expect(await screen.findByRole('heading', { name: /Attachment version · Round/ })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('heading', { name: new RegExp(`${expectedLabel} · Round`) }),
+  ).toBeInTheDocument();
 }
 
 describe('ProjectReviewsPage', () => {
@@ -384,7 +389,7 @@ describe('ProjectReviewsPage', () => {
     mocks.getReview.mockResolvedValue({ review: taskReview });
 
     await renderPage();
-    await openFirstReview(user);
+    await openFirstReview(user, 'Task');
 
     expect(screen.getByRole('heading', { name: /Task · Round 2/ })).toBeInTheDocument();
     expect(screen.getByText('Task ID')).toBeInTheDocument();
@@ -409,7 +414,7 @@ describe('ProjectReviewsPage', () => {
     mocks.getReview.mockResolvedValue({ review: taskReview });
 
     await renderPage();
-    await openFirstReview(user);
+    await openFirstReview(user, 'Task');
 
     expect(screen.queryByRole('link', { name: /javascript:alert/ })).not.toBeInTheDocument();
     expect(screen.getByText('Review copy')).toBeInTheDocument();
@@ -425,7 +430,7 @@ describe('ProjectReviewsPage', () => {
     mocks.getReview.mockResolvedValue({ review: checklistReview });
 
     await renderPage();
-    await openFirstReview(user);
+    await openFirstReview(user, 'Checklist');
 
     expect(screen.getByRole('heading', { name: /Checklist · Round 2/ })).toBeInTheDocument();
     expect(screen.getByText('Target ID')).toBeInTheDocument();

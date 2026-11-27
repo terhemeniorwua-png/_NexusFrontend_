@@ -108,6 +108,91 @@ describe('reviews service', () => {
     expect(result).toEqual({ items: [], nextCursor: null });
   });
 
+  it('normalises a task review, including decisions mapping', async () => {
+    mocks.apiRequest.mockResolvedValue({
+      review: {
+        ...reviewPayload,
+        resource: { kind: 'task', id: 'task-1' },
+        taskId: 'task-1',
+        artworkUrl: 'https://example.com/art.png',
+        decisions: [
+          { text: '  Approve hero  ' },
+          { text: '' },
+          { nope: true },
+          '  Keep spacing  ',
+          42,
+        ],
+      },
+    });
+    const { getReview } = await import('../reviews');
+
+    const result = await getReview(WS, PROJECT, REVIEW);
+
+    expect(result.review.resource).toEqual({ kind: 'task', id: 'task-1' });
+    expect(result.review.taskId).toBe('task-1');
+    expect(result.review.artworkUrl).toBe('https://example.com/art.png');
+    expect(result.review.decisions).toEqual(['Approve hero', 'Keep spacing']);
+  });
+
+  it('normalises malformed or missing task decisions to an empty array', async () => {
+    mocks.apiRequest.mockResolvedValue({
+      review: {
+        ...reviewPayload,
+        resource: { kind: 'task', id: 'task-1' },
+        taskId: 'task-1',
+        artworkUrl: null,
+        decisions: { bad: true },
+      },
+    });
+    const { getReview } = await import('../reviews');
+
+    const result = await getReview(WS, PROJECT, REVIEW);
+
+    expect(result.review.decisions).toEqual([]);
+    expect(result.review.artworkUrl).toBeNull();
+  });
+
+  it('does not label a review with no target as attachment version', async () => {
+    mocks.apiRequest.mockResolvedValue({
+      review: {
+        id: REVIEW,
+        status: 'SUBMITTED',
+        round: 1,
+        assigneeId: null,
+        submittedById: 'user-1',
+        resource: { kind: 'mystery', id: '' },
+      },
+    });
+    const { getReview } = await import('../reviews');
+
+    const result = await getReview(WS, PROJECT, REVIEW);
+
+    expect(result.review.resource.kind).toBe('unknown');
+    expect(result.review.resource.kind).not.toBe('attachmentVersion');
+  });
+
+  it('keeps attachment and checklist normalisation unchanged', async () => {
+    mocks.apiRequest.mockResolvedValue({
+      items: [
+        {
+          ...reviewPayload,
+          resource: { kind: 'attachmentVersion', id: 'version-1' },
+          checklistRevision: null,
+          lastDecision: null,
+        },
+        reviewPayload,
+      ],
+      nextCursor: null,
+    });
+    const { listReviews } = await import('../reviews');
+
+    const result = await listReviews(WS, PROJECT);
+
+    expect(result.items[0].resource).toEqual({ kind: 'attachmentVersion', id: 'version-1' });
+    expect(result.items[1].resource).toEqual({ kind: 'checklist', id: 'checklist-1', revision: 3 });
+    expect(result.items[1].checklistRevision).toBe(3);
+  });
+
   it('createReview posts a typed checklist target and unwraps the review', async () => {
     mocks.apiRequest.mockResolvedValue({ review: reviewPayload });
     const { createReview } = await import('../reviews');
@@ -316,7 +401,7 @@ describe('reviews service', () => {
 
     expect(result.review).toMatchObject({
       id: REVIEW,
-      resource: { kind: 'attachmentVersion', id: 'version-1' },
+      resource: { kind: 'unknown', id: 'version-1' },
       status: 'SUBMITTED',
       round: 1,
       assigneeId: null,

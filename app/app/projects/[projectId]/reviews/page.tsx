@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Textarea } from '@/components/ui/Textarea';
 import { useWorkspaceRedirect } from '@/hooks/useWorkspaceRedirect';
 import { ApiRequestError } from '@/lib/api';
+import { safeExternalUrl } from '@/lib/safe-url';
 import { usePermissions } from '@/providers/ProjectPermissionsProvider';
 import { useWorkspaceContext } from '@/providers/WorkspaceProvider';
 import type { ProjectRoleDefinition } from '@/services/projects';
@@ -58,7 +59,10 @@ function formatWhen(value?: string | null): string {
 }
 
 function targetLabel(review: ReviewView): string {
-  return review.resource?.kind === 'checklist' ? 'Checklist' : 'Attachment version';
+  if (review.resource?.kind === 'checklist') return 'Checklist';
+  if (review.resource?.kind === 'attachmentVersion') return 'Attachment version';
+  if (review.resource?.kind === 'task') return 'Task';
+  return 'Review';
 }
 
 function isOpenStatus(status: ReviewStatus): boolean {
@@ -437,11 +441,18 @@ export default function ProjectReviewsPage() {
                 <h3 id="review-target-heading" className="text-sm font-semibold">Target</h3>
                 <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
                   <div><dt className="text-xs text-[var(--color-text-secondary)]">Type</dt><dd>{targetLabel(detail)}</dd></div>
-                  <div><dt className="text-xs text-[var(--color-text-secondary)]">Target ID</dt><dd className="break-all">{detail.resource?.id || '—'}</dd></div>
                   <div>
-                    <dt className="text-xs text-[var(--color-text-secondary)]">Checklist revision</dt>
-                    <dd>{detail.checklistRevision ?? detail.resource?.revision ?? '—'}</dd>
+                    <dt className="text-xs text-[var(--color-text-secondary)]">
+                      {detail.resource?.kind === 'task' ? 'Task ID' : 'Target ID'}
+                    </dt>
+                    <dd className="break-all">{detail.resource?.id || '—'}</dd>
                   </div>
+                  {detail.resource?.kind !== 'task' ? (
+                    <div>
+                      <dt className="text-xs text-[var(--color-text-secondary)]">Checklist revision</dt>
+                      <dd>{detail.checklistRevision ?? detail.resource?.revision ?? '—'}</dd>
+                    </div>
+                  ) : null}
                   <div><dt className="text-xs text-[var(--color-text-secondary)]">Assignee</dt><dd>{nameFor(detail.assigneeId)}</dd></div>
                 </dl>
               </section>
@@ -456,6 +467,36 @@ export default function ProjectReviewsPage() {
                     Submit a new review
                   </Link>
                 </Alert>
+              ) : null}
+
+              {detail.resource?.kind === 'task' && (safeExternalUrl(detail.artworkUrl) || (detail.decisions?.length ?? 0) > 0) ? (
+                <section aria-labelledby="review-task-details-heading" className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+                  <h3 id="review-task-details-heading" className="text-sm font-semibold">Task review details</h3>
+                  {safeExternalUrl(detail.artworkUrl) ? (
+                    <p className="mt-2 text-sm">
+                      <span className="text-xs text-[var(--color-text-secondary)]">Artwork</span>
+                      <br />
+                      <a
+                        href={safeExternalUrl(detail.artworkUrl) ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="break-all underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                      >
+                        {safeExternalUrl(detail.artworkUrl)}
+                      </a>
+                    </p>
+                  ) : null}
+                  {(detail.decisions?.length ?? 0) > 0 ? (
+                    <div className="mt-3">
+                      <p className="text-xs text-[var(--color-text-secondary)]">Decisions needed</p>
+                      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
+                        {(detail.decisions ?? []).map((decision, index) => (
+                          <li key={`${index}-${decision}`}>{decision}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </section>
               ) : null}
 
               <section aria-labelledby="latest-decision-heading">

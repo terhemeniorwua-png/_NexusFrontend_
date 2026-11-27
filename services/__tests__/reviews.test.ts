@@ -401,7 +401,7 @@ describe('reviews service', () => {
 
     expect(result.review).toMatchObject({
       id: REVIEW,
-      resource: { kind: 'attachmentVersion', id: 'version-1' },
+      resource: { kind: 'unknown', id: 'version-1' },
       status: 'SUBMITTED',
       round: 1,
       assigneeId: null,

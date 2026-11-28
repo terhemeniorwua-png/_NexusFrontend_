@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GET, POST } from './route';
+import { GET, POST, ALLOWED_API_PREFIXES } from './route';
 
 describe('same-origin backend proxy', () => {
   beforeEach(() => {
@@ -139,5 +139,90 @@ describe('same-origin backend proxy', () => {
 
     expect(response.status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Onboarding routes
+  // ---------------------------------------------------------------------------
+
+  it.each([
+    [['onboarding', 'status'], 'GET', 'http://localhost:4000/api/v1/onboarding/status'],
+    [['onboarding', 'accept'], 'POST', 'http://localhost:4000/api/v1/onboarding/accept'],
+    [['onboarding', 'ai'], 'POST', 'http://localhost:4000/api/v1/onboarding/ai'],
+    [['onboarding', 'step'], 'POST', 'http://localhost:4000/api/v1/onboarding/step'],
+    [['onboarding', 'complete'], 'POST', 'http://localhost:4000/api/v1/onboarding/complete'],
+  ])('proxies %s %s to the upstream', async (path, method, expectedUrl) => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: {} }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const request = new NextRequest(
+      `http://localhost/api/backend/${path.join('/')}`,
+      { method },
+    );
+
+    const response = method === 'GET'
+      ? await GET(request, { params: Promise.resolve({ path }) })
+      : await POST(request, { params: Promise.resolve({ path }) });
+
+    expect(response.status).toBe(200);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(expectedUrl);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ method }),
+    );
+  });
+
+  it('rejects an unknown prefix that is not in the onboarding allowlist', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const request = new NextRequest('http://localhost/api/backend/onboardingx/status');
+
+    const response = await GET(request, { params: Promise.resolve({ path: ['onboardingx', 'status'] }) });
+
+    expect(response.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects path traversal inside onboarding', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const request = new NextRequest('http://localhost/api/backend/onboarding/%2E%2E');
+
+    const response = await GET(request, { params: Promise.resolve({ path: ['onboarding', '..'] }) });
+
+    expect(response.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Coverage: every service-level root prefix must be in the allowlist
+  // ---------------------------------------------------------------------------
+
+  it('ALLOWED_API_PREFIXES covers every root path prefix used by the frontend services', () => {
+    // These are the definitive root-level first path segments that services/*.ts
+    // send through /api/backend/. Any addition to a service must be reflected
+    // here and in ALLOWED_API_PREFIXES.
+    const SERVICE_ROOT_PREFIXES = [
+      'auth',
+      'users',
+      'workspaces',
+      'invitations',
+      'billing',
+      'notifications',
+      'integrations',
+      'imports',
+      'search',
+      'ai',
+      'privacy-requests',
+      'onboarding',
+    ] as const;
+
+    for (const prefix of SERVICE_ROOT_PREFIXES) {
+      expect(
+        (ALLOWED_API_PREFIXES as readonly string[]).includes(prefix),
+        `"${prefix}" is used by a service but missing from ALLOWED_API_PREFIXES`,
+      ).toBe(true);
+    }
   });
 });

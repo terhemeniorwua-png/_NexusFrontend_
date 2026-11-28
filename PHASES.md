@@ -787,8 +787,7 @@ These describe backend contract requirements; they are not OAuth routes implemen
 
 #### Live authentication verification — 2026-11-11 (LIVE BACKEND)
 
-Live authentication was exercised against the configured backend at
-`https://nexusbackend-1-0ffo.onrender.com/api/v1` (from `.env`). All Phase 3
+Live authentication was exercised against the configured backend (from `.env`). All Phase 3
 auth workflows were verified end-to-end:
 
 | Workflow | Endpoint | Result |

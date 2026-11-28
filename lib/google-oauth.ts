@@ -1,5 +1,6 @@
 import type { AuthAccountType } from '@/types/auth';
 import { safeRedirectPath } from '@/lib/redirect';
+import { getBackendOrigin } from '@/lib/api-base-url';
 
 const GOOGLE_OAUTH_INTENT_KEY = 'nexus-google-oauth-intent';
 
@@ -30,8 +31,8 @@ export function beginGoogleOAuth(
   }
   // Start on the backend's own origin so the state cookie is set on the same
   // host Google redirects back to (a proxied start would store it on the frontend host).
-  const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN ?? 'https://nexusbackend-1-0ffo.onrender.com';
-  navigate(`${backendOrigin.replace(/\/+$/, '')}/api/v1/auth/google`);
+  const backendOrigin = getBackendOrigin();
+  navigate(`${backendOrigin}/api/v1/auth/google`);
 }
 
 export function readGoogleOAuthIntent(): GoogleOAuthIntent | null {

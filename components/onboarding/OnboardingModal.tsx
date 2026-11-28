@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal } from '@/components/ui/Modal';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -10,6 +9,7 @@ import {
   completeOnboarding,
   getOnboardingStatus,
   type OnboardingStep,
+  type OnboardingStatus,
 } from '@/services/onboarding';
 import type { Workspace } from '@/services/workspaces';
 
@@ -44,7 +44,11 @@ const STEP_DESCRIPTIONS: Record<OnboardingStep, string> = {
 interface OnboardingModalProps {
   open: boolean;
   onClose: () => void;
-  onComplete: () => void;
+  /**
+   * Called when the returned OnboardingStatus has required === false, so the
+   * shell can close the modal immediately without a page reload.
+   */
+  onComplete: (status?: OnboardingStatus) => void;
   userName: string;
   userEmail: string;
   workspace: Workspace | null;
@@ -60,9 +64,9 @@ export function OnboardingModal({
   const [statusError, setStatusError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome');
   const [stepError, setStepError] = useState<string | null>(null);
-  const [busyStep, setBusyStep] = useState<OnboardingStep | null>(null);
-  const [direction, setDirection] = useState<'next' | 'back' | null>(null);
+  const [busy, setBusy] = useState(false);
   const [stepKey, setStepKey] = useState(0);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const includeInviteStep =
     workspace != null && workspace.type !== 'INDIVIDUAL' && !workspace.isPersonal;
@@ -82,17 +86,15 @@ export function OnboardingModal({
 
   // Terms and Privacy are legally required and cannot be skipped or dismissed.
   const requiredSteps = new Set(['terms', 'privacy']);
+  const isRequired = requiredSteps.has(currentStep);
+  const showSkip = !isRequired && !isLastStep;
 
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  });
+  // Scroll the body to the top whenever the step changes (P1 fix).
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const handler = () => { setPrefersReducedMotion(mq.matches); };
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
+    if (bodyRef.current) {
+      bodyRef.current.scrollTop = 0;
+    }
+  }, [currentStep, stepKey]);
 
   // Fetch onboarding status when the modal opens so the user resumes at the
   // current step rather than always restarting at Welcome. Progress lives on
@@ -124,65 +126,72 @@ export function OnboardingModal({
     };
   }, [open, steps]);
 
-  // The modal is never dismissible mid-flow. Escape / backdrop / X are no-ops
-  // until onboarding completes (onClose is only invoked from Done).
-  const handleClose = useCallback(() => {
-    // Intentional no-op: the flow must be completed before the modal closes.
-  }, []);
+  /**
+   * Apply a fresh OnboardingStatus returned by an action.
+   * If the status says required === false, tell the shell to close immediately.
+   */
+  const applyStatus = useCallback(
+    (status: OnboardingStatus | null | undefined) => {
+      if (!status) return;
+      if (status.required === false || status.completedAt != null) {
+        onComplete(status);
+        return;
+      }
+      const serverStep = status.currentStep;
+      if (serverStep && steps.includes(serverStep)) {
+        setCurrentStep(serverStep);
+        setStepKey((k) => k + 1);
+      }
+    },
+    [onComplete, steps],
+  );
 
   const handleAdvance = useCallback(
     async (step: OnboardingStep, action: 'complete' | 'skip' = 'complete') => {
       setStepError(null);
-      setBusyStep(step);
-      setDirection('next');
+      setBusy(true);
       try {
-        await advanceStep({ step, action });
+        // P2 fix: apply the returned status so the next step renders immediately.
+        const status = await advanceStep({ step, action });
         const nextIndex = currentIndex + 1;
         if (nextIndex < steps.length) {
           setStepKey((k) => k + 1);
           setCurrentStep(steps[nextIndex]);
         }
+        // Also update the shell with the latest status (closes modal if done).
+        applyStatus(status);
       } catch (cause) {
         const message =
           cause instanceof Error ? cause.message : 'Could not complete this step.';
         setStepError(message);
       } finally {
-        setBusyStep(null);
+        setBusy(false);
       }
     },
-    [currentIndex, steps],
+    [currentIndex, steps, applyStatus],
   );
 
   const handleDone = useCallback(async () => {
     setStepError(null);
-    setBusyStep('done');
-    setDirection('next');
+    setBusy(true);
     try {
-      await completeOnboarding();
-      onComplete();
+      const status = await completeOnboarding();
+      onComplete(status);
     } catch (cause) {
       const message =
         cause instanceof Error ? cause.message : 'Could not complete onboarding.';
       setStepError(message);
     } finally {
-      setBusyStep(null);
+      setBusy(false);
     }
   }, [onComplete]);
 
   const handleBack = useCallback(() => {
     if (isFirstStep) return;
-    setDirection('back');
     const prevIndex = currentIndex - 1;
     setStepKey((k) => k + 1);
     setCurrentStep(steps[prevIndex]);
   }, [currentIndex, steps, isFirstStep]);
-
-  const stepTitle = STEP_LABELS[currentStep] ?? 'Onboarding';
-  const stepDescription = STEP_DESCRIPTIONS[currentStep] ?? '';
-  const isRequired = requiredSteps.has(currentStep);
-  const showSkip = !isRequired && !isLastStep;
-
-  const continueLabel = isLastStep ? 'Finish setup' : 'Continue';
 
   const renderStep = () => {
     switch (currentStep) {
@@ -192,7 +201,7 @@ export function OnboardingModal({
             key={stepKey}
             userName={userName}
             onComplete={() => void handleAdvance('welcome')}
-            busy={busyStep === 'welcome'}
+            busy={busy}
           />
         );
       case 'terms':
@@ -201,7 +210,7 @@ export function OnboardingModal({
             key={stepKey}
             onComplete={() => void handleAdvance('terms')}
             onError={setStepError}
-            busy={busyStep === 'terms'}
+            busy={busy}
           />
         );
       case 'privacy':
@@ -210,7 +219,7 @@ export function OnboardingModal({
             key={stepKey}
             onComplete={() => void handleAdvance('privacy')}
             onError={setStepError}
-            busy={busyStep === 'privacy'}
+            busy={busy}
           />
         );
       case 'profile':
@@ -220,7 +229,7 @@ export function OnboardingModal({
             userName={userName}
             onComplete={(action) => void handleAdvance('profile', action)}
             onError={setStepError}
-            busy={busyStep === 'profile'}
+            busy={busy}
           />
         );
       case 'invite':
@@ -230,7 +239,7 @@ export function OnboardingModal({
             workspace={workspace}
             onComplete={(action) => void handleAdvance('invite', action)}
             onError={setStepError}
-            busy={busyStep === 'invite'}
+            busy={busy}
           />
         );
       case 'ai':
@@ -239,7 +248,7 @@ export function OnboardingModal({
             key={stepKey}
             onComplete={(action) => void handleAdvance('ai', action)}
             onError={setStepError}
-            busy={busyStep === 'ai'}
+            busy={busy}
           />
         );
       case 'done':
@@ -247,7 +256,7 @@ export function OnboardingModal({
           <DoneStep
             key={stepKey}
             onComplete={handleDone}
-            busy={busyStep === 'done'}
+            busy={busy}
           />
         );
       default:
@@ -256,110 +265,161 @@ export function OnboardingModal({
   };
 
   const progressPct = totalSteps > 0 ? (stepNumber / totalSteps) * 100 : 0;
+  const continueLabel = isLastStep ? 'Finish setup' : 'Continue';
+
+  if (!open) return null;
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={stepTitle}
-      description={stepDescription}
-      maxWidth="lg"
-      className="max-w-[600px]"
+    // Overlay: fixed, inset-0, overflow-y-auto so the modal is always reachable
+    // even on very small screens where the modal approaches full height.
+    <div
+      role="presentation"
+      className="fixed inset-0 z-[var(--z-modal)] overflow-y-auto flex items-start sm:items-center justify-center p-4"
     >
-      {/* Progress indicator */}
-      <div className="px-5 py-3 border-b border-[var(--color-border)]">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-medium text-[var(--color-text-secondary)]">
-            Step {stepNumber} of {totalSteps}
-          </p>
-          {statusError && (
-            <span className="text-xs text-[var(--color-error)]">{statusError}</span>
-          )}
-        </div>
-        <div
-          role="progressbar"
-          aria-label="Onboarding progress"
-          aria-valuenow={stepNumber}
-          aria-valuemin={1}
-          aria-valuemax={totalSteps}
-          className="w-full h-1.5 rounded-full bg-[var(--color-surface-secondary)] overflow-hidden"
-        >
-          <div
-            className="h-full bg-[var(--color-primary)] transition-all duration-300"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-      </div>
+      {/* Dimmed backdrop */}
+      <div aria-hidden="true" className="absolute inset-0 bg-black/40" />
 
-      {/* Status error alert */}
-      {statusError && (
-        <div className="px-5 pt-4 pb-2">
-          <Alert variant="error" title="Unable to load onboarding">
-            {statusError}
-          </Alert>
-        </div>
-      )}
-
-      {/* Step error alert */}
-      {stepError && (
-        <div className="px-5 pt-2 pb-2">
-          <Alert variant="error" title="Unable to complete step">
-            {stepError}
-          </Alert>
-        </div>
-      )}
-
-      {/* Step content */}
+      {/* Dialog panel: flex column, max-height bounded to viewport */}
       <div
+        role="dialog"
+        aria-labelledby="onboarding-modal-title"
+        aria-describedby="onboarding-modal-desc"
         className={[
-          'flex-1 overflow-y-auto px-5 py-4',
-          'transition-opacity duration-200 ease-in-out',
-          prefersReducedMotion ? 'duration-0' : '',
-          direction === null ? 'opacity-100' : 'opacity-0',
+          'relative z-10 w-full max-w-[600px]',
+          'flex flex-col',
+          // P1 fix: cap height so the modal never overflows the viewport.
+          // calc(100dvh - 2rem) leaves 1 rem of breathing room top and bottom.
+          'max-h-[calc(100dvh-2rem)]',
+          'rounded-[var(--radius-xl)]',
+          'bg-[var(--color-surface)] shadow-[var(--shadow-lg)]',
         ].join(' ')}
       >
-        {loading && (
-          <div className="flex flex-col gap-4">
-            <Skeleton className="h-5 w-1/3" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
+        {/* ── Fixed header ── */}
+        <div className="flex-shrink-0 border-b border-[var(--color-border)] px-5 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2
+                id="onboarding-modal-title"
+                className="text-base font-semibold text-[var(--color-text-primary)]"
+              >
+                {STEP_LABELS[currentStep] ?? 'Onboarding'}
+              </h2>
+              <p
+                id="onboarding-modal-desc"
+                className="mt-0.5 text-sm text-[var(--color-text-secondary)]"
+              >
+                {STEP_DESCRIPTIONS[currentStep] ?? ''}
+              </p>
+            </div>
           </div>
-        )}
-        {!loading && renderStep()}
-      </div>
+        </div>
 
-      {/* Footer navigation */}
-      <div className="flex items-center justify-between gap-3 border-t border-[var(--color-border)] px-5 py-3">
-        {!isFirstStep && (
-          <Button
-            variant="secondary"
-            size="md"
-            disabled={busyStep != null}
-            onClick={handleBack}
+        {/* ── Fixed progress bar ── */}
+        <div className="flex-shrink-0 px-5 py-3 border-b border-[var(--color-border)]">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-[var(--color-text-secondary)]">
+              Step {stepNumber} of {totalSteps}
+            </p>
+            {statusError && (
+              <span className="text-xs text-[var(--color-error)]">{statusError}</span>
+            )}
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Onboarding progress"
+            aria-valuenow={stepNumber}
+            aria-valuemin={1}
+            aria-valuemax={totalSteps}
+            className="w-full h-1.5 rounded-full bg-[var(--color-surface-secondary)] overflow-hidden"
           >
-            Back
-          </Button>
-        )}
-        <span className="text-xs text-[var(--color-text-secondary)]">
-          {isRequired ? 'Required step' : showSkip ? 'Optional step' : ''}
-        </span>
-        <Button
-          size="md"
-          loading={busyStep != null}
-          disabled={busyStep != null}
-          onClick={() => {
-            if (showSkip) {
-              void handleAdvance(currentStep, 'skip');
-            } else if (isLastStep) {
-              void handleDone();
-            } else {
-              void handleAdvance(currentStep, 'complete');
-            }
-          }}
+            <div
+              className="h-full bg-[var(--color-primary)] transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
+
+        {/* ── Scrollable body ── */}
+        {/* min-h-0 is required for flex children to shrink below their content size */}
+        <div
+          ref={bodyRef}
+          className="flex-1 min-h-0 overflow-y-auto px-5 py-4"
         >
-          {showSkip ? 'Skip for now' : continueLabel}
-        </Button>
+          {/* Status error */}
+          {statusError && (
+            <div className="mb-4">
+              <Alert variant="error" title="Unable to load onboarding">
+                {statusError}
+              </Alert>
+            </div>
+          )}
+
+          {/* Step error with retry */}
+          {stepError && (
+            <div className="mb-4" role="alert">
+              <Alert variant="error" title="Unable to complete step">
+                <span>{stepError}</span>{' '}
+                <button
+                  type="button"
+                  onClick={() => setStepError(null)}
+                  className="ml-1 underline text-xs"
+                >
+                  Dismiss
+                </button>
+              </Alert>
+            </div>
+          )}
+
+          {/* Step content */}
+          {loading ? (
+            <div className="flex flex-col gap-4">
+              <Skeleton className="h-5 w-1/3" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          ) : (
+            renderStep()
+          )}
+        </div>
+
+        {/* ── Fixed footer with action buttons ── */}
+        <div
+          data-testid="onboarding-footer"
+          className="flex-shrink-0 flex items-center justify-between gap-3 border-t border-[var(--color-border)] px-5 py-3"
+        >
+          {!isFirstStep ? (
+            <Button
+              variant="secondary"
+              size="md"
+              disabled={busy}
+              onClick={handleBack}
+            >
+              Back
+            </Button>
+          ) : (
+            <span />
+          )}
+          <span className="text-xs text-[var(--color-text-secondary)]">
+            {isRequired ? 'Required step' : showSkip ? 'Optional step' : ''}
+          </span>
+          <Button
+            size="md"
+            loading={busy}
+            disabled={busy}
+            onClick={() => {
+              if (showSkip) {
+                void handleAdvance(currentStep, 'skip');
+              } else if (isLastStep) {
+                void handleDone();
+              } else {
+                void handleAdvance(currentStep, 'complete');
+              }
+            }}
+          >
+            {showSkip ? 'Skip for now' : continueLabel}
+          </Button>
+        </div>
       </div>
-    </Modal>
+    </div>
   );
 }

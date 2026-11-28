@@ -115,3 +115,104 @@ export function getApiBaseUrl(): string {
   const isDev = process.env.NODE_ENV !== 'production';
   return resolveApiBaseUrl(process.env.NEXUS_API_URL, isDev);
 }
+
+// ---------------------------------------------------------------------------
+// Backend origin resolution (NEXT_PUBLIC_BACKEND_ORIGIN)
+// ---------------------------------------------------------------------------
+
+const ORIGIN_DEV_FALLBACK = 'http://localhost:4000';
+const API_V1_SUFFIX = '/api/v1';
+
+/**
+ * Parse and sanitise NEXT_PUBLIC_BACKEND_ORIGIN.
+ *
+ * Rules (identical to resolveApiBaseUrl except the path handling):
+ *   1. Splits on commas.
+ *   2. Trims whitespace.
+ *   3. Drops empty parts.
+ *   4. Picks the first valid http(s) URL.
+ *   5. Strips trailing slashes.
+ *   6. Strips any trailing /api/v1 suffix — the caller appends its own path.
+ *
+ * In development falls back to http://localhost:4000 and warns when multiple
+ * URL candidates were present.
+ * In production throws if the value is missing or invalid.
+ *
+ * @param rawValue - The raw string from process.env.NEXT_PUBLIC_BACKEND_ORIGIN
+ * @param isDev    - Whether the app is running in development mode
+ * @returns        - A clean origin URL with no trailing slash and no /api/v1
+ * @throws         - In production when no valid URL can be found
+ */
+export function resolveBackendOrigin(rawValue: string | undefined, isDev: boolean): string {
+  if (!rawValue || rawValue.trim() === '') {
+    if (isDev) {
+      console.warn(
+        '[nexus] NEXT_PUBLIC_BACKEND_ORIGIN is not set. ' +
+          'Falling back to ' + ORIGIN_DEV_FALLBACK + ' for development.',
+      );
+      return ORIGIN_DEV_FALLBACK;
+    }
+    throw new Error(
+      'NEXT_PUBLIC_BACKEND_ORIGIN is not configured. ' +
+        'Set it to a single URL such as https://api.example.com.',
+    );
+  }
+
+  const candidates = rawValue
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  if (candidates.length > 1 && isDev) {
+    console.warn(
+      '[nexus] NEXT_PUBLIC_BACKEND_ORIGIN contains ' +
+        candidates.length +
+        ' comma-separated values. Only the first valid URL will be used. ' +
+        'Set the variable to a single URL with no spaces or commas.',
+    );
+  }
+
+  for (const candidate of candidates) {
+    let parsed: URL;
+    try {
+      parsed = new URL(candidate);
+    } catch {
+      continue;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+
+    // Strip trailing slashes then strip /api/v1 suffix if present.
+    let href = parsed.toString().replace(/\/+$/, '');
+    if (href.endsWith(API_V1_SUFFIX)) {
+      href = href.slice(0, href.length - API_V1_SUFFIX.length);
+    }
+
+    return href;
+  }
+
+  if (isDev) {
+    console.warn(
+      '[nexus] NEXT_PUBLIC_BACKEND_ORIGIN ("' +
+        rawValue.slice(0, 80) +
+        '") does not contain a valid http(s) URL. ' +
+        'Falling back to ' + ORIGIN_DEV_FALLBACK + ' for development.',
+    );
+    return ORIGIN_DEV_FALLBACK;
+  }
+  throw new Error(
+    'NEXT_PUBLIC_BACKEND_ORIGIN ("' +
+      rawValue.slice(0, 80) +
+      '") does not contain a valid http(s) URL. ' +
+      'Set it to a single URL such as https://api.example.com.',
+  );
+}
+
+/**
+ * Return the sanitised backend origin for client-side OAuth starts.
+ *
+ * Reads `process.env.NEXT_PUBLIC_BACKEND_ORIGIN` and `process.env.NODE_ENV`.
+ */
+export function getBackendOrigin(): string {
+  const isDev = process.env.NODE_ENV !== 'production';
+  return resolveBackendOrigin(process.env.NEXT_PUBLIC_BACKEND_ORIGIN, isDev);
+}

@@ -304,13 +304,29 @@ export async function listReviews(
   };
 }
 
+function serialiseDecisions(
+  decisions: string[] | undefined,
+): Array<{ text: string }> | undefined {
+  if (decisions === undefined) return undefined;
+  return decisions.map((text) => ({ text }));
+}
+
 export async function createReview(
   workspaceId: string,
   projectId: string,
   input: CreateReviewInput,
 ): Promise<ReviewResult> {
   const path = reviewsPath(workspaceId, projectId);
-  const data = await request<unknown>(path, post(path, input));
+  const body: Record<string, unknown> = { ...input };
+  if ('decisions' in input) {
+    const serialised = serialiseDecisions(input.decisions);
+    if (serialised !== undefined) {
+      body['decisions'] = serialised;
+    } else {
+      delete body['decisions'];
+    }
+  }
+  const data = await request<unknown>(path, post(path, body));
   return { review: normaliseReview(unwrapRecord(data, 'review')) };
 }
 
@@ -377,9 +393,18 @@ export async function updateReview(
   input: UpdateReviewInput,
 ): Promise<ReviewResult> {
   const path = reviewsPath(workspaceId, projectId, reviewId);
+  const body: Record<string, unknown> = { ...input };
+  if ('decisions' in input) {
+    const serialised = serialiseDecisions(input.decisions);
+    if (serialised !== undefined) {
+      body['decisions'] = serialised;
+    } else {
+      delete body['decisions'];
+    }
+  }
   const data = await request<unknown>(path, {
     method: 'PATCH',
-    body: JSON.stringify(input),
+    body: JSON.stringify(body),
   });
   return { review: normaliseReview(unwrapRecord(data, 'review')) };
 }

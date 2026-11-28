@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 const REQUEST_HEADERS = ['authorization', 'content-type', 'cookie', 'user-agent', 'x-csrf-token'] as const;
 const RESPONSE_HEADERS = ['cache-control', 'content-type', 'etag', 'content-disposition', 'content-length', 'x-request-id'] as const;
@@ -17,8 +18,10 @@ async function forwardRequest(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ): Promise<Response> {
-  const configuredBase = process.env.NEXUS_API_URL;
-  if (!configuredBase) {
+  let configuredBase: string;
+  try {
+    configuredBase = getApiBaseUrl();
+  } catch {
     return Response.json({ success: false, error: { code: 'API_NOT_CONFIGURED', message: 'The Nexus API is not configured.' } }, { status: 503 });
   }
 
@@ -32,10 +35,7 @@ async function forwardRequest(
       || path.some((segment) => !SEGMENT_PATTERN.test(segment))) {
       return Response.json({ success: false, error: { code: 'NOT_FOUND', message: 'The requested API route was not found.' } }, { status: 404 });
     }
-    const base = new URL(configuredBase);
-    if (base.protocol !== 'http:' && base.protocol !== 'https:') throw new Error('Unsupported protocol');
-    const normalizedBase = base.toString().replace(/\/$/, '');
-    upstreamUrl = new URL(`${normalizedBase}/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`);
+    upstreamUrl = new URL(`${configuredBase}/${path.map(encodeURIComponent).join('/')}${request.nextUrl.search}`);
   } catch {
     return Response.json({ success: false, error: { code: 'API_NOT_CONFIGURED', message: 'The Nexus API configuration is invalid.' } }, { status: 503 });
   }

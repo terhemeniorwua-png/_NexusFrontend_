@@ -8,8 +8,25 @@ const RESPONSE_HEADERS = ['cache-control', 'content-type', 'etag', 'content-disp
  * Backend API prefixes the browser is allowed to reach through the same-origin
  * proxy. Every prefix is a module the frontend actually consumes; anything
  * else is rejected so the proxy cannot become an open relay.
+ *
+ * Keep this list in sync with the top-level path segments used by
+ * services/*.ts. The route.test.ts suite asserts every entry is reachable
+ * and that every service-level root prefix is present here.
  */
-const ALLOWED_API_PREFIXES = ['auth', 'users', 'workspaces', 'invitations', 'billing', 'notifications', 'integrations', 'imports', 'search', 'ai', 'privacy-requests'] as const;
+export const ALLOWED_API_PREFIXES = [
+  'auth',
+  'users',
+  'workspaces',
+  'invitations',
+  'billing',
+  'notifications',
+  'integrations',
+  'imports',
+  'search',
+  'ai',
+  'privacy-requests',
+  'onboarding',
+] as const;
 
 /** Path segments must be URL-safe; invitation and join-code tokens are base64url. */
 const SEGMENT_PATTERN = /^[a-zA-Z0-9_-]+$/;

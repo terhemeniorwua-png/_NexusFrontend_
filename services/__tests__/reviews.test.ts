@@ -423,4 +423,119 @@ describe('reviews service', () => {
       ]),
     );
   });
+
+  // -------------------------------------------------------------------------
+  // decisions serialisation: string[] → [{text}] on the wire
+  // -------------------------------------------------------------------------
+
+  it('createReview serialises string[] decisions as [{text}] in the request body', async () => {
+    mocks.apiRequest.mockResolvedValue({ review: reviewPayload });
+    const { createReview } = await import('../reviews');
+
+    await createReview(WS, PROJECT, {
+      taskId: 'task-1',
+      decisions: ['Approve hero', 'Keep spacing'],
+    });
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      BASE,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          taskId: 'task-1',
+          decisions: [{ text: 'Approve hero' }, { text: 'Keep spacing' }],
+        }),
+      }),
+    );
+  });
+
+  it('createReview sends decisions as [] when given an empty array', async () => {
+    mocks.apiRequest.mockResolvedValue({ review: reviewPayload });
+    const { createReview } = await import('../reviews');
+
+    await createReview(WS, PROJECT, { taskId: 'task-1', decisions: [] });
+
+    const body = JSON.parse(
+      (mocks.apiRequest.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as Record<string, unknown>;
+    expect(body['decisions']).toEqual([]);
+  });
+
+  it('createReview omits decisions from the body when undefined', async () => {
+    mocks.apiRequest.mockResolvedValue({ review: reviewPayload });
+    const { createReview } = await import('../reviews');
+
+    await createReview(WS, PROJECT, { taskId: 'task-1' });
+
+    const body = JSON.parse(
+      (mocks.apiRequest.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(body, 'decisions')).toBe(false);
+  });
+
+  it('updateReview serialises string[] decisions as [{text}] in the PATCH body', async () => {
+    mocks.apiRequest.mockResolvedValue({ review: reviewPayload });
+    const { updateReview } = await import('../reviews');
+
+    await updateReview(WS, PROJECT, REVIEW, {
+      round: 2,
+      decisions: ['Check contrast', 'Fix alignment'],
+    });
+
+    expect(mocks.apiRequest).toHaveBeenCalledWith(
+      `${BASE}/${REVIEW}`,
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({
+          round: 2,
+          decisions: [{ text: 'Check contrast' }, { text: 'Fix alignment' }],
+        }),
+      }),
+    );
+  });
+
+  it('updateReview omits decisions from the body when undefined', async () => {
+    mocks.apiRequest.mockResolvedValue({ review: reviewPayload });
+    const { updateReview } = await import('../reviews');
+
+    await updateReview(WS, PROJECT, REVIEW, { round: 1 });
+
+    const body = JSON.parse(
+      (mocks.apiRequest.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(body, 'decisions')).toBe(false);
+  });
+
+  it('normaliseReviewDecisions maps {text} response objects to strings', async () => {
+    mocks.apiRequest.mockResolvedValue({
+      review: {
+        ...reviewPayload,
+        resource: { kind: 'task', id: 'task-1' },
+        taskId: 'task-1',
+        decisions: [{ text: 'Approve hero' }, { text: '  Keep spacing  ' }, { text: '' }],
+      },
+    });
+    const { getReview } = await import('../reviews');
+
+    const result = await getReview(WS, PROJECT, REVIEW);
+
+    // Empty-text entries are dropped; whitespace is trimmed
+    expect(result.review.decisions).toEqual(['Approve hero', 'Keep spacing']);
+  });
+
+  it('normaliseReviewDecisions also accepts plain strings from the response', async () => {
+    mocks.apiRequest.mockResolvedValue({
+      review: {
+        ...reviewPayload,
+        resource: { kind: 'task', id: 'task-1' },
+        taskId: 'task-1',
+        decisions: ['  Plain A  ', '  Plain B  '],
+      },
+    });
+    const { getReview } = await import('../reviews');
+
+    const result = await getReview(WS, PROJECT, REVIEW);
+
+    expect(result.review.decisions).toEqual(['Plain A', 'Plain B']);
+  });
 });

@@ -66,8 +66,12 @@ import {
   type LinkedProjectRepository,
   type TaskDevLink,
 } from '@/services/dev-integrations';
+import { listProjectMembers, type ProjectMember } from '@/services/projects';
+import { listReviews, type ReviewView } from '@/services/reviews';
+import { RequestDesignReviewDialog } from '@/components/reviews/RequestDesignReviewDialog';
+import { DesignReviewPanel } from '@/components/reviews/DesignReviewPanel';
 
-const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'documents', 'attachments', 'development', 'discussion', 'progress', 'activity', 'time'];
+const SECTIONS: WorkspaceSection[] = ['overview', 'subtasks', 'documents', 'attachments', 'development', 'discussion', 'progress', 'activity', 'time', 'design-review'];
 
 function parseSection(hash: string, search: string): WorkspaceSection {
   const h = hash.replace(/^#/, '').toLowerCase();
@@ -137,6 +141,13 @@ export default function TaskWorkPage() {
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
   const [devBusy, setDevBusy] = useState(false);
+
+  // Design review state
+  const [designReview, setDesignReview] = useState<ReviewView | null>(null);
+  const [designReviewLoading, setDesignReviewLoading] = useState(false);
+  const [designReviewError, setDesignReviewError] = useState<string | null>(null);
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
 
   const loadedKeyRef = useRef<string | null>(null);
 
@@ -266,6 +277,23 @@ export default function TaskWorkPage() {
     }
   }, [activeWorkspaceId, projectId, taskId]);
 
+  const loadDesignReview = useCallback(async () => {
+    if (!activeWorkspaceId) return;
+    setDesignReviewLoading(true); setDesignReviewError(null);
+    try {
+      const [page, members] = await Promise.all([
+        listReviews(activeWorkspaceId, projectId, { targetKind: 'task', targetId: taskId, limit: 1 }),
+        listProjectMembers(activeWorkspaceId, projectId).catch(() => []),
+      ]);
+      setDesignReview(page.items[0] ?? null);
+      setProjectMembers(members);
+    } catch (e) {
+      setDesignReviewError(e instanceof ApiRequestError ? e.message : 'Failed to load design review.');
+    } finally {
+      setDesignReviewLoading(false);
+    }
+  }, [activeWorkspaceId, projectId, taskId]);
+
   useEffect(() => {
     if (!workspaceData || !activeWorkspaceId) return;
     if (section === 'discussion') void loadComments();
@@ -274,7 +302,8 @@ export default function TaskWorkPage() {
     if (section === 'progress') void loadProgressUpdates(true);
     if (section === 'time') void loadTimeEntries();
     if (section === 'development') void loadDevelopment();
-  }, [section, workspaceData, activeWorkspaceId, loadComments, loadFiles, loadActivity, loadProgressUpdates, loadTimeEntries, loadDevelopment]);
+    if (section === 'design-review') void loadDesignReview();
+  }, [section, workspaceData, activeWorkspaceId, loadComments, loadFiles, loadActivity, loadProgressUpdates, loadTimeEntries, loadDevelopment, loadDesignReview]);
 
   useEffect(() => {
     if (!workspaceData || !activeWorkspaceId || !timeTrackingEnabled) return;
@@ -604,6 +633,81 @@ export default function TaskWorkPage() {
           finally { setTimeBusy(false); }
         }}
       />
+    );
+  } else if (section === 'design-review') {
+    const reviewerNameResolved = designReview?.assigneeId
+      ? (projectMembers.find((m) => m.userId === designReview.assigneeId)?.user.name ?? null)
+      : null;
+    const submitterNameResolved = designReview?.submittedById
+      ? (designReview.submittedById === currentUserId
+          ? (user?.name ?? null)
+          : (projectMembers.find((m) => m.userId === designReview?.submittedById)?.user.name ??
+             task?.assignees.find((a) => a.userId === designReview?.submittedById)?.user.name ??
+             null))
+      : null;
+
+    const openReviewExists =
+      Boolean(designReview) && designReview?.status !== 'APPROVED';
+
+    sectionContent = (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">Design review</h2>
+          {can('submission.submit') ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setShowRequestDialog(true)}
+              disabled={openReviewExists}
+              title={openReviewExists ? 'An open review already exists for this task.' : undefined}
+            >
+              Request design review
+            </Button>
+          ) : null}
+        </div>
+
+        {designReviewLoading ? (
+          <div className="space-y-2">
+            <div className="h-6 w-32 animate-pulse rounded bg-[var(--color-surface-secondary)]" />
+            <div className="h-24 w-full animate-pulse rounded bg-[var(--color-surface-secondary)]" />
+          </div>
+        ) : designReviewError ? (
+          <Alert variant="error">{designReviewError}</Alert>
+        ) : designReview ? (
+          <DesignReviewPanel
+            review={designReview}
+            workspaceId={activeWorkspaceId}
+            projectId={projectId}
+            currentUserId={currentUserId}
+            reviewerName={reviewerNameResolved}
+            submitterName={submitterNameResolved}
+            onRefresh={loadDesignReview}
+          />
+        ) : (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            No design review has been requested for this task yet.
+          </p>
+        )}
+
+        <RequestDesignReviewDialog
+          open={showRequestDialog}
+          onClose={() => setShowRequestDialog(false)}
+          workspaceId={activeWorkspaceId}
+          projectId={projectId}
+          taskId={taskId}
+          currentUserId={currentUserId}
+          members={projectMembers}
+          disabledReason={
+            openReviewExists
+              ? 'An open review already exists for this task.'
+              : undefined
+          }
+          onCreated={() => {
+            setShowRequestDialog(false);
+            void loadDesignReview();
+          }}
+        />
+      </div>
     );
   }
 

@@ -76,6 +76,7 @@ export function TaskWorkspaceLayout({
             { value: 'progress', label: 'Progress updates' },
             { value: 'activity', label: 'Activity' },
             { value: 'time', label: 'Time tracking' },
+            { value: 'design-review', label: 'Design review' },
           ]}
         />
       </div>

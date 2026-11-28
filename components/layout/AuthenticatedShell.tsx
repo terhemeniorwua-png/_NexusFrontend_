@@ -258,9 +258,13 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
           onClose={() => {
             // Intentional no-op: the flow cannot be dismissed mid-flow.
           }}
-          onComplete={() => {
+          onComplete={(status) => {
             setShowOnboarding(false);
-            setOnboardingStatus((current) => (current ? { ...current, required: false, completedAt: new Date().toISOString() } : current));
+            if (status) {
+              setOnboardingStatus(status);
+            } else {
+              setOnboardingStatus((current) => (current ? { ...current, required: false, completedAt: new Date().toISOString() } : current));
+            }
           }}
           userName={user.name}
           userEmail={user.email}

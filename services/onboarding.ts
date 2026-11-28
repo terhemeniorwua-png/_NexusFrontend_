@@ -33,6 +33,11 @@ export interface UpdateAIAccessInput {
   enabled: boolean;
 }
 
+export interface UpdateAIAccessResult {
+  aiAccessEnabled: boolean;
+  aiAccessUpdatedAt: string | null;
+}
+
 async function authorizedRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
     return await apiRequest<T>(path, { ...options, authenticated: true });
@@ -49,30 +54,30 @@ export function getOnboardingStatus(): Promise<OnboardingStatus> {
 }
 
 /** Accept a legal document (Terms or Privacy). */
-export function acceptLegalDocument(input: AcceptLegalInput): Promise<{ documentType: string; version: string }> {
-  return authorizedRequest('/onboarding/accept-legal', {
+export function acceptLegalDocument(input: AcceptLegalInput): Promise<OnboardingStatus> {
+  return authorizedRequest<OnboardingStatus>('/onboarding/accept', {
     method: 'POST',
     body: JSON.stringify(input),
   });
 }
 
 /** Mark a step as complete or skipped on the server. */
-export function advanceStep(input: AdvanceStepInput): Promise<{ step: OnboardingStep; action: 'complete' | 'skip' }> {
-  return authorizedRequest('/onboarding/step', {
+export function advanceStep(input: AdvanceStepInput): Promise<OnboardingStatus> {
+  return authorizedRequest<OnboardingStatus>('/onboarding/step', {
     method: 'POST',
     body: JSON.stringify(input),
   });
 }
 
-/** Enable or disable AI access for the workspace. */
-export function updateAIAccess(input: UpdateAIAccessInput): Promise<{ enabled: boolean }> {
-  return authorizedRequest('/onboarding/ai-access', {
-    method: 'PATCH',
+/** Enable or disable AI access for the user. */
+export function updateAIAccess(input: UpdateAIAccessInput): Promise<UpdateAIAccessResult> {
+  return authorizedRequest<UpdateAIAccessResult>('/onboarding/ai', {
+    method: 'POST',
     body: JSON.stringify(input),
   });
 }
 
 /** Finalise onboarding. Called from the Done step. */
-export function completeOnboarding(): Promise<{ completedAt: string }> {
-  return authorizedRequest('/onboarding/complete', { method: 'POST' });
+export function completeOnboarding(): Promise<OnboardingStatus> {
+  return authorizedRequest<OnboardingStatus>('/onboarding/complete', { method: 'POST' });
 }

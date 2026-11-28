@@ -84,7 +84,16 @@ export interface ReviewQuery {
 export interface CreateReviewInput {
   attachmentVersionId?: string;
   checklistId?: string;
+  taskId?: string;
+  artworkUrl?: string;
+  decisions?: string[];
   assigneeId?: string;
+}
+
+export interface UpdateReviewInput {
+  round: number;
+  artworkUrl?: string | null;
+  decisions?: string[];
 }
 
 export interface ApproveReviewInput {
@@ -359,6 +368,20 @@ function normaliseDecisionResult(value: unknown): ReviewDecisionResult {
       decidedAt: '',
     },
   };
+}
+
+export async function updateReview(
+  workspaceId: string,
+  projectId: string,
+  reviewId: string,
+  input: UpdateReviewInput,
+): Promise<ReviewResult> {
+  const path = reviewsPath(workspaceId, projectId, reviewId);
+  const data = await request<unknown>(path, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+  return { review: normaliseReview(unwrapRecord(data, 'review')) };
 }
 
 export async function approveReview(

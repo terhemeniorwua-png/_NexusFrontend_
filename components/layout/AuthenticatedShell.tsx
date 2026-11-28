@@ -65,36 +65,61 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
   const { open: searchOpen, openSearch, closeSearch } = useGlobalSearch();
 
   // ─── Onboarding gate ──────────────────────────────────────────────────────
+  const [onboardingRetry, setOnboardingRetry] = useState(0);
+  const [resolvedGateKey, setResolvedGateKey] = useState<string | null>(null);
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null);
-  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // Fetch onboarding status once the session and workspace are available.
-  // The gate blocks the app until required onboarding completes.
+  function isValidOnboardingStatus(value: unknown): value is OnboardingStatus {
+    if (!value || typeof value !== 'object') return false;
+    const status = value as Record<string, unknown>;
+    return (
+      typeof status.required === 'boolean' &&
+      (status.completedAt === null || typeof status.completedAt === 'string') &&
+      (status.currentStep === null || typeof status.currentStep === 'string') &&
+      Array.isArray(status.pendingLegal) &&
+      typeof status.aiAccessEnabled === 'boolean' &&
+      Array.isArray(status.skippedSteps)
+    );
+  }
+
+  const gateKey = user ? `${user.id}:${onboardingRetry}` : null;
+  const onboardingLoading = gateKey !== null && resolvedGateKey !== gateKey;
+
+  // Fetch onboarding status once the user is loaded. Independent of activeWorkspace
+  // so the gate cannot be skipped when workspace context is unavailable.
   useEffect(() => {
-    if (!user || !activeWorkspace) return;
+    if (!gateKey) return;
+
     let active = true;
     async function load() {
-      setOnboardingLoading(true);
       try {
         const result = await getOnboardingStatus();
         if (!active) return;
-        setOnboardingStatus(result);
-        if (result.required && !result.completedAt) {
-          setShowOnboarding(true);
+        if (!isValidOnboardingStatus(result)) {
+          setOnboardingStatus(null);
+          setShowOnboarding(false);
+          setOnboardingError('We could not confirm your account setup status.');
+          return;
         }
+        setOnboardingStatus(result);
+        setOnboardingError(null);
+        setShowOnboarding(result.required === true && result.completedAt == null);
       } catch {
         if (!active) return;
-        // Do not block the app on a status fetch failure.
+        setOnboardingStatus(null);
+        setShowOnboarding(false);
+        setOnboardingError('We could not confirm your account setup status.');
       } finally {
-        if (active) setOnboardingLoading(false);
+        if (active) setResolvedGateKey(gateKey);
       }
     }
     void load();
     return () => {
       active = false;
     };
-  }, [user, activeWorkspace]);
+  }, [gateKey]);
 
   // Load the avatar URL once the session is ready.
   useEffect(() => {
@@ -179,10 +204,41 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
   // app content never flashes before the gate check completes.
   if (onboardingLoading) {
     return (
-      <div className="mx-auto w-full max-w-xl px-5 py-16">
+      <div className="mx-auto w-full max-w-xl px-5 py-16" role="status" aria-label="Loading account setup">
         <Skeleton className="h-5 w-1/3" />
         <Skeleton className="mt-4 h-4 w-full" />
         <Skeleton className="mt-3 h-4 w-3/4" />
+      </div>
+    );
+  }
+
+  if (onboardingError) {
+    return (
+      <div className="mx-auto w-full max-w-xl px-5 py-16">
+        <Alert variant="error" title="Couldn't load your account setup">
+          {onboardingError} Please retry, or sign out and sign back in.
+        </Alert>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => setOnboardingRetry((count) => count + 1)}
+            className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white"
+          >
+            Retry
+          </button>
+          <button
+            type="button"
+            onClick={() => { void handleSignOut(); }}
+            className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)]"
+          >
+            Sign out
+          </button>
+        </div>
+        {signOutError && (
+          <div className="mt-4">
+            <Alert variant="error" title="Sign out failed">{signOutError}</Alert>
+          </div>
+        )}
       </div>
     );
   }
@@ -192,11 +248,11 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
   if (
     showOnboarding &&
     onboardingStatus != null &&
-    onboardingStatus.required &&
-    !onboardingStatus.completedAt
+    onboardingStatus.required === true &&
+    onboardingStatus.completedAt == null
   ) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[var(--color-background)] p-4">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)] p-4">
         <OnboardingModal
           open={true}
           onClose={() => {
@@ -204,6 +260,7 @@ export function AuthenticatedShell({ children }: { children: React.ReactNode }) 
           }}
           onComplete={() => {
             setShowOnboarding(false);
+            setOnboardingStatus((current) => (current ? { ...current, required: false, completedAt: new Date().toISOString() } : current));
           }}
           userName={user.name}
           userEmail={user.email}
